@@ -31,15 +31,15 @@
   (interactive "p")
   (save-excursion
     (let ((nb (or n 1))
-					(current-line (thing-at-point 'line)))
+          (current-line (thing-at-point 'line)))
       ;; when on last line, insert a newline first
       (when (or (= 1 (forward-line 1)) (eq (point) (point-max)))
-				(insert "\n"))
-      
+        (insert "\n"))
+
       ;; now insert as many time as requested
       (while (> n 0)
-				(insert current-line)
-				(decf n)))))
+        (insert current-line)
+        (decf n)))))
 
 ;; ====================== Common Setting =======================
 ;; TODO: Move common-setting to a more generic file.
@@ -58,10 +58,11 @@
 (global-hl-line-mode 1)
 
 ;; cursor display as a bar
-(setq cursor-type 'bar)
+(setq-default cursor-type 'bar)
 
 ;; tab width
-(setq tab-width 2)
+(setq-default tab-width 2)
+(setq-default indent-tabs-mode nil)
 
 ;; turn off backup file
 (setq make-backup-files nil)
