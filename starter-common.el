@@ -31,18 +31,21 @@
   (interactive "p")
   (save-excursion
     (let ((nb (or n 1))
-    	  (current-line (thing-at-point 'line)))
+					(current-line (thing-at-point 'line)))
       ;; when on last line, insert a newline first
       (when (or (= 1 (forward-line 1)) (eq (point) (point-max)))
-    	(insert "\n"))
+				(insert "\n"))
       
       ;; now insert as many time as requested
       (while (> n 0)
-    	(insert current-line)
-    	(decf n)))))
+				(insert current-line)
+				(decf n)))))
 
 ;; ====================== Common Setting =======================
 ;; TODO: Move common-setting to a more generic file.
+
+;; enable CUA mode
+(cua-mode t)
 
 ;; turn on highlight matching brackets
 (show-paren-mode 1)
@@ -53,6 +56,12 @@
 
 ;; highlight current line
 (global-hl-line-mode 1)
+
+;; cursor display as a bar
+(setq cursor-type 'bar)
+
+;; tab width
+(setq tab-width 2)
 
 ;; turn off backup file
 (setq make-backup-files nil)
