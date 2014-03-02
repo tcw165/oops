@@ -4,9 +4,11 @@
 ;;
 ;;
 
-(add-to-list 'load-path "~/.emacs.d/Starter/3rd-party")
+(add-to-list 'load-path "~/.emacs.d/starter/3rd-party")
 
 (require 'highlight-symbol)
+(require 'highlight-parentheses)
+(require 'auto-complete)
 
 ;; ====================== Common Feature =======================
 
@@ -14,16 +16,14 @@
 (defun starter-kill-current-buffer ()
   ""
   (interactive)
-  (kill-buffer (current-buffer))
-  )
+  (kill-buffer (current-buffer)))
 
 ;; Find tag with symbol under cursor.
 (defun starter-find-definition ()
   (interactive)
   ""
   ;; todo: thingatpt
-  (message "smart find tag")
-  )
+  (message "smart find tag"))
 
 ;; duplicate current line
 (defun starter-duplicate-line (&optional n)
@@ -48,8 +48,8 @@
 (cua-mode t)
 
 ;; turn on highlight matching brackets
-(show-paren-mode 1)
-(setq show-paren-style 'parenthesis)
+;;(show-paren-mode 1)
+;;(setq show-paren-style 'parenthesis)
 
 ;; insert brackets by pairs
 (electric-pair-mode 1)
@@ -77,6 +77,24 @@
 (highlight-symbol-mode t)
 (setq highlight-symbol-idle-delay 0)
 
+;; highlight parentheses function, require 'highlight-parentheses
+;; only for:
+;; emacs-lisp-mode-hook
+(add-hook 'emacs-lisp-mode-hook
+          '(lambda ()
+             (highlight-parentheses-mode)))
+
+;; auto-complete function, require 'auto-complete-config
+;; only for:
+;; emacs-lisp-mode-hook
+(add-hook 'emacs-lisp-mode-hook
+          '(lambda ()
+             (auto-complete-mode)))
+
+;; test for "semantic + ede""
+(semantic-mode t)
+(global-ede-mode t)
+
 ;; ======================== KEY BINDING ========================
 ;; TODO: Move key-binding to a more generic file.
 
@@ -87,19 +105,22 @@
 (global-set-key (kbd "C-w") 'starter-kill-current-buffer)
 (if (eq system-type 'darwin)
   (global-set-key (kbd "s-w") 'starter-kill-current-buffer))
-
 ;; ctrl + d
 (global-set-key (kbd "C-d") 'starter-duplicate-line)
 ;; ctrl + shift + d
 (global-set-key (kbd "C-S-d") 'kill-whole-line)
 
-;; F1
+;; Alt + l
+(global-set-key (kbd "M-l") 'bs-show)
+;; Ctrl + l
+
+;; f1
 ;; F2
 (global-set-key (kbd "<f2>") 'highlight-symbol-at-point)
 ;; F3
 (global-set-key (kbd "<f3>") 'highlight-symbol-next)
 ;; F4
-(global-set-key (kbd "<f4>") 'semantic-ia-fast-jump)
+(global-set-key (kbd "<f4>") 'find-function)
 
 ;; Shift + F1
 ;; Shift + F2
