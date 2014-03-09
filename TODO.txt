@@ -1,0 +1,10 @@
+(defun test4()
+  ""
+  (interactive)
+  (save-excursion
+    (skip-syntax-backward "_w")
+    (setq a (point))
+    (skip-syntax-forward "_w")
+    (setq b (point))
+    (message "%d - %d" a b)
+    ))
