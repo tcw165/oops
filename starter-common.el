@@ -92,8 +92,8 @@
              (auto-complete-mode)))
 
 ;; test for "semantic + ede""
-(semantic-mode t)
-(global-ede-mode t)
+;;(semantic-mode t)
+;;(global-ede-mode t)
 
 ;; ======================== KEY BINDING ========================
 ;; TODO: Move key-binding to a more generic file.
@@ -113,6 +113,7 @@
 ;; Alt + l
 (global-set-key (kbd "M-l") 'bs-show)
 ;; Ctrl + l
+(global-set-key (kbd "C-l") 'goto-line)
 
 ;; f1
 ;; F2

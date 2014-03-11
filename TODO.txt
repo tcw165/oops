@@ -1,10 +1,19 @@
-(defun test4()
+(defun test()
   ""
   (interactive)
-  (save-excursion
-    (skip-syntax-backward "_w")
-    (setq a (point))
-    (skip-syntax-forward "_w")
-    (setq b (point))
-    (message "%d - %d" a b)
-    ))
+  (skip-syntax-backward "_w")
+  ;;(set-mark (point))
+  (push-mark (point) nil t)
+  (skip-syntax-forward "_w")
+  )
+
+(mark-marker)
+(length mark-ring)
+(list mark-ring)
+
+(defun reggggggg ()
+  ""
+  (interactive)
+  (message "%s" (region-active-p))
+  )
+(global-set-key (kbd "C-,") 'reggggggg)
