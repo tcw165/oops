@@ -12,18 +12,227 @@
 
 ;; ====================== Common Feature =======================
 
+(defun starter-thing-at-point-or-selection ()
+  "Return string according to syntax-table, \"_w\", to get the
+symbol string in which the point is."
+  (save-excursion
+    (let* (
+           (tmp (skip-syntax-backward "_w"))
+           (a (point))
+           (tmp (skip-syntax-forward "_w"))
+           (b (point))
+           (text (buffer-substring-no-properties a b))
+           )
+      (and (stringp text) text) ;; return text.
+      )
+    )
+  )
+
+;; Find tag with symbol under cursor.
+(defun starter-find-definition ()
+  "Find the symbol definition both for function and variable."
+  (interactive)
+  (cond
+   ;; Clause: major-mode == "emacs-lisp-mode"
+   (
+    (eq major-mode 'emacs-lisp-mode)
+    (let (
+          (symb (read (starter-thing-at-point-or-selection)))
+          )
+      (find-function symb)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      )
+    )
+   ;; Clause: major-mode == ...
+   )
+  )
+
 ;; Get current buffer and kill it.
 (defun starter-kill-current-buffer ()
   ""
   (interactive)
-  (kill-buffer (current-buffer)))
-
-;; Find tag with symbol under cursor.
-(defun starter-find-definition ()
-  (interactive)
-  ""
-  ;; todo: thingatpt
-  (message "smart find tag"))
+  (kill-buffer (current-buffer))
+  )
 
 ;; duplicate current line
 (defun starter-duplicate-line (&optional n)
@@ -39,7 +248,8 @@
       ;; now insert as many time as requested
       (while (> n 0)
         (insert current-line)
-        (decf n)))))
+        (decf n))))
+  )
 
 ;; ====================== Common Setting =======================
 ;; TODO: Move common-setting to a more generic file.
@@ -121,7 +331,9 @@
 ;; F3
 (global-set-key (kbd "<f3>") 'highlight-symbol-next)
 ;; F4
-(global-set-key (kbd "<f4>") 'find-function)
+(global-set-key (kbd "<f4>") 'starter-find-definition)
+;; F5
+(global-set-key (kbd "<f5>") 'find-function)
 
 ;; Shift + F1
 ;; Shift + F2

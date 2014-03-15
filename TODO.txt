@@ -3,7 +3,7 @@
   (interactive)
   (skip-syntax-backward "_w")
   ;;(set-mark (point))
-  (push-mark (point) nil t)
+  (set-mark (point))
   (skip-syntax-forward "_w")
   )
 
@@ -14,6 +14,6 @@
 (defun reggggggg ()
   ""
   (interactive)
-  (message "%s" (region-active-p))
+  (message "%s" (use-active-p))
   )
 (global-set-key (kbd "C-,") 'reggggggg)
