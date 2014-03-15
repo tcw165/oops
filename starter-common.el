@@ -14,23 +14,34 @@
 
 (defun starter-thing-at-point-or-selection ()
   "Return string according to syntax-table, \"_w\", to get the
-symbol string in which the point is."
-  (save-excursion
-    (let* (
-           (tmp (skip-syntax-backward "_w"))
-           (a (point))
-           (tmp (skip-syntax-forward "_w"))
-           (b (point))
-           (text (buffer-substring-no-properties a b))
-           )
-      (and (stringp text) text) ;; return text.
+symbol string in which the point is.
+Or just return the text selection."
+  (if mark-active
+      ;; if there is already a selection, use the selection.
+      (let (
+            (text (buffer-substring-no-properties (region-beginning) (region-end)))
+            )
+        (and (stringp text) text) ;; return string.
+        )
+    ;; else.
+    (save-excursion
+      (let* (
+            (tmp (skip-syntax-backward "_w"))
+            (a (point))
+            (tmp (skip-syntax-forward "_w"))
+            (b (point))
+            (text (buffer-substring-no-properties a b))
+            )
+        (and (stringp text) text) ;; return string.
+        )
       )
     )
   )
 
 ;; Find tag with symbol under cursor.
 (defun starter-find-definition ()
-  "Find the symbol definition both for function and variable."
+  "Find the symbol definition both for function and variable.
+test: find-function"
   (interactive)
   (cond
    ;; Clause: major-mode == "emacs-lisp-mode"
@@ -39,11 +50,50 @@ symbol string in which the point is."
     (let (
           (symb (read (starter-thing-at-point-or-selection)))
           )
-      (find-function symb)
+      (cond
+       ;; function
+       (
+        (fboundp symb)
+        (find-function symb)
+        (message "function: %s" (symbol-name symb))
+        )
+       ;; variable
+       (
+        (boundp symb)
+        (find-variable symb)
+        (message "variable: %s" (symbol-name symb))
+        )
+       )
       )
     )
    ;; Clause: major-mode == ...
+   (
+    (eq major-mode 'c-mode)
+    (message "not implement yet...")
+    )
    )
+  )
+
+;;
+(defun starter-push-mark (mark &optional index)
+  ""
+  )
+
+;;
+(defun starter-mark-iterator ()
+  ""
+  )
+
+;;
+(defun starter-previous-mark ()
+  ""
+  (interactive)
+  )
+
+;;
+(defun starter-next-mark ()
+  ""
+  (interactive)
   )
 
 ;; Get current buffer and kill it.
@@ -98,7 +148,7 @@ symbol string in which the point is."
 
 ;; scroll one line at a time
 (setq mouse-wheel-scroll-amount '(1 ((shift) . 1))) ;; one line at a time
-(setq mouse-wheel-progressive-speed nil) ;; don't accelerate scrolling
+;;(setq mouse-wheel-progressive-speed nil) ;; don't accelerate scrolling
 (setq mouse-wheel-follow-mouse 't) ;; scroll window under mouse
 (setq scroll-step 1) ;; keyboard scroll one line at a time
 
