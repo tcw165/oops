@@ -46,7 +46,9 @@ test: find-function"
   (cond
    ;; Clause: major-mode == "emacs-lisp-mode"
    (
-    (eq major-mode 'emacs-lisp-mode)
+    (or (eq major-mode 'emacs-lisp-mode)
+        (eq major-mode 'lisp-interaction-mode)
+        )
     (let (
           (symb (read (starter-thing-at-point-or-selection)))
           )
@@ -183,7 +185,8 @@ test: find-function"
 ;; ctrl + w, command + w
 (global-set-key (kbd "C-w") 'starter-kill-current-buffer)
 (if (eq system-type 'darwin)
-  (global-set-key (kbd "s-w") 'starter-kill-current-buffer))
+  (global-set-key (kbd "s-w") 'starter-kill-current-buffer)
+  )
 ;; ctrl + d
 (global-set-key (kbd "C-d") 'starter-duplicate-line)
 ;; ctrl + shift + d
