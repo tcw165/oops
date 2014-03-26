@@ -1,21 +1,39 @@
-(make-variable-buffer-local
- (defvar foo-count 0
-   "Number of foos inserted into the current buffer."))
+;; Define a variable named name-mode. Make it buffer-local.
+(defvar refill-mode nil
+  "Mode variable for refill minor mode.")
+(make-variable-buffer-local 'refill-mode)
 
-(defun insert-foo ()
-  (interactive)
-  (setq foo-count (1+ foo-count))
-  (insert "foo"))
+;; Define a command called name-mode.
+(defun refill-mode (&optional arg)
+  "Refill minor mode."
+  (interactive "P")
+  (setq refill-mode
+        (if (null arg)
+            ;; if
+            (not refill-mode)
+          ;; else
+          (> (prefix-numeric-value arg) 0)
+          )
+        )
+;;  (make-local-hook 'after-change-functions)
+  (if refill-mode
+      ;; code for turning on
+      (add-hook 'after-change-functions 'refill nil t)
+    ;; code for turning off
+    (remove-hook 'after-change-functions 'refill t)
+    )
+  )
 
-;;;###autoload
-(define-minor-mode foo-mode
-  "Get your foos in the right places."
-  :lighter " foo"
-  :keymap (let ((map (make-sparse-keymap)))
-            (define-key map (kbd "C-c f") 'insert-foo)
-            map))
+;; mode lighter.
+(if (not (assq 'refill-mode minor-mode-alist))
+    (setq minor-mode-alist
+          (cons '(refill-mode " Refill") minor-mode-alist))
+    )
 
-;;;###autoload
-(add-hook 'text-mode-hook 'foo-mode)
+;; hook in 'after-change-functions
+(defun refill (start end len)
+  "After a text change, refill the current paragraph."
+  (fill-paragraph nil)
+  )
 
-(provide 'foo-mode)
+(provide 'refill-mode)

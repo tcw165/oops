@@ -49,8 +49,9 @@ test: find-function"
     (or (eq major-mode 'emacs-lisp-mode)
         (eq major-mode 'lisp-interaction-mode)
         )
-    (let (
-          (symb (read (starter-thing-at-point-or-selection)))
+    (let* (
+           (text (starter-thing-at-point-or-selection))
+           (symb (read text))
           )
       (cond
        ;; function
@@ -65,6 +66,10 @@ test: find-function"
         (find-variable symb)
         (message "variable: %s" (symbol-name symb))
         )
+       ;; not found
+       (
+        (message "not found: %s" text)
+        )
        )
       )
     )
@@ -75,7 +80,6 @@ test: find-function"
     )
    )
   )
-
 ;;
 (defun starter-push-mark (mark &optional index)
   ""
