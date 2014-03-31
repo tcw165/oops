@@ -6,42 +6,42 @@
 
 (add-to-list 'load-path "~/.emacs.d/starter/3rd-party")
 
+;; 3rd party library.
 (require 'highlight-symbol)
 (require 'highlight-parentheses)
 (require 'auto-complete)
+;; native library.
+(require 'thingatpt)
 
 ;; ====================== Common Feature =======================
 
-(defun starter-thing-at-point-or-selection ()
+(defun oops-require-check ()
+  "Check if the cursor or the selection is on which just after 'require statement.
+Return t if is on which just after 'require statement. Other is nil."
+  (save-excursion
+    (backward-up-list)
+    (forward-char)
+    (if (equal "require" (thing-at-point 'symbol))
+        t ;; return t
+      nil ;; return nil
+      )
+    )
+  )
+
+(defun oops-thing-at-point ()
   "Return string according to syntax-table, \"_w\", to get the
 symbol string in which the point is.
 Or just return the text selection."
   (if mark-active
       ;; if there is already a selection, use the selection.
-      (let (
-            (text (buffer-substring-no-properties (region-beginning) (region-end)))
-            )
-        (and (stringp text) text) ;; return string.
-        )
+      (buffer-substring-no-properties (region-beginning) (region-end))
     ;; else.
-    (save-excursion
-      (let* (
-            (tmp (skip-syntax-backward "_w"))
-            (a (point))
-            (tmp (skip-syntax-forward "_w"))
-            (b (point))
-            (text (buffer-substring-no-properties a b))
-            )
-        (and (stringp text) text) ;; return string.
-        )
-      )
+    (thing-at-point 'symbol)
     )
   )
 
-;; Find tag with symbol under cursor.
-(defun starter-find-definition ()
-  "Find the symbol definition both for function and variable.
-test: find-function"
+(defun oops-find-definition ()
+  "Find the symbol definition both for function, variable or library."
   (interactive)
   (cond
    ;; Clause: major-mode == "emacs-lisp-mode"
@@ -50,10 +50,16 @@ test: find-function"
         (eq major-mode 'lisp-interaction-mode)
         )
     (let* (
-           (text (starter-thing-at-point-or-selection))
+           (text (oops-thing-at-point))
            (symb (read text))
           )
       (cond
+       ;; library
+       (
+        (oops-require-check)
+        (find-library text)
+        ;; TODO: go to (require 'text) line
+        )
        ;; function
        (
         (fboundp symb)
@@ -79,27 +85,6 @@ test: find-function"
     (message "not implement yet...")
     )
    )
-  )
-;;
-(defun starter-push-mark (mark &optional index)
-  ""
-  )
-
-;;
-(defun starter-mark-iterator ()
-  ""
-  )
-
-;;
-(defun starter-previous-mark ()
-  ""
-  (interactive)
-  )
-
-;;
-(defun starter-next-mark ()
-  ""
-  (interactive)
   )
 
 ;; Get current buffer and kill it.
@@ -207,9 +192,7 @@ test: find-function"
 ;; F3
 (global-set-key (kbd "<f3>") 'highlight-symbol-next)
 ;; F4
-(global-set-key (kbd "<f4>") 'starter-find-definition)
-;; F5
-(global-set-key (kbd "<f5>") 'find-function)
+(global-set-key (kbd "<f4>") 'oops-find-definition)
 
 ;; Shift + F1
 ;; Shift + F2
