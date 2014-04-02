@@ -15,86 +15,105 @@
 
 ;; ====================== Common Feature =======================
 
-(defun oops-require-check ()
+;; TODO: to oops-lisp-core.el
+(defun oops-lisp-is-library ()
   "Check if the cursor or the selection is on which just after 'require statement.
 Return t if is on which just after 'require statement. Other is nil."
   (save-excursion
     (backward-up-list)
-    (forward-char)
-    (if (equal "require" (thing-at-point 'symbol))
-        t ;; return t
-      nil ;; return nil
+    (forward-char 1)
+    (if (string-equal "require" (buffer-substring-no-properties (point) (+ (point) 7)))
+        t ;; return t.
+      nil ;; return nil.
       )
     )
   )
 
+;; TODO: to oops-lisp-core.el
+(defun oops-lisp-skip-parenthesis ()
+  "Move the point forward 1 word if it's just before a \"(\".
+Move the point backward 1 word if it's just after a \")\"."
+  (unless mark-active
+    (cond
+     ;; Move the point forward 1 word if it's just before a "(".
+     ((char-equal (get-byte nil "(") (char-after (point)))
+      (forward-word 1)
+      )
+     ;; Move the point backward 1 word if it's just after a ")".
+     ((char-equal (get-byte nil ")") (char-before (point)))
+      (backward-word 1)
+      )
+     )
+    )
+  )
+
+;; TODO: to oops-core.el
 (defun oops-thing-at-point ()
-  "Return string according to syntax-table, \"_w\", to get the
-symbol string in which the point is.
-Or just return the text selection."
+  "Return string on which the point is or just string of selection."
   (if mark-active
-      ;; if there is already a selection, use the selection.
+      ;; if there is already a selection, return the selection.
       (buffer-substring-no-properties (region-beginning) (region-end))
     ;; else.
     (thing-at-point 'symbol)
     )
   )
 
+;; TODO: to oops-core.el
 (defun oops-find-definition ()
   "Find the symbol definition both for function, variable or library."
   (interactive)
   (cond
-   ;; Clause: major-mode == "emacs-lisp-mode"
-   (
-    (or (eq major-mode 'emacs-lisp-mode)
+   ;; major-mode == "emacs-lisp-mode", lisp-interaction-mode
+   ((or (eq major-mode 'emacs-lisp-mode)
         (eq major-mode 'lisp-interaction-mode)
         )
-    (let* (
+    ;; Force to skip parenthesis.
+    (oops-lisp-skip-parenthesis)
+    (let* ((is-lib (oops-lisp-is-library))
            (text (oops-thing-at-point))
            (symb (read text))
-          )
+           )
+      ;; Force to unselect text.
+      (deactivate-mark)
       (cond
        ;; library
-       (
-        (oops-require-check)
+       ((and is-lib (not (string-equal "require" text)))
         (find-library text)
+        (message "library: %s" text)
         ;; TODO: go to (require 'text) line
         )
-       ;; function
-       (
-        (fboundp symb)
+       ;; Function:
+       ((fboundp symb)
         (find-function symb)
-        (message "function: %s" (symbol-name symb))
+        (message "function: %s" text)
         )
-       ;; variable
-       (
-        (boundp symb)
+       ;; Variable:
+       ((boundp symb)
         (find-variable symb)
-        (message "variable: %s" (symbol-name symb))
+        (message "variable: %s" text)
         )
-       ;; not found
-       (
-        (message "not found: %s" text)
+       ;; Unknown symbol:
+       (t
+        (message "unknown symbol: %s" text)
         )
        )
       )
     )
    ;; Clause: major-mode == ...
-   (
-    (eq major-mode 'c-mode)
+   ((eq major-mode 'c-mode)
     (message "not implement yet...")
     )
    )
   )
 
-;; Get current buffer and kill it.
+;; TODO: to oops-core.el
 (defun starter-kill-current-buffer ()
-  ""
+  "Kill current-buffer."
   (interactive)
   (kill-buffer (current-buffer))
   )
 
-;; duplicate current line
+;; TODO: to oops-core.el
 (defun starter-duplicate-line (&optional n)
   "duplicate current line, make more than 1 copy given a numeric argument"
   (interactive "p")
