@@ -2,6 +2,9 @@
 (require 'oops-lisp-lib)
 (require 'oops-settings)
 
+(defvar oops-idle-timer-for-definition nil
+  "")
+
 (defun oops-find-definition-at-point ()
   "Find the symbol definition both for function, variable or library."
   (interactive)
@@ -19,6 +22,16 @@
    )
   )
 
+(defun oops-show-definition-at-point ()
+  ""
+  (message "hello")
+  )
+
+(defun oops-show-definition-window ()
+  ""
+  (interactive)
+  )
+
 (defun test-hook ()
   ""
   (message "yes")
@@ -29,8 +42,8 @@
   "Constructing..."
   :lighter " Oops"
   (if oops-mode
-      (add-hook 'post-command-hook 'test-hook nil t)
-    (remove-hook 'post-command-hook 'test-hook t)
+      (setq oops-idle-timer-for-definition (run-with-idle-timer 0.2 t 'oops-show-definition-at-point))
+    (cancel-timer oops-idle-timer-for-definition)
     )
   )
 
