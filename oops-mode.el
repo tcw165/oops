@@ -5,6 +5,13 @@
 (defvar oops-idle-timer-for-definition nil
   "")
 
+(defun oops-show-definition-at-point ()
+  ""
+  (if oops-mode
+      (message "%s" (oops-thing-at-point))
+      )
+  )
+
 (defun oops-find-definition-at-point ()
   "Find the symbol definition both for function, variable or library."
   (interactive)
@@ -20,11 +27,6 @@
     (message "Yet ready...")
     )
    )
-  )
-
-(defun oops-show-definition-at-point ()
-  ""
-  (message "hello")
   )
 
 (defun oops-show-definition-window ()
