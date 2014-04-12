@@ -32,28 +32,37 @@ Move the point backward 1 word if it's just after a \")\"."
 
 (defun oops-lisp-find-definition-at-point ()
   ""
+  ;; TODO: add local variable navigation.
   ;; Force to skip parenthesis.
   (oops-lisp-skip-parenthesis)
   (let* ((is-lib (oops-lisp-is-library))
          (text (oops-thing-at-point))
-         (symb (read text))
+         (symb (and (not (null text))
+                    (read text)))
          )
     ;; Force to unselect text.
     (deactivate-mark)
     (cond
+     ;; nil
+     ((or (null text)
+          (null symb))
+      ;; DO NOTHING
+      nil
+      )
      ;; library
-     ((and is-lib (not (string-equal "require" text)))
+     ((and is-lib
+           (not (string-equal "require" text)))
       (find-library text)
       (message "library: %s" text)
       ;; TODO: go to (require 'text) line
       )
      ;; Function:
-     ((fboundp symb)
+     ((and symb (fboundp symb))
       (find-function symb)
       (message "function: %s" text)
       )
      ;; Variable:
-     ((boundp symb)
+     ((and symb (boundp symb))
       (find-variable symb)
       (message "variable: %s" text)
       )

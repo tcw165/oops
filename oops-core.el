@@ -1,5 +1,23 @@
 ;; Update load-path ============================================================
-(add-to-list 'load-path (concat (file-name-directory load-file-name) "3rd-party"))
+(defun oops-add-subdirs-to-load-path ()
+  "Add all the sub-directories under current directory into load-path."
+  (when (not (null load-file-name))
+    (dolist (file (directory-files (file-name-directory load-file-name)))
+      (let ((file-path (concat (file-name-directory load-file-name) file)))
+        (when (and (file-directory-p file-path)
+                   (not (equal file "."))
+                   (not (equal file ".."))
+                   (not (equal file ".svn"))
+                   (not (equal file ".git"))
+                   (not (memq file-path load-path))
+                   )
+          (add-to-list 'load-path file-path)
+          )
+        )
+      )
+    )
+  )
+(oops-add-subdirs-to-load-path)
 
 ;; Native library ==============================================================
 (require 'thingatpt)
@@ -9,11 +27,14 @@
 (require 'highlight-parentheses)
 (require 'auto-complete)
 
-(defun oops-thing-at-point ()
+(defun oops-thing-at-point (&optional skip-select)
   "Return string on which the point is or just string of selection."
   (if mark-active
-      ;; if there is already a selection, return the selection.
-      (buffer-substring-no-properties (region-beginning) (region-end))
+      (if (null skip-select)
+          ;; return the selection.
+          (buffer-substring-no-properties (region-beginning) (region-end))
+        ;; skip selection, return nil
+        nil)
     ;; else.
     (thing-at-point 'symbol)
     )
@@ -23,6 +44,26 @@
   "Kill current-buffer."
   (interactive)
   (kill-buffer (current-buffer))
+  )
+
+(defun oops-toggle-comment ()
+  "Toggle comment."
+  (interactive)
+  (let ((start (line-beginning-position))
+        (end (line-end-position)))
+    (when mark-active
+      (setq start (save-excursion
+                    (goto-char (region-beginning))
+                    (beginning-of-line)
+                    (point))
+            end (save-excursion
+                  (goto-char (region-end))
+                  (end-of-line)
+                  (point))
+            )
+      )
+    (comment-or-uncomment-region start end)
+    )
   )
 
 (defun oops-duplicate-lines (&optional n)

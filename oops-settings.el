@@ -56,14 +56,14 @@
 ;; ESC
 (global-set-key (kbd "<escape>") 'keyboard-escape-quit)
 
-;; ctrl + w, command + w
+;; Ctrl + w, command + w
 (global-set-key (kbd "C-w") 'oops-kill-current-buffer)
 (if (eq system-type 'darwin)
   (global-set-key (kbd "s-w") 'oops-kill-current-buffer)
   )
-;; ctrl + d
+;; Ctrl + d
 (global-set-key (kbd "C-d") 'oops-duplicate-line)
-;; ctrl + shift + d
+;; Ctrl + shift + d
 (global-set-key (kbd "C-S-d") 'kill-whole-line)
 
 ;; Alt + l
@@ -71,7 +71,12 @@
 ;; Ctrl + l
 (global-set-key (kbd "C-l") 'goto-line)
 
-;; f1
+;; Ctrl + /
+(global-set-key (kbd "C-/") 'oops-toggle-comment)
+;; Alt + /
+(global-set-key (kbd "M-/") 'oops-toggle-comment)
+
+;; F1
 ;; F2
 (global-set-key (kbd "<f2>") 'highlight-symbol-at-point)
 ;; F3

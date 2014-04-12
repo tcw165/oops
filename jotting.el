@@ -13,6 +13,7 @@ See also `find-function-recenter-line' and `find-function-after-hook'."
   (find-function-do-it function nil 'switch-to-buffer)
   )
   
+
 (defun find-function-read (&optional type)
   "Read and return an interned symbol, defaulting to the one near point.
 
@@ -95,5 +96,39 @@ If that doesn't give a function, return nil."
             )
           )
         )
+    )
+  )
+
+(defun variable-at-point (&optional any-symbol)
+  "Return the bound variable symbol found at or before point.
+Return 0 if there is no such symbol.
+If ANY-SYMBOL is non-nil, don't insist the symbol be bound."
+  (with-syntax-table emacs-lisp-mode-syntax-table
+    (or (condition-case ()
+	    (save-excursion
+	      (skip-chars-forward "'")
+	      (or (not (zerop (skip-syntax-backward "_w")))
+            (eq (char-syntax (following-char)) ?w)
+            (eq (char-syntax (following-char)) ?_)
+            (forward-sexp -1))
+	      (skip-chars-forward "'")
+	      (let ((obj (read (current-buffer))))
+          (and (symbolp obj) (boundp obj) obj)
+          )
+        )
+      (error nil))
+        (let* ((str (find-tag-default))
+               (sym (if str (intern-soft str))))
+          (if (and sym (or any-symbol (boundp sym)))
+              sym
+            (save-match-data
+              (when (and str (string-match "\\`\\W*\\(.*?\\)\\W*\\'" str))
+                (setq sym (intern-soft (match-string 1 str)))
+                (and (or any-symbol (boundp sym)) sym)
+                )
+              )
+            )
+          )
+        0)
     )
   )
