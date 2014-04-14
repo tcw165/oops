@@ -29,6 +29,7 @@ Set mark before moving, if the buffer already existed."
          (orig-buffers (buffer-list))
          (buffer-point (save-excursion
                          (find-definition-noselect symbol type)))
+         ;; 'find-definition-noselect is the key function.
          (new-buf (car buffer-point))
          (new-point (cdr buffer-point)))
     (when buffer-point
@@ -36,7 +37,9 @@ Set mark before moving, if the buffer already existed."
         (push-mark orig-point)
         )
       (funcall switch-fn new-buf)
-      (when new-point (goto-char new-point))
+      (when new-point
+        (goto-char new-point)
+        )
       (recenter find-function-recenter-line)
       (run-hooks 'find-function-after-hook)
       )
@@ -72,6 +75,108 @@ otherwise uses `variable-at-point'."
                    )
                   )
           )
+    )
+  )
+
+(defun find-definition-noselect (symbol type &optional file)
+  "Return a pair `(BUFFER . POINT)' pointing to the definition of SYMBOL.
+If the definition can't be found in the buffer, return (BUFFER).
+TYPE says what type of definition: nil for a function, `defvar' for a
+variable, `defface' for a face.  This function does not switch to the
+buffer nor display it.
+
+The library where SYMBOL is defined is searched for in FILE or
+`find-function-source-path', if non-nil, otherwise in `load-path'."
+  (cond
+   ((not symbol)
+    (error "You didn't specify a symbol")
+    )
+   ((null type)
+    (find-function-noselect symbol)
+    )
+   ((eq type 'defvar)
+    (find-variable-noselect symbol file)
+    )
+   (t
+    (let ((library (or file (symbol-file symbol type))))
+      (find-function-search-for-symbol symbol type library)
+      )
+    )
+   )
+  )
+
+(defun find-function-noselect (function &optional lisp-only)
+  "Return a pair (BUFFER . POINT) pointing to the definition of FUNCTION.
+
+Finds the source file containing the definition of FUNCTION
+in a buffer and the point of the definition.  The buffer is
+not selected.  If the function definition can't be found in
+the buffer, returns (BUFFER).
+
+If FUNCTION is a built-in function, this function normally
+attempts to find it in the Emacs C sources; however, if LISP-ONLY
+is non-nil, signal an error instead.
+
+If the file where FUNCTION is defined is not known, then it is
+searched for in `find-function-source-path' if non-nil, otherwise
+in `load-path'."
+  (if (not function)
+      (error "You didn't specify a function"))
+  (let ((def (symbol-function (find-function-advised-original function)))
+        aliases)
+    ;; FIXME for completeness, it might be nice to print something like:
+    ;; foo (which is advised), which is an alias for bar (which is advised).
+    (while (symbolp def)
+      (or (eq def function)
+          (if aliases
+              (setq aliases (concat aliases
+                                    (format ", which is an alias for `%s'"
+                                            (symbol-name def))))
+            (setq aliases (format "`%s' is an alias for `%s'"
+                                  function (symbol-name def)))
+            )
+          )
+      (setq function (symbol-function (find-function-advised-original function))
+            def (symbol-function (find-function-advised-original function)))
+      )
+    (if aliases
+        (message "%s" aliases))
+    (let ((library
+           (cond ((autoloadp def)
+                  (nth 1 def)
+                  )
+                 ((subrp def)
+                  (if lisp-only
+                      (error "%s is a built-in function" function)
+                    )
+                  (help-C-file-name def 'subr)
+                  )
+                 ((symbol-file function 'defun)
+                  )
+                 )
+           )
+          )
+      (find-function-search-for-symbol function nil library)
+      )
+    )
+  )
+
+(defun find-variable-noselect (variable &optional file)
+  "Return a pair `(BUFFER . POINT)' pointing to the definition of VARIABLE.
+
+Finds the library containing the definition of VARIABLE in a buffer and
+the point of the definition.  The buffer is not selected.
+If the variable's definition can't be found in the buffer, return (BUFFER).
+
+The library where VARIABLE is defined is searched for in FILE or
+`find-function-source-path', if non-nil, otherwise in `load-path'."
+  (if (not variable)
+      (error "You didn't specify a variable")
+    (let ((library (or file
+                       (symbol-file variable 'defvar)
+                       (help-C-file-name variable 'var))))
+      (find-function-search-for-symbol variable 'defvar library)
+      )
     )
   )
 
