@@ -12,7 +12,36 @@ See also `find-function-recenter-line' and `find-function-after-hook'."
   (interactive (find-function-read))
   (find-function-do-it function nil 'switch-to-buffer)
   )
-  
+
+(defun find-function-do-it (symbol type switch-fn)
+  "Find Emacs Lisp SYMBOL in a buffer and display it.
+TYPE is nil to search for a function definition,
+or else `defvar' or `defface'.
+
+The variable `find-function-recenter-line' controls how
+to recenter the display.  SWITCH-FN is the function to call
+to display and select the buffer.
+See also `find-function-after-hook'.
+
+Set mark before moving, if the buffer already existed."
+  (let* ((orig-point (point))
+         (orig-buf (window-buffer))
+         (orig-buffers (buffer-list))
+         (buffer-point (save-excursion
+                         (find-definition-noselect symbol type)))
+         (new-buf (car buffer-point))
+         (new-point (cdr buffer-point)))
+    (when buffer-point
+      (when (memq new-buf orig-buffers)
+        (push-mark orig-point)
+        )
+      (funcall switch-fn new-buf)
+      (when new-point (goto-char new-point))
+      (recenter find-function-recenter-line)
+      (run-hooks 'find-function-after-hook)
+      )
+    )
+  )
 
 (defun find-function-read (&optional type)
   "Read and return an interned symbol, defaulting to the one near point.
