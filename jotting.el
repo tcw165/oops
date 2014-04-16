@@ -3,10 +3,13 @@
 ;; symbol-file
 ;; find-function-noselect
 ;; find-variable-noselect
+;; find-function-search-for-symbol
 
 (symbol-function (read "find-function-noselect"))
 (symbol-file (read "find-function-noselect"))
 (find-function-noselect (read "find-variable-noselect"))
+(car (find-function-noselect (read "find-variable-noselect")))
+(cdr (find-function-noselect (read "find-variable-noselect")))
 
 ;; <------------------------------------------------------ test end;
 
@@ -118,8 +121,6 @@ The library where SYMBOL is defined is searched for in FILE or
    )
   )
 
-(symbol-function (read "find-function"))
-
 (defun find-function-noselect (function &optional lisp-only)
   "Return a pair (BUFFER . POINT) pointing to the definition of FUNCTION.
 
@@ -171,21 +172,11 @@ in `load-path'."
                  )
            )
           )
+      ;; KEY !=============================================>
       (find-function-search-for-symbol function nil library)
+      ;; <==================================================
       )
     )
-  )
-
-(defun find-function-advised-original (func)
-  "Return the original function symbol of an advised function FUNC.
-If FUNC is not the symbol of an advised function, just returns FUNC."
-  (or (and (symbolp func)
-           (featurep 'advice)
-           (let ((ofunc (cdr (assq 'origname (ad-get-advice-info func)))))
-             (and (fboundp ofunc) ofunc)
-             ))
-      func
-      )
   )
 
 (defun find-variable-noselect (variable &optional file)
@@ -203,6 +194,72 @@ The library where VARIABLE is defined is searched for in FILE or
                        (symbol-file variable 'defvar)
                        (help-C-file-name variable 'var))))
       (find-function-search-for-symbol variable 'defvar library)
+      )
+    )
+  )
+
+(defun find-function-search-for-symbol (symbol type library)
+  "Search for SYMBOL's definition of type TYPE in LIBRARY.
+Visit the library in a buffer, and return a cons cell (BUFFER . POSITION),
+or just (BUFFER . nil) if the definition can't be found in the file.
+
+If TYPE is nil, look for a function definition.
+Otherwise, TYPE specifies the kind of definition,
+and it is interpreted via `find-function-regexp-alist'.
+The search is done in the source for library LIBRARY."
+  (if (null library)
+      (error "Don't know where `%s' is defined" symbol)
+    )
+  ;; Some functions are defined as part of the construct
+  ;; that defines something else.
+  (while (and (symbolp symbol) (get symbol 'definition-name))
+    (setq symbol (get symbol 'definition-name))
+    )
+  (if (string-match "\\`src/\\(.*\\.\\(c\\|m\\)\\)\\'" library)
+      (find-function-C-source symbol (match-string 1 library) type)
+    (when (string-match "\\.el\\(c\\)\\'" library)
+      (setq library (substring library 0 (match-beginning 1)))
+      )
+    ;; Strip extension from .emacs.el to make sure symbol is searched in
+    ;; .emacs too.
+    (when (string-match "\\.emacs\\(.el\\)" library)
+      (setq library (substring library 0 (match-beginning 1)))
+      )
+    (let* ((filename (find-library-name library))
+           (regexp-symbol (cdr (assq type find-function-regexp-alist))))
+      (with-current-buffer (find-file-noselect filename)
+        (let ((regexp (format (symbol-value regexp-symbol)
+                              ;; Entry for ` (backquote) macro in loaddefs.el,
+                              ;; (defalias (quote \`)..., has a \ but
+                              ;; (symbol-name symbol) doesn't.  Add an
+                              ;; optional \ to catch this.
+                              (concat "\\\\?"
+                                      (regexp-quote (symbol-name symbol)))))
+              (case-fold-search)
+              )
+          (with-syntax-table emacs-lisp-mode-syntax-table
+            (goto-char (point-min))
+            (if (or (re-search-forward regexp nil t)
+                    ;; `regexp' matches definitions using known forms like
+                    ;; `defun', or `defvar'.  But some functions/variables
+                    ;; are defined using special macros (or functions), so
+                    ;; if `regexp' can't find the definition, we look for
+                    ;; something of the form "(SOMETHING <symbol> ...)".
+                    ;; This fails to distinguish function definitions from
+                    ;; variable declarations (or even uses thereof), but is
+                    ;; a good pragmatic fallback.
+                    (re-search-forward
+                     (concat "^([^ ]+" find-function-space-re "['(]?"
+                             (regexp-quote (symbol-name symbol))
+                             "\\_>")
+                     nil t))
+                (progn
+                  (beginning-of-line)
+                  (cons (current-buffer) (point)))
+              (cons (current-buffer) nil))
+            )
+          )
+        )
       )
     )
   )

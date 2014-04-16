@@ -1,44 +1,17 @@
 (require 'oops-core)
 
-(defun oops-lisp-is-library ()
-  "Check if the cursor or the selection is on which just after 'require statement.
-Return t if is on which just after 'require statement. Other is nil."
-  (save-excursion
-    (backward-up-list)
-    (forward-char 1)
-    (if (string-equal "require" (buffer-substring-no-properties (point) (+ (point) 7)))
-        t ;; return t.
-      nil ;; return nil.
-      )
-    )
-  )
-
-(defun oops-lisp-skip-parenthesis ()
-  "Move the point forward 1 word if it's just before a \"(\".
-Move the point backward 1 word if it's just after a \")\"."
-  (unless mark-active
-    (cond
-     ;; Move the point forward 1 word if it's just before a "(".
-     ((char-equal (get-byte nil "(") (char-after (point)))
-      (forward-word 1)
-      )
-     ;; Move the point backward 1 word if it's just after a ")".
-     ((char-equal (get-byte nil ")") (char-before (point)))
-      (backward-word 1)
-      )
-     )
-    )
-  )
-
 (defun oops-lisp-find-definition-at-point ()
   ""
-  ;; TODO: add local variable navigation.
-  ;; Force to skip parenthesis.
-  (oops-lisp-skip-parenthesis)
-  (let* ((is-lib (oops-lisp-is-library))
-         (text (oops-thing-at-point))
+  ;; TODO/FIXME:
+  ;; * advising function list!
+  ;; * variable and function with same name!
+  ;; * add local variable navigation!
+  (let* ((text (oops-thing-at-point))
          (symb (and (not (null text))
                     (read text)))
+         (is-var-fun (and (not (null symb))
+                          (boundp symb)
+                          (fboundp symb)))
          )
     ;; Force to unselect text.
     (deactivate-mark)
@@ -50,12 +23,17 @@ Move the point backward 1 word if it's just after a \")\"."
       nil
       )
      ;; library
-     ((and is-lib
-           (not (string-equal "require" text)))
+     ((and symb (featurep symb))
       (find-library text)
+      ;; TODO/FIXME: go to (require 'text) line
       (message "library: %s" text)
-      ;; TODO: go to (require 'text) line
       )
+     ;; TODO/FIXME =======================================================>
+     ;; ;; Variable and Function with the same name:
+     ;; (is-var-fun
+     ;;  (message "%s is type of \"is-var-fun\" and is not ready yet" text)
+     ;;  )
+     ;; <==================================================================
      ;; Function:
      ((and symb (fboundp symb))
       (find-function symb)
