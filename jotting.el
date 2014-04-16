@@ -30,6 +30,7 @@ Set mark before moving, if the buffer already existed."
          (buffer-point (save-excursion
                          (find-definition-noselect symbol type)))
          ;; 'find-definition-noselect is the key function.
+         ;; 'symbol-function
          (new-buf (car buffer-point))
          (new-point (cdr buffer-point)))
     (when buffer-point
@@ -105,6 +106,8 @@ The library where SYMBOL is defined is searched for in FILE or
    )
   )
 
+(symbol-function (read "find-function"))
+
 (defun find-function-noselect (function &optional lisp-only)
   "Return a pair (BUFFER . POINT) pointing to the definition of FUNCTION.
 
@@ -159,6 +162,18 @@ in `load-path'."
       (find-function-search-for-symbol function nil library)
       )
     )
+  )
+
+(defun find-function-advised-original (func)
+  "Return the original function symbol of an advised function FUNC.
+If FUNC is not the symbol of an advised function, just returns FUNC."
+  (or (and (symbolp func)
+           (featurep 'advice)
+           (let ((ofunc (cdr (assq 'origname (ad-get-advice-info func)))))
+             (and (fboundp ofunc) ofunc)
+             ))
+      func
+      )
   )
 
 (defun find-variable-noselect (variable &optional file)
