@@ -1,3 +1,15 @@
+;; subrp
+;; symbol-function
+;; symbol-file
+;; find-function-noselect
+;; find-variable-noselect
+
+(symbol-function (read "find-function-noselect"))
+(symbol-file (read "find-function-noselect"))
+(find-function-noselect (read "find-variable-noselect"))
+
+;; <------------------------------------------------------ test end;
+
 (defun find-function (function)
   "Find the definition of the FUNCTION near point.
 
