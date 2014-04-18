@@ -10,6 +10,9 @@
 (find-function-noselect (read "find-variable-noselect"))
 (car (find-function-noselect (read "find-variable-noselect")))
 (cdr (find-function-noselect (read "find-variable-noselect")))
+(get-file-buffer (expand-file-name "~/.emacs.d/oops/jotting.el"))
+(oops-lisp-find-function (read "find-file"))
+(generate-new-buffer "*test*")
 
 ;; <------------------------------------------------------ test end;
 
@@ -157,20 +160,18 @@ in `load-path'."
       )
     (if aliases
         (message "%s" aliases))
-    (let ((library
-           (cond ((autoloadp def)
-                  (nth 1 def)
-                  )
-                 ((subrp def)
-                  (if lisp-only
-                      (error "%s is a built-in function" function)
-                    )
-                  (help-C-file-name def 'subr)
-                  )
-                 ((symbol-file function 'defun)
-                  )
-                 )
-           )
+    (let ((library (cond ((autoloadp def)
+                          (nth 1 def)
+                          )
+                         ((subrp def)
+                          (if lisp-only
+                              (error "%s is a built-in function" function)
+                            )
+                          (help-C-file-name def 'subr)
+                          )
+                         ((symbol-file function 'defun)
+                          )
+                         ))
           )
       ;; KEY !=============================================>
       (find-function-search-for-symbol function nil library)
@@ -348,5 +349,24 @@ If ANY-SYMBOL is non-nil, don't insist the symbol be bound."
             )
           )
         0)
+    )
+  )
+
+(defun find-variable-noselect (variable &optional file)
+  "Return a pair `(BUFFER . POINT)' pointing to the definition of VARIABLE.
+
+Finds the library containing the definition of VARIABLE in a buffer and
+the point of the definition.  The buffer is not selected.
+If the variable's definition can't be found in the buffer, return (BUFFER).
+
+The library where VARIABLE is defined is searched for in FILE or
+`find-function-source-path', if non-nil, otherwise in `load-path'."
+  (if (not variable)
+      (error "You didn't specify a variable")
+    (let ((library (or file
+                       (symbol-file variable 'defvar)
+                       (help-C-file-name variable 'var))))
+      (find-function-search-for-symbol variable 'defvar library)
+      )
     )
   )
