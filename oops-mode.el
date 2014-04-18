@@ -35,7 +35,7 @@
 (defvar oops-idle-timer-for-definition nil
   "An idle timer that detect the symbol nearby the `point', and show symbol's definition in another window. Normally, the definition window is under the current window.")
 
-(defun oops-find-definition-at-point ()
+(defun oops-jump-to-definition-atpt ()
   "Find the symbol's definition. If there's only one result, open the file in the current window. If there're multiple results, show a list under the current window.
 
 For lisp, it supports symbol of `defun', `defadvice', `defvar' and `provide'.
@@ -46,7 +46,7 @@ For Python, it doesn't support yet."
    ;; lisp
    ((or (eq major-mode 'emacs-lisp-mode)
         (eq major-mode 'lisp-interaction-mode))
-    (oops-lisp-find-definition-at-point)
+    (oops-lisp-jump-to-definition-atpt)
     )
    ;; c
    ;; c++
@@ -62,7 +62,6 @@ For Python, it doesn't support yet."
      ((or (eq major-mode 'emacs-lisp-mode)
           (eq major-mode 'lisp-interaction-mode))
       (oops-lisp-show-definition-at-point)
-      (message "Yet ready...")
       )
      ;; c
      ;; c++

@@ -1,6 +1,10 @@
+;; =============================================================================
+
 (defun oops-lisp-show-definition-at-point ()
   ""
   )
+
+;; =============================================================================
 
 (defun oops-lisp-find-function (function)
   ""
@@ -18,31 +22,7 @@
   ""
   )
 
-(defun oops-lisp-find-symbol (symb &optional type)
-  "Return a pair `(BUFFER . POINT)' pointing to the definition of `symb'.
-`symb' should be a lisp symbol, string is prohibited.
-
-The `type' should be `defun' or `defvar'. If `type' is nil, indicate the `symb' is a function.
-
-TODO/FIXME:
-* Advising function list."
-  (interactive)
-  (cond
-   ;; Function
-   ((or (null type)
-        (eq type 'defun))
-    (oops-lisp-find-function symb)
-    )
-   ;; Variable
-   ((eq type 'defvar)
-    (oops-lisp-find-variable symb)
-    )
-   ;; Unknown
-   (t nil)
-   )
-  )
-
-(defun oops-lisp-find-definition-at-point ()
+(defun oops-lisp-jump-to-definition-atpt ()
   ""
   ;; TODO/FIXME:
   ;; * advising function list!

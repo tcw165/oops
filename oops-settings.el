@@ -82,7 +82,7 @@
 ;; F3
 (global-set-key (kbd "<f3>") 'highlight-symbol-next)
 ;; F4
-(global-set-key (kbd "<f4>") 'oops-find-definition-at-point)
+(global-set-key (kbd "<f4>") 'oops-jump-to-definition-atpt)
 
 ;; Shift + F1
 ;; Shift + F2
