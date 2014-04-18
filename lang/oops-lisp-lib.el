@@ -1,4 +1,6 @@
-(require 'oops-core)
+(defun oops-lisp-show-definition-at-point ()
+  ""
+  )
 
 (defun oops-lisp-find-function (function)
   ""

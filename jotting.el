@@ -14,6 +14,8 @@
 (oops-lisp-find-function (read "find-file"))
 (generate-new-buffer "*test*")
 
+(message "total = %s, %s" (length (buffer-list)) (buffer-list))
+
 ;; <------------------------------------------------------ test end;
 
 (defun find-function (function)

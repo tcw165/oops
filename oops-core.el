@@ -9,8 +9,7 @@
                    (not (equal file ".."))
                    (not (equal file ".svn"))
                    (not (equal file ".git"))
-                   (not (memq file-path load-path))
-                   )
+                   (not (memq file-path load-path)))
           (add-to-list 'load-path file-path)
           )
         )
@@ -41,7 +40,7 @@
   )
 
 (defun oops-kill-current-buffer ()
-  "Kill current-buffer."
+  "Kill `current-buffer'."
   (interactive)
   (kill-buffer (current-buffer))
   )

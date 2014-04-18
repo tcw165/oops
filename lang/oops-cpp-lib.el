@@ -1,0 +1,1 @@
+(provide 'oops-cpp-lib)
