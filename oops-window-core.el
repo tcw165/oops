@@ -68,4 +68,4 @@ e.g.
 ;; (window-total-height (frame-root-window))
 ;; (frame-height)
 
-(provide 'oops-definition-core)
+(provide 'oops-window-core)

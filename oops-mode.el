@@ -22,7 +22,7 @@
 
 ;; Core libraries:
 (require 'oops-core)
-(require 'oops-definition-core)
+(require 'oops-window-core)
 ;; Language libraries:
 (require 'oops-c-lib)
 (require 'oops-cpp-lib)
@@ -69,11 +69,10 @@ For Python, it doesn't support yet."
   "The function for `oops-idle-timer' do the following things:
   * Detect the symbol nearby the `point', and show symbol's definition in another window. Normally, the definition window is under the current window."
   (when oops-mode
-    (message "%s" (current-time))
     (cond
      ;; lisp
      ((or (eq major-mode 'emacs-lisp-mode)
-          (eq major-mode 'lisp-interaction-mode))oops-idle-timer-for-definition
+          (eq major-mode 'lisp-interaction-mode))
       (oops-lisp-show-definition-atpt)
       )
      ;; c
