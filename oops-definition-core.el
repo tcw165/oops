@@ -1,6 +1,10 @@
 (make-variable-buffer-local
  (defvar oops-definition-buffer nil
-  "A buffer dedicated "))
+  "A buffer dedicated to show definition."))
+
+(make-variable-buffer-local
+ (defvar oops-definition-window-enabled t
+   "A buffer-local variable indicate to show or hide definition window."))
 
 (defun oops-init-def-buffer (flag)
   "Initialize definition buffer or destory it. Depends on `flag', t indicate to initialize buffer and nil to destory the buffer.
@@ -20,7 +24,7 @@ e.g.
     )
   )
 
-(defun oops-toggle-definition-window ()
+(defun oops-toggle-definition-window (&optional enable)
   "Toggle the definition window linked to `oops-definition-buffer' under the `selected-window'. The height of definition window will be 1/3 height of `frame-root-window'.
 
 .----------------------.
@@ -32,8 +36,10 @@ e.g.
 '----------------------'
 "
   (interactive)
-  (when oops-mode
+  (when (and oops-mode
+             enable)
     ;; Force source window to be selected.
+
     ;; Init buffer.
     (oops-init-def-buffer t)
     ;; Split or merge window.

@@ -1,7 +1,8 @@
 ;; =============================================================================
 
-(defun oops-lisp-show-definition-at-point ()
+(defun oops-lisp-show-definition-atpt (enable)
   ""
+  (message "%s" (oops-thing-at-point))
   )
 
 ;; =============================================================================
