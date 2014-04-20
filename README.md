@@ -4,4 +4,4 @@ not-release-yet
 (require 'oops-mode)
 
 ;; Init all the features of `oops-mode'.
-(oops-global-init t)
+(oops-mode 1)

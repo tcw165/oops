@@ -64,19 +64,31 @@ The `base' should be a directory string and the `exclude' should be a list that 
 
 ;; =============================================================================
 
-(defconst oops-supported-alist
-  '(;; oops-mode
-    (emacs-lisp-mode-hook . oops-mode)
-    (lisp-interaction-mode-hook . oops-mode)
+(defconst oops-supported-major-mode
+  '('emacs-lisp-mode-hook 'lisp-interaction-mode-hook)
+  "Supported major-mode list.")
+
+(defconst oops-hook-alist
+  '(;; oops-everywhere-mode
+    (emacs-lisp-mode-hook . oops-everywhere-mode)
+    (lisp-interaction-mode-hook . oops-everywhere-mode)
     ;; imenu
     (emacs-lisp-mode-hook . imenu-add-menubar-index)
     (lisp-interaction-mode-hook . imenu-add-menubar-index))
-  "An association list that indicates the supported languages. Its format should be (MODE-HOOK . MY-HOOK)")
+  "An association list that indicates the bindings of major mode and minor mode. Its format should be (MAJOR-MODE-HOOK . MINOR-MODE-HOOK)")
 
 (defvar oops-idle-timer nil
   "An idle timer that ask `oops-idle-timer-function' to do something.")
 
-;; =============================================================================
+;; = Minor Mode ===============================================================>
+
+;;;###autoload
+(define-minor-mode oops-everywhere-mode
+  ""
+  :lighter " Oops"
+  )
+
+;; <============================================================================
 
 (defun oops-goto-symbol (&optional symbol-list)
   "Refresh imenu and jump to a place in the buffer using Ido."
@@ -137,7 +149,7 @@ For lisp, it supports symbol of `defun', `defadvice', `defvar' and `provide'.
 For C/C++, it doesn't support yet.
 For Python, it doesn't support yet."
   (interactive)
-  (when oops-mode
+  (when oops-everywhere-mode
     (cond
      ;; lisp
      ((or (eq major-mode 'emacs-lisp-mode)
@@ -154,7 +166,7 @@ For Python, it doesn't support yet."
 (defun oops-idle-timer-function ()
   "The function for `oops-idle-timer' do the following things:
   * Detect the symbol nearby the `point', and show symbol's definition in another window. Normally, the definition window is under the current window."
-  (when oops-mode
+  (when oops-everywhere-mode
     (cond
      ;; lisp
      ((or (eq major-mode 'emacs-lisp-mode)
@@ -169,47 +181,36 @@ For Python, it doesn't support yet."
     )
   )
 
-;; = Minor Mode ===============================================================>
-
-;;;###autoload
-(define-minor-mode oops-mode
-  ""
-  :lighter " Oops"
-  )
-
-;; <============================================================================
-
-;; (oops-init-hook t)
-;; (oops-init-hook nil)
 (defun oops-init-hook (enable)
-  "Add hooks and enable `oops-mode' for all the supported languages if `enable' is t.
-Remove hooks and disable `oops-mode' for all the supported languages if `enable' is nil.
+  "Add hooks and enable `oops-everywhere-mode' for all the supported languages if `enable' is t.
+Remove hooks and disable `oops-everywhere-mode' for all the supported languages if `enable' is nil.
 
 !DO NOT use this function in your lisp, or there would be side effects!"
   (if enable
-      ;; Add hooks and enable `oops-mode' for all the supported languages.
-      (progn (dolist (l oops-supported-alist)
+      ;; Add hooks and enable `oops-everywhere-mode' for all the supported languages.
+      (progn (dolist (l oops-hook-alist)
                (add-hook (car l) (cdr l))
                )
              (dolist (bf (buffer-list))
                (with-current-buffer bf
-                 (oops-mode 1))
+                 (when (and (not (string-match "^[*].+[*]$" (buffer-name)))
+                            (memq major-mode oops-supported-major-mode))
+                   (oops-everywhere-mode 1))
+                   )
                )
              )
-    ;; Remove hooks and disable `oops-mode' for all the supported languages.
-    (progn (dolist (l oops-supported-alist)
+    ;; Remove hooks and disable `oops-everywhere-mode' for all the supported languages.
+    (progn (dolist (l oops-hook-alist)
              (remove-hook (car l) (cdr l))
              )
            (dolist (bf (buffer-list))
                (with-current-buffer bf
-                 (oops-mode -1))
+                 (oops-everywhere-mode -1))
                )
            )
     )
   )
 
-;; (oops-init-idle-timer t)
-;; (oops-init-idle-timer nil)
 (defun oops-init-idle-timer (enable)
   "Create the `oops-idle-timer' if `enable' is t. Destory it if `enable' is nil.
 
@@ -229,21 +230,29 @@ Remove hooks and disable `oops-mode' for all the supported languages if `enable'
     )
   )
 
-;; (oops-global-init t)
-;; (oops-global-init nil)
-(defun oops-global-init (enable)
-  "A convenient way to let `oops-mode' automatically and globally enabled for all the supported languages.
-To disable `oops-mode' if `enable' is nil."
-  (interactive
-   (let* ((in (read-minibuffer (format "oops-global-init (current state is \"%s\", plz enter t or nil): " oops-mode) nil)))
-     (list (not (string-equal in "nil"))))
-   )
-  ;; hooks.
-  (oops-init-hook enable)
-  ;; window core.
-  (oops-init-window-core enable)
-  ;; idle timer.
-  (oops-init-idle-timer enable)
+;;;###autoload
+(defun oops-mode (&optional toggle)
+  "A convenient way to let `oops-everywhere-mode' automatically and globally enabled for all the supported languages.
+ (oops-mode 1)  => enable `oops-everywhere-mode'.
+ (oops-mode -1) => disable `oops-everywhere-mode'."
+  (interactive)
+  (let ((enable (if toggle
+                    ;; toggle == t or numeric number.
+                    (if (booleanp toggle)
+                        t
+                      (> toggle 0))
+                  ;; toggle == nil.
+                  (not oops-everywhere-mode))))
+    ;; hooks.
+    (oops-init-hook enable)
+    ;; window core.
+    (oops-init-window-core enable)
+    ;; idle timer.
+    (oops-init-idle-timer enable)
+
+    ;; togggle mode.
+    (oops-everywhere-mode (if enable 1 -1))
+    )
   )
 
 (provide 'oops-mode)
