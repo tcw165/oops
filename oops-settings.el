@@ -1,6 +1,13 @@
 ;; ====================== Common Setting =======================
 ;; TODO: Move common-setting to a more generic file.
 
+;; ido-mode
+(ido-mode t)
+(ido-everywhere t)
+
+;; icomplete-mode
+;; (icomplete-mode t)
+
 ;; enable CUA mode
 (cua-mode t)
 
@@ -67,7 +74,7 @@
 (global-set-key (kbd "C-S-d") 'kill-whole-line)
 
 ;; Alt + l
-(global-set-key (kbd "M-l") 'bs-show)
+(global-set-key (kbd "M-l") 'ido-switch-buffer)
 ;; Ctrl + l
 (global-set-key (kbd "C-l") 'goto-line)
 
@@ -75,6 +82,14 @@
 (global-set-key (kbd "C-/") 'oops-toggle-comment)
 ;; Alt + /
 (global-set-key (kbd "M-/") 'oops-toggle-comment)
+
+;; Ctrl + o
+(global-set-key (kbd "C-o") 'oops-goto-symbol)
+;; Alt + o
+(global-set-key (kbd "M-o") 'oops-goto-symbol)
+
+;; Ctrl + x, Ctrl + b
+(global-set-key (kbd "C-x C-b") 'ido-switch-buffer)
 
 ;; F1
 ;; F2

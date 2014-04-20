@@ -1,30 +1,5 @@
-;; Update load-path ============================================================
-(defun oops-add-subdirs-to-load-path ()
-  "Add all the sub-directories under current directory into load-path."
-  (when (not (null load-file-name))
-    (dolist (file (directory-files (file-name-directory load-file-name)))
-      (let ((file-path (concat (file-name-directory load-file-name) file)))
-        (when (and (file-directory-p file-path)
-                   (not (equal file "."))
-                   (not (equal file ".."))
-                   (not (equal file ".svn"))
-                   (not (equal file ".git"))
-                   (not (memq file-path load-path)))
-          (add-to-list 'load-path file-path)
-          )
-        )
-      )
-    )
-  )
-(oops-add-subdirs-to-load-path)
-
 ;; Native library ==============================================================
 (require 'thingatpt)
-
-;; 3rd party library ===========================================================
-(require 'highlight-symbol)
-(require 'highlight-parentheses)
-(require 'auto-complete)
 
 (defun oops-thing-at-point (&optional skip-select)
   "Return string on which the point is or just string of selection."
