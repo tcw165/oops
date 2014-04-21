@@ -1,50 +1,77 @@
 (make-variable-buffer-local
  (defvar oops-dbuf nil
-  "A buffer exist locally and dedicate to show definition."))
+   "A buffer exist locally and dedicate to show definition."))
 
-(defvar oops-def-bufs nil
-  "A buffer dedicated to show definition.")
+(make-variable-buffer-local
+ (defvar oops-is-show-dbuf nil
+  "A boolean tha indicate to show or hide the definition windows."))
 
-(defvar oops-def-window-enabled nil
-  "A boolean tha indicate to show or hide the definition windows.")
+(defvar oops-dbufs nil
+  "A list containing buffer that dedicated to show definition.")
+
+(defconst oops-window-core-hook-alist '((window-configuration-change-hook . oops-window-configuration-change-hook)
+                                        )
+  "")
 
 ;; =============================================================================
 
-(defun oops-gen-new-def-buf (index)
-  "Generate a new definition buffer with default name and index."
-  (generate-new-buffer (format "*definition (%s)*" index))
-  )
+;; (setq a '(1))
+;; (push 2 a)
+;; (length a)
+;; (setq a (delq 2 a))
+;; (setq a (delq 1 a))
 
-(defun oops-update-def-windows ()
-  "A convenient way to get all the window of `selected-frame' binding with source codes. It filters out all the windows with the name starting with \"*\"."
-
-  ;; Iterate all live windows.
-  (dolist (win (window-list))
-    (let* ((win-buf (window-buffer win))
-           (buf-name (buffer-name win-buf))
-           ;; definition buffer's amount.
-           (i (length oops-def-bufs))
-           ;; new window's height.
-           (h (- (/ (window-total-height win) 4))))
-      (when (not (string-match "^[*][a-zA-Z -_(0-9)]+[*]$" buf-name))
-        (if (null oops-def-bufs)
-            ;; 1st time to create buffer.
-            (setq oops-def-bufs
-                  (list (oops-gen-new-def-buf i)))
-          ;; Push new buffer.
-          (push (oops-gen-new-def-buf i)
-                oops-def-bufs)
-          )
-        ;; Bind new window with new buffer.
-        (split-window win h 'below)
-        (set-window-buffer (window-next-sibling win) (car oops-def-bufs))
-        )
+(defun oops-new-dbuf ()
+  "Generate a new definition buffer and push into `oops-dbufs'. Return the new buffer."
+  (let ((buf (generate-new-buffer (format "*definition (%s)*" (length oops-dbufs)))))
+    (if (null oops-dbufs)
+        (setq oops-dbufs '(buf))
+      (push buf oops-dbufs)
       )
+    buf
     )
   )
-;; (split-window nil nil 'right)
-;; (string-match "^[*]definition.*[*]" "*definition (0)*")
-;; (oops-update-def-windows)
+
+(defun oops-del-dbuf (buf)
+  "Delete a definition buff from `oops-dbufs'."
+  (if (not (null buf))
+      (setq oops-dbufs
+            (delq buf oops-dbufs))
+    )
+  )
+
+;; (defun oops-gen-new-def-buf (index)
+;;   "Generate a new definition buffer with default name and index."
+;;   (generate-new-buffer (format "*definition (%s)*" index))
+;;   )
+
+;; (defun oops-update-def-windows ()
+;;   "A convenient way to get all the window of `selected-frame' binding with source codes. It filters out all the windows with the name starting with \"*\"."
+
+;;   ;; Iterate all live windows.
+;;   (dolist (win (window-list))
+;;     (let* ((win-buf (window-buffer win))
+;;            (buf-name (buffer-name win-buf))
+;;            ;; definition buffer's amount.
+;;            (i (length oops-dbufs))
+;;            ;; new window's height.
+;;            (h (- (/ (window-total-height win) 4))))
+;;       (when (not (string-match "^[*][a-zA-Z -_(0-9)]+[*]$" buf-name))
+;;         (if (null oops-dbufs)
+;;             ;; 1st time to create buffer.
+;;             (setq oops-dbufs
+;;                   (list (oops-gen-new-def-buf i)))
+;;           ;; Push new buffer.
+;;           (push (oops-gen-new-def-buf i)
+;;                 oops-dbufs)
+;;           )
+;;         ;; Bind new window with new buffer.
+;;         (split-window win h 'below)
+;;         (set-window-buffer (window-next-sibling win) (car oops-dbufs))
+;;         )
+;;       )
+;;     )
+;;   )
 
 (defun oops-kill-def-windows ()
   "Kill all the definition windows."
@@ -58,8 +85,8 @@
     )
   )
 
-(defun oops-toggle-definition-window ()
-  "Toggle the definition window linked to `oops-def-bufs' under the source code window. The height of definition window will be 1/3 height of `frame-root-window'.
+(defun oops-toggle-definition-window (&optional all-live-win)
+  "Toggle the definition window linked to `oops-dbufs' under the source code window. The height of definition window will be 1/3 height of `frame-root-window'.
 
 .---.------------------.
 |   |                  |
@@ -95,10 +122,6 @@
   ;; Check definition window status.
   )
 
-(defconst oops-window-core-hook-alist '((window-configuration-change-hook . oops-window-configuration-change-hook)
-                                        )
-  "")
-
 (defun oops-init-window-core (enable)
   ""
   (if enable
@@ -108,11 +131,11 @@
         (dolist (alist oops-window-core-hook-alist)
           (add-hook (car alist) (cdr alist))
           )
-      )
+        )
     ;; Disable.
     (progn
       ;; Remove hooks.
-      (dolist (alist  oops-window-core-hook-alist)
+      (dolist (alist oops-window-core-hook-alist)
         (remove-hook (car alist) (cdr alist))
         )
       )
