@@ -1,25 +1,19 @@
 (make-variable-buffer-local
  (defvar oops-dbuf nil
-   "A buffer exist locally and dedicate to show definition."))
+   "A buffer that dedicate to show definition."))
 
 (make-variable-buffer-local
  (defvar oops-is-show-dbuf nil
-  "A boolean tha indicate to show or hide the definition windows."))
+  "A boolean locally belong to buffer that indicate to show or hide the definition windows."))
 
 (defvar oops-dbufs nil
   "A list containing buffer that dedicated to show definition.")
 
-(defconst oops-window-core-hook-alist '((window-configuration-change-hook . oops-window-configuration-change-hook)
-                                        )
+(defconst oops-win-hook-alist '((window-configuration-change-hook . oops-window-configuration-change-hook)
+                                )
   "")
 
 ;; =============================================================================
-
-;; (setq a '(1))
-;; (push 2 a)
-;; (length a)
-;; (setq a (delq 2 a))
-;; (setq a (delq 1 a))
 
 (defun oops-new-dbuf ()
   "Generate a new definition buffer and push into `oops-dbufs'. Return the new buffer."
@@ -38,12 +32,8 @@
       (setq oops-dbufs
             (delq buf oops-dbufs))
     )
+  ;; TODO/FIXME: rename oops-dbufs
   )
-
-;; (defun oops-gen-new-def-buf (index)
-;;   "Generate a new definition buffer with default name and index."
-;;   (generate-new-buffer (format "*definition (%s)*" index))
-;;   )
 
 ;; (defun oops-update-def-windows ()
 ;;   "A convenient way to get all the window of `selected-frame' binding with source codes. It filters out all the windows with the name starting with \"*\"."
@@ -120,27 +110,9 @@
 (defun oops-window-configuration-change-hook ()
   ""
   ;; Check definition window status.
+  (message "window is changed.")
   )
 
-(defun oops-init-window-core (enable)
-  ""
-  (if enable
-      ;; Enable.
-      (progn
-        ;; Add hooks.
-        (dolist (alist oops-window-core-hook-alist)
-          (add-hook (car alist) (cdr alist))
-          )
-        )
-    ;; Disable.
-    (progn
-      ;; Remove hooks.
-      (dolist (alist oops-window-core-hook-alist)
-        (remove-hook (car alist) (cdr alist))
-        )
-      )
-    )
-  )
 ;; (oops-init-window-core t)
 ;; (oops-init-window-core nil)
 
@@ -155,4 +127,46 @@
 ;; (window-total-height (frame-root-window))
 ;; (frame-height)
 
-(provide 'oops-window-core)
+;; ;;;###autoload
+;; (defun oops-win-mode (&optional toggle)
+;;   "A convenient way to let `oops-win-mgr-mode' automatically enabled or disabled.
+;;  (oops-win-mode 1)  => enable `oops-win-mgr-mode'.
+;;  (oops-win-mode -1) => disable `oops-win-mgr-mode'."
+;;   (interactive)
+;;   (let ((enable (if toggle
+;;                     ;; toggle == t or numeric number.
+;;                     (if (booleanp toggle)
+;;                         t
+;;                       (> toggle 0))
+;;                   ;; toggle == nil.
+;;                   (not oops-win-mgr-mode))))
+;;     ;; togggle mode.
+;;     (oops-win-mgr-mode (if enable 1 -1))
+;;     )
+;;   )
+
+;; = Minor Mode ===============================================================>
+
+;;;###autoload
+(define-minor-mode oops-win-mode
+  "Window manager mode for ..."
+  :global t
+
+  (if oops-win-mode
+      ;; Enable.
+      (progn
+        (dolist (alist oops-win-hook-alist)
+          (add-hook (car alist) (cdr alist)))
+        )
+    ;; Disable.
+    (progn
+      (dolist (alist oops-win-hook-alist)
+        (remove-hook (car alist) (cdr alist)))
+      ;; TODO/FIXME: kill oops-dbufs.
+      )
+    )
+  )
+
+;; <============================================================================
+
+(provide 'oops-win-mode)
