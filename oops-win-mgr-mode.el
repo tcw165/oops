@@ -1,10 +1,21 @@
-(make-variable-buffer-local
- (defvar oops-dbuf nil
-   "A buffer that dedicate to show definition."))
+;;
+;; .---.------------------.
+;; |   |                  |
+;; |   |        S         | S* -> Source/Option window (might be mutiple, depends on user)
+;; | O |                  | D* -> Definition window (might be multiple, depends on amount of source windows)
+;; |   |------------------| O  -> Outline window (only 1 for each frame)
+;; |   |        D         |
+;; '---'------------------'
 
-(make-variable-buffer-local
- (defvar oops-is-show-dbuf nil
-  "A boolean locally belong to buffer that indicate to show or hide the definition windows."))
+;;             or
+
+;; .---.--------.---------.
+;; |   |        |         |
+;; |   |   S1   |    S2   |
+;; | O |        |         | or more complicated...
+;; |   |--------:---------|
+;; |   |   D1   |    D2   |
+;; '---'--------'---------'
 
 (defvar oops-dbufs nil
   "A list containing buffer that dedicated to show definition.")
@@ -63,7 +74,7 @@
 ;;     )
 ;;   )
 
-(defun oops-kill-def-windows ()
+(defun oops-kill-dbufs ()
   "Kill all the definition windows."
   (dolist (win (window-list))
     (let* ((win-buf (window-buffer win))
@@ -75,35 +86,22 @@
     )
   )
 
-(defun oops-toggle-definition-window (&optional all-live-win)
-  "Toggle the definition window linked to `oops-dbufs' under the source code window. The height of definition window will be 1/3 height of `frame-root-window'.
-
-.---.------------------.
-|   |                  |
-|   |        S         | S* -> Source/Option window (might be mutiple, depends on user)
-| O |                  | D* -> Definition window (might be multiple, depends on amount of source windows)
-|   |------------------| O  -> Outline window (only 1 for each frame)
-|   |        D         |
-'---'------------------'
-
-            or
-
-.---.--------.---------.
-|   |        |         |
-|   |   S1   |    S2   |
-| O |        |         | or more complicated...
-|   |--------:---------|
-|   |   D1   |    D2   |
-'---'--------'---------'
-"
-  (interactive)
-  (if (null oops-def-window-enabled)
-      ;; Enable.
-      (progn (oops-update-def-windows)
-             (setq oops-def-window-enabled t))
-    ;; Disable.
-    (progn (oops-kill-def-windows)
-           (setq oops-def-window-enabled nil))
+(defun oops-win-mgr-show-definition (data)
+  "Toggle the definition window linked to `oops-dbufs' under the source code window. The height of definition window will be 1/3 height of `frame-root-window'."
+  (when oops-win-mgr-mode
+    (cond
+     ;; nil
+     ((null data)
+      ;; kill window
+      (oops-kill-dbufs)
+      )
+     ;; (FILE_NAME . POINT)
+     ((consp data)
+      ;; kill old window
+      ;; show window
+      )
+     ;; special form for mutiple results.
+     )
     )
   )
 
@@ -128,10 +126,10 @@
 ;; (frame-height)
 
 ;; ;;;###autoload
-;; (defun oops-win-mode (&optional toggle)
+;; (defun oops-win-mgr-mode (&optional toggle)
 ;;   "A convenient way to let `oops-win-mgr-mode' automatically enabled or disabled.
-;;  (oops-win-mode 1)  => enable `oops-win-mgr-mode'.
-;;  (oops-win-mode -1) => disable `oops-win-mgr-mode'."
+;;  (oops-win-mgr-mode 1)  => enable `oops-win-mgr-mode'.
+;;  (oops-win-mgr-mode -1) => disable `oops-win-mgr-mode'."
 ;;   (interactive)
 ;;   (let ((enable (if toggle
 ;;                     ;; toggle == t or numeric number.
@@ -148,11 +146,11 @@
 ;; = Minor Mode ===============================================================>
 
 ;;;###autoload
-(define-minor-mode oops-win-mode
+(define-minor-mode oops-win-mgr-mode
   "Window manager mode for ..."
   :global t
 
-  (if oops-win-mode
+  (if oops-win-mgr-mode
       ;; Enable.
       (progn
         (dolist (alist oops-win-hook-alist)
@@ -169,4 +167,4 @@
 
 ;; <============================================================================
 
-(provide 'oops-win-mode)
+(provide 'oops-win-mgr-mode)
