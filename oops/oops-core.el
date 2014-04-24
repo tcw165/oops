@@ -132,15 +132,9 @@
 (defun oops-indent-or-company ()
   (interactive)
   (if (or mark-active
-          (looking-back "^") ;; begining of line.
-          (looking-at "$")) ;; end of line.
+          (looking-at "\\(^\\|$\\|\(\\|\)\\|\\s-+\\)")) ;; begining of line, end of line, space, '(', ')'
       (indent-for-tab-command)
     (company-complete-common))
   )
-
-;; (string-match "\\(foo\\|xy\\)\\(7\\)\\2" "fooxyxyxfoofoofoo")
-;; (string-match "\\(.*\\)\\1" "aabb\naabb")
-;; (string-match "\\(foo\\(b*\\)\\|z\\)\\2" "hihiaaa")
-;; (string-match "\\(foo\\(b*\\)\\|lose\\)\\2" "123 123 foobbbbbb")
 
 (provide 'oops-core)
