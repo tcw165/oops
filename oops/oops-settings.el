@@ -82,6 +82,11 @@
 ;; Alt + /
 (global-set-key (kbd "M-/") 'oops-toggle-comment)
 
+;; Ctrl + up
+(global-set-key (kbd "C-<up>") 'oops-move-lines-up)
+;; Ctrl + down
+(global-set-key (kbd "C-<down>") 'oops-move-lines-down)
+
 ;; Ctrl + o
 (global-set-key (kbd "C-o") 'oops-goto-symbol)
 ;; Alt + o

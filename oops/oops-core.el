@@ -55,15 +55,15 @@
 (defun oops-duplicate-lines ()
   "Duplciate the current line or the lines between point and mark without modifying `kill-ring'."
   (interactive)
+  ;; There're two situation:
+  ;; (point) ---------------
+  ;; -----------------(mark)
+  ;; or
+  ;; (mark)-----------------
+  ;; ----------------(point)
   (let* ((beg (line-beginning-position 1))
          (end (line-beginning-position 2))
          (str (buffer-substring-no-properties beg end)))
-    ;; There're two situation:
-    ;; (point) ---------------
-    ;; -----------------(mark)
-    ;; or
-    ;; (mark)-----------------
-    ;; ----------------(point)
     (when mark-active
       (setq beg (save-excursion
                   (goto-char (region-beginning))
@@ -109,14 +109,60 @@
     )
   )
 
+(defun oops-move-lines (step)
+  "Move the current line or the lines covered by region upward or downward without modifying `kill-ring'."
+  ;; There're two situation:
+  ;; (point) ---------------
+  ;; -----------------(mark)
+  ;; or
+  ;; (mark)-----------------
+  ;; ----------------(point)
+  (let* ((beg (line-beginning-position 1))
+         (end (line-beginning-position 2))
+         (line-num 1)
+         (point-excursion (- (point) end))
+         (mark-excursion 0)
+         text)
+    (when mark-active
+      (setq beg (save-excursion
+                  (goto-char (region-beginning))
+                  (beginning-of-line 1)
+                  (point))
+            end (save-excursion
+                  (goto-char (region-end))
+                  (beginning-of-line 2)
+                  (point))
+            line-num (count-lines (region-beginning) (region-end))
+            point-excursion (- (point) end)
+            mark-excursion (- (mark) (point))
+            )
+      )
+    ;; Extract region.
+    (setq text (delete-and-extract-region beg end))
+    ;; Move upward/downward and insert the cut region.
+    (forward-line step)
+    (insert text)
+    ;; Set new point.
+    (goto-char (+ (point) point-excursion))
+    ;; Set new mark.
+    (when mark-active
+      (deactivate-mark)
+      (set-mark (+ (point) mark-excursion))
+      (setq deactivate-mark nil)
+      )
+    )
+  )
+
 (defun oops-move-lines-up ()
-  "Move the current line or the lines between point and mark upword without modifying `king-ring'."
+  "Move the current line or the lines covered by region upward without modifying `kill-ring'."
   (interactive)
+  (oops-move-lines -1)
   )
 
 (defun oops-move-lines-down ()
-  "Move the current line or the lines between point and mark upword without modifying `king-ring'."
+  "Move the current line or the lines covered by region downward without modifying `kill-ring'."
   (interactive)
+  (oops-move-lines 1)
   )
 
 (defun oops-common-escape ()
