@@ -19,6 +19,13 @@
     )
   )
 
+(defun oops-undo ()
+  "Just undo something without caring the region."
+  (interactive)
+  (deactivate-mark)
+  (undo)
+  )
+
 (defun oops-kill-current-buffer ()
   "Kill the buffer you are focusing which is `current-buffer'."
   (interactive)
@@ -28,10 +35,10 @@
 (defun oops-toggle-comment ()
   "Toggle comment smartly. It support comment on both single line and multiple lines."
   (interactive)
-  (let ((start (line-beginning-position))
+  (let ((beg (line-beginning-position))
         (end (line-end-position)))
     (when mark-active
-      (setq start (save-excursion
+      (setq beg (save-excursion
                     (goto-char (region-beginning))
                     (beginning-of-line)
                     (point))
@@ -41,34 +48,78 @@
                   (point))
             )
       )
-    (comment-or-uncomment-region start end)
+    (comment-or-uncomment-region beg end)
     )
   )
 
 (defun oops-duplicate-lines ()
-  ""
+  "Duplciate the current line or the lines between point and mark without modifying `kill-ring'."
   (interactive)
-  (message "Yet ready...")
-  ;; (save-excursion
-  ;;   (let ((nb (or n 1))
-  ;;         (current-line (thing-at-point 'line)))
-  ;;     ;; when on last line, insert a newline first
-  ;;     (when (or (= 1 (forward-line 1)) (eq (point) (point-max)))
-  ;;       (insert "\n"))
-
-  ;;     ;; now insert as many time as requested
-  ;;     (while (> n 0)
-  ;;       (insert current-line)
-  ;;       (decf n))))
+  (let* ((beg (line-beginning-position 1))
+         (end (line-beginning-position 2))
+         (str (buffer-substring-no-properties beg end)))
+    ;; There're two situation:
+    ;; (point) ---------------
+    ;; -----------------(mark)
+    ;; or
+    ;; (mark)-----------------
+    ;; ----------------(point)
+    (when mark-active
+      (setq beg (save-excursion
+                  (goto-char (region-beginning))
+                  (beginning-of-line 1)
+                  (point))
+            end (save-excursion
+                  (goto-char (region-end))
+                  (beginning-of-line 2)
+                  (point))
+            str (buffer-substring-no-properties beg end)
+            )
+      ;; (push-mark)
+      )
+    (save-excursion
+      (if (and mark-active
+               (> (mark) (point)))
+          (goto-char (region-end)))
+      (beginning-of-line 2)
+      (insert str)
+      )
+    ;; Restore selection.
+    (setq deactivate-mark nil)
+    )
   )
 
 (defun oops-kill-lines ()
-  ""
+  "Kill the current line or the lines between point and mark without modifying `kill-ring'."
   (interactive)
-  (message "Yet ready...")
+  (let ((beg (line-beginning-position 1))
+        (end (line-beginning-position 2)))
+    (when mark-active
+       (setq beg (save-excursion
+                    (goto-char (region-beginning))
+                    (beginning-of-line 1)
+                    (point))
+            end (save-excursion
+                  (goto-char (region-end))
+                  (beginning-of-line 2)
+                  (point))
+            )
+      )
+    (delete-region beg end)
+    )
   )
 
-(defun oops-generic-escape ()
+(defun oops-move-lines-up ()
+  "Move the current line or the lines between point and mark upword without modifying `king-ring'."
+  (interactive)
+  )
+
+(defun oops-move-lines-down ()
+  "Move the current line or the lines between point and mark upword without modifying `king-ring'."
+  (interactive)
+  )
+
+(defun oops-common-escape ()
   ""
   (interactive)
   )
@@ -132,7 +183,7 @@
 (defun oops-indent-or-company ()
   (interactive)
   (if (or mark-active
-          (looking-at "\\(^\\|$\\|\(\\|\)\\|\\s-+\\)")) ;; begining of line, end of line, space, '(', ')'
+          (looking-at "\\(^\\|$\\|\(\\|\\s-+\\)")) ;; begining of line, end of line, space, '('
       (indent-for-tab-command)
     (company-complete-common))
   )

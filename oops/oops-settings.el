@@ -55,18 +55,22 @@
 ;; ======================== KEY BINDING ========================
 ;; TODO: Move key-binding to a more generic file.
 
+(when (eq system-type 'darwin)
+  (global-set-key (kbd "s-w") 'oops-kill-current-buffer)
+  (global-set-key (kbd "s-z") 'oops-undo)
+  )
+
 ;; ESC
 (global-set-key (kbd "<escape>") 'keyboard-escape-quit)
 
 ;; Ctrl + w, command + w
 (global-set-key (kbd "C-w") 'oops-kill-current-buffer)
-(if (eq system-type 'darwin)
-  (global-set-key (kbd "s-w") 'oops-kill-current-buffer)
-  )
 ;; Ctrl + d
-(global-set-key (kbd "C-d") 'oops-duplicate-line)
+(global-set-key (kbd "C-d") 'oops-duplicate-lines)
 ;; Ctrl + shift + d
-(global-set-key (kbd "C-S-d") 'kill-whole-line)
+(global-set-key (kbd "C-S-d") 'oops-kill-lines)
+;; Ctrl + z
+(global-set-key (kbd "C-z") 'oops-undo)
 
 ;; Alt + l
 (global-set-key (kbd "M-l") 'ido-switch-buffer)
