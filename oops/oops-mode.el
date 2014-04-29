@@ -43,7 +43,7 @@ The `base' should be a directory string and the `exclude' should be a list that 
 
 ;; Core libraries:
 (require 'oops-core)
-(require 'oops-win-mgr-mode)
+(require 'oops-win-mode)
 (require 'oops-help)
 ;; Language libraries:
 (require 'oops-c-lib)
@@ -160,14 +160,14 @@ For Python, it doesn't support yet."
                (add-hook (car l) (cdr l)))
 
              (oops-init-idle-timer 1)
-             (oops-win-mgr-mode 1)
+             (oops-win-mode 1)
              )
     ;; Disable.
     (progn (dolist (l oops-hook-alist)
              (remove-hook (car l) (cdr l)))
 
            (oops-init-idle-timer -1)
-           (oops-win-mgr-mode -1)
+           (oops-win-mode -1)
            )
     )
   )
