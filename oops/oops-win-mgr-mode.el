@@ -1,29 +1,91 @@
+;; Following are basic windows for some purpose:
+;; 1. Editing Window (E*):
+;;    It binds to source code you're editing or a temporary search result.
+;;    There might be more than one E* window at the same time in a frame.
+;;
+;; 2. Definition Window (D*):
+;;    To show the definition of the symbol that is currently under cursor if there is only one matched result.
+;;    The amount of D* windows increase or decrease proportionally to the amount of E* windows.
+;;
+;; 3. Definition Option Window (DO*):
+;;    Only appears and provide a options list when there're multiple matched results.
+;;    The amount of DO* windows increase or decrease proportionally to the amount of E* windows.
+;;
+;; 4. Outline Window (O):
+;;    To show the outline of the selected E* window.
+;;    There'll be only one outline window at the same time in a frame, even there're more than one E* windows.
 ;;
 ;; .---.------------------.
 ;; |   |                  |
-;; |   |        S         | S* -> Source/Option window (might be mutiple, depends on user)
-;; | O |                  | D* -> Definition window (might be multiple, depends on amount of source windows)
-;; |   |------------------| O  -> Outline window (only 1 for each frame)
+;; |   |                  |
+;; |   |        E         |
+;; | O |                  |
+;; |   |                  |
+;; |   |------------------|
 ;; |   |        D         |
 ;; '---'------------------'
-
-;;             or
-
+;;
+;;             and
+;;
+;; .---.------------------.
+;; |   |                  |
+;; |   |        E         |
+;; |   |                  |
+;; | O |------------------|
+;; |   |       DO         |
+;; |   |------------------|
+;; |   |        D         |
+;; '---'------------------'
+;;
+;; Following is a complicated example:
+;;
 ;; .---.--------.---------.
 ;; |   |        |         |
+;; |   |        |         |
 ;; |   |   S1   |    S2   |
-;; | O |        |         | or more complicated...
+;; |   |--------:---------|
+;; | O |  DO1   |   DO2   |
 ;; |   |--------:---------|
 ;; |   |   D1   |    D2   |
 ;; '---'--------'---------'
+;;
 
 (defvar oops-dbufs nil
   "A list containing buffer that dedicated to show definition.")
+
+(defvar oops--outline-win nil
+  "A boolean indicates the D* window is shown or not.")
+
+(defvar oops--help-win nil
+  "A boolean indicates the D* window is shown or not.")
 
 (defconst oops-win-hook-alist '(
                                 ;; (window-configuration-change-hook . oops-window-configuration-change-hook)
                                 )
   "")
+
+;; = Windows ===================================================================
+
+(defun oops-win-toggle-outline-and-help (&optional toggle)
+  (interactive)
+  ;; (let ((enable (if toggle
+  ;;                   ;; toggle == t or numeric number.
+  ;;                   (if (booleanp toggle)
+  ;;                       t
+  ;;                     (> toggle 0))
+  ;;                 ;; toggle == nil.
+  ;;                 ;; TODO/FIXME: exam D* is alive
+  ;;                 (not (and (null oops--outline-win)
+  ;;                           (null oops--help-win))))
+  ;;       (win (selected-window))
+  ;;       (h (- (/ (window-total-height win) 4))))
+  ;;   (if enable
+  ;;       ;; New window.
+  ;;       (split-window win h 'below)
+  ;;     ;; Delete window.
+  ;;     )
+  ;;   )
+  )
 
 ;; =============================================================================
 
@@ -87,15 +149,10 @@
     )
   )
 
-(defun oops-win-mgr-show-definition (data)
+(defun oops-wmgr-set-definition (data)
   "Toggle the definition window linked to `oops-dbufs' under the source code window. The height of definition window will be 1/3 height of `frame-root-window'."
   (when oops-win-mgr-mode
     (cond
-     ;; nil
-     ((null data)
-      ;; kill window
-      (oops-kill-dbufs)
-      )
      ;; (FILE_NAME . POINT)
      ((consp data)
       ;; kill old window

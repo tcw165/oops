@@ -20,7 +20,6 @@
 ;;     '------'   '-----------------'
 ;;
 
-;; Add sub-directories recursively to `load-path'.
 (defun oops-add-to-list-with-subdirs (base exclude)
   "Add sub-directories recursively to `load-path'.
 The `base' should be a directory string and the `exclude' should be a list that to be skipped."
@@ -34,9 +33,7 @@ The `base' should be a directory string and the `exclude' should be a list that 
     )
   (add-to-list 'load-path base)
   )
-(let ((base "~/.emacs.d"))
-      (oops-add-to-list-with-subdirs base '("." ".." ".svn" ".git"))
-      )
+(oops-add-to-list-with-subdirs "~/.emacs.d" '("." ".." ".svn" ".git"))
 
 ;; 3rd party library ===========================================================
 (require 'highlight-symbol)

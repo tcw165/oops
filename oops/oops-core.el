@@ -165,6 +165,15 @@
   (oops-move-lines 1)
   )
 
+(defun oops-indent-or-company ()
+  (interactive)
+  (if (or mark-active
+          ;; including: "begining of line"", "end of line"", "space"", "("
+          (looking-at "\\(^\\|$\\|\(\\|\\s-+\\)"))
+      (indent-for-tab-command)
+    (company-complete-common))
+  )
+
 ;; Navigation ==================================================================
 
 (defun oops-prev-history ()
@@ -214,8 +223,7 @@ or go back to just one window (by deleting all but the selected window)."
    )
   )
 
-;; `imenu' =====================================================================
-
+;; require `imenu'.
 (defun oops-goto-symbol (&optional symbol-list)
   "Refresh imenu and jump to a place in the buffer using Ido."
   (interactive)
@@ -268,14 +276,10 @@ or go back to just one window (by deleting all but the selected window)."
    )
   )
 
-;; `company' ===================================================================
-
-(defun oops-indent-or-company ()
+;; TODO/FIXME:
+(defun oops-goto-global-symbol ()
+  ""
   (interactive)
-  (if (or mark-active
-          (looking-at "\\(^\\|$\\|\(\\|\\s-+\\)")) ;; begining of line, end of line, space, '('
-      (indent-for-tab-command)
-    (company-complete-common))
   )
 
 (provide 'oops-core)

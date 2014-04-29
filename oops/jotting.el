@@ -1,374 +1,212 @@
-;; subrp
-;; symbol-function
-;; symbol-file
-;; find-function-noselect
-;; find-variable-noselect
-;; find-function-search-for-symbol
+(defun split-window (&optional window size side)
+  (interactive "i")
+  (setq window (window-normalize-window window))
+  (let* ((side (cond
+                ((not side) 'below)
+                ((memq side '(below above right left)) side)
+                (t 'right)))
+         (horizontal (not (memq side '(below above))))
+         (frame (window-frame window))
+         (parent (window-parent window))
+         (function (window-parameter window 'split-window))
+         (window-side (window-parameter window 'window-side))
+         ;; Rebind the following two variables since in some cases we
+         ;; have to override their value.
+         (window-combination-limit window-combination-limit)
+         (window-combination-resize window-combination-resize)
+         atom-root)
 
-(symbol-function (read "find-function-noselect"))
-(symbol-file (read "find-function-noselect"))
-(find-function-noselect (read "find-variable-noselect"))
-(car (find-function-noselect (read "find-variable-noselect")))
-(cdr (find-function-noselect (read "find-variable-noselect")))
-(get-file-buffer (expand-file-name "~/.emacs.d/oops/jotting.el"))
-(oops-lisp-find-function (read "find-file"))
-(generate-new-buffer "*test*")
-
-(message "total = %s, %s" (length (buffer-list)) (buffer-list))
-
-;; <------------------------------------------------------ test end;
-
-(defun find-function (function)
-  "Find the definition of the FUNCTION near point.
-
-Finds the source file containing the definition of the function
-near point (selected by `function-called-at-point') in a buffer and
-places point before the definition.
-Set mark before moving, if the buffer already existed.
-
-The library where FUNCTION is defined is searched for in
-`find-function-source-path', if non-nil, otherwise in `load-path'.
-See also `find-function-recenter-line' and `find-function-after-hook'."
-  (interactive (find-function-read))
-  (find-function-do-it function nil 'switch-to-buffer)
-  )
-
-(defun find-function-do-it (symbol type switch-fn)
-  "Find Emacs Lisp SYMBOL in a buffer and display it.
-TYPE is nil to search for a function definition,
-or else `defvar' or `defface'.
-
-The variable `find-function-recenter-line' controls how
-to recenter the display.  SWITCH-FN is the function to call
-to display and select the buffer.
-See also `find-function-after-hook'.
-
-Set mark before moving, if the buffer already existed."
-  (let* ((orig-point (point))
-         (orig-buf (window-buffer))
-         (orig-buffers (buffer-list))
-         (buffer-point (save-excursion
-                         (find-definition-noselect symbol type)))
-         ;; 'find-definition-noselect is the key function.
-         ;; 'symbol-function
-         (new-buf (car buffer-point))
-         (new-point (cdr buffer-point)))
-    (when buffer-point
-      (when (memq new-buf orig-buffers)
-        (push-mark orig-point)
+    (window--check frame)
+    (catch 'done
+      (cond
+       ;; Ignore window parameters if either `ignore-window-parameters'
+       ;; is t or the `split-window' parameter equals t.
+       ((or ignore-window-parameters (eq function t)))
+       ((functionp function)
+        ;; The `split-window' parameter specifies the function to call.
+        ;; If that function is `ignore', do nothing.
+        (throw 'done (funcall function window size side))
         )
-      (funcall switch-fn new-buf)
-      (when new-point
-        (goto-char new-point)
+       ;; If WINDOW is part of an atomic window, split the root window
+       ;; of that atomic window instead.
+       ((and (window-parameter window 'window-atom)
+             (setq atom-root (window-atom-root window))
+             (not (eq atom-root window)))
+        (throw 'done (split-window atom-root size side))
         )
-      (recenter find-function-recenter-line)
-      (run-hooks 'find-function-after-hook)
-      )
-    )
-  )
+       ;; If WINDOW is a side window or its first or last child is a
+       ;; side window, throw an error unless `window-combination-resize'
+       ;; equals 'side.
+       ((and (not (eq window-combination-resize 'side))
+             (or (window-parameter window 'window-side)
+                 (and (window-child window)
+                      (or (window-parameter
+                           (window-child window) 'window-side)
+                          (window-parameter
+                           (window-last-child window) 'window-side)))))
+        (error "Cannot split side window or parent of side window")
+        )
+       ;; If `window-combination-resize' is 'side and window has a side
+       ;; window sibling, bind `window-combination-limit' to t.
+       ((and (not (eq window-combination-resize 'side))
+             (or (and (window-prev-sibling window)
+                      (window-parameter
+                       (window-prev-sibling window) 'window-side))
+                 (and (window-next-sibling window)
+                      (window-parameter
+                       (window-next-sibling window) 'window-side))))
+        (setq window-combination-limit t)
+        )
+       )
 
-(defun find-function-read (&optional type)
-  "Read and return an interned symbol, defaulting to the one near point.
+      ;; If `window-combination-resize' is t and SIZE is non-negative,
+      ;; bind `window-combination-limit' to t.
+      (when (and (eq window-combination-resize t) size (> size 0))
+        (setq window-combination-limit t))
 
-If TYPE is nil, insist on a symbol with a function definition.
-Otherwise TYPE should be `defvar' or `defface'.
-If TYPE is nil, defaults using `function-called-at-point',
-otherwise uses `variable-at-point'."
-  (let* ((symb1 (cond ((null type) (function-called-at-point))
-                      ((eq type 'defvar) (variable-at-point))
-                      (t (variable-at-point t))))
-         (symb  (unless (eq symb1 0) symb1))
-         (predicate (cdr (assq type '((nil . fboundp)
-                                      (defvar . boundp)
-                                      (defface . facep)))))
-         (prompt-type (cdr (assq type '((nil . "function")
-                                        (defvar . "variable")
-                                        (defface . "face")))))
-         (prompt (concat "Find " prompt-type
-                         (and symb (format " (default %s)" symb))
-                         ": "))
-         (enable-recursive-minibuffers t)
-         )
-    (list (intern (completing-read
-                   prompt obarray predicate
-                   t nil nil
-                   (and symb (symbol-name symb))
-                   )
-                  )
-          )
-    )
-  )
+      (let* ((parent-size
+              ;; `parent-size' is the size of WINDOW's parent, provided
+              ;; it has one.
+              (when parent (window-total-size parent horizontal)))
+             ;; `resize' non-nil means we are supposed to resize other
+             ;; windows in WINDOW's combination.
+             (resize
+              (and window-combination-resize
+                   (or (window-parameter window 'window-side)
+                       (not (eq window-combination-resize 'side)))
+                   (not (eq window-combination-limit t))
+                   ;; Resize makes sense in iso-combinations only.
+                   (window-combined-p window horizontal)))
+             ;; `old-size' is the current size of WINDOW.
+             (old-size (window-total-size window horizontal))
+             ;; `new-size' is the specified or calculated size of the
+             ;; new window.
+             (new-size
+              (cond
+               ((not size)
+                (max (window-split-min-size horizontal)
+                     (if resize
+                         ;; When resizing try to give the new window the
+                         ;; average size of a window in its combination.
+                         (min (- parent-size
+                                 (window-min-size parent horizontal))
+                              (/ parent-size
+                                 (1+ (window-combinations
+                                      parent horizontal))))
+                       ;; Else try to give the new window half the size
+                       ;; of WINDOW (plus an eventual odd line).
+                       (+ (/ old-size 2) (% old-size 2)))))
+               ((>= size 0)
+                ;; SIZE non-negative specifies the new size of WINDOW.
 
-(defun find-definition-noselect (symbol type &optional file)
-  "Return a pair `(BUFFER . POINT)' pointing to the definition of SYMBOL.
-If the definition can't be found in the buffer, return (BUFFER).
-TYPE says what type of definition: nil for a function, `defvar' for a
-variable, `defface' for a face.  This function does not switch to the
-buffer nor display it.
+                ;; Note: Specifying a non-negative SIZE is practically
+                ;; always done as workaround for making the new window
+                ;; appear above or on the left of the new window (the
+                ;; ispell window is a typical example of that).  In all
+                ;; these cases the SIDE argument should be set to 'above
+                ;; or 'left in order to support the 'resize option.
+                ;; Here we have to nest the windows instead, see above.
+                (- old-size size))
+               (t
+                ;; SIZE negative specifies the size of the new window.
+                (- size))))
+             new-parent new-normal)
 
-The library where SYMBOL is defined is searched for in FILE or
-`find-function-source-path', if non-nil, otherwise in `load-path'."
-  (cond
-   ((not symbol)
-    (error "You didn't specify a symbol")
-    )
-   ((null type)
-    (find-function-noselect symbol)
-    )
-   ((eq type 'defvar)
-    (find-variable-noselect symbol file)
-    )
-   (t
-    (let ((library (or file (symbol-file symbol type))))
-      (find-function-search-for-symbol symbol type library)
-      )
-    )
-   )
-  )
+        ;; Check SIZE.
+        (cond
+         ((not size)
+          (cond
+           (resize
+            ;; SIZE unspecified, resizing.
+            (when (and (not (window-sizable-p parent (- new-size) horizontal))
+                       ;; Try again with minimum split size.
+                       (setq new-size
+                             (max new-size (window-split-min-size horizontal)))
+                       (not (window-sizable-p parent (- new-size) horizontal)))
+              (error "Window %s too small for splitting" parent)))
+           ((> (+ new-size (window-min-size window horizontal)) old-size)
+            ;; SIZE unspecified, no resizing.
+            (error "Window %s too small for splitting" window))))
+         ((and (>= size 0)
+               (or (>= size old-size)
+                   (< new-size (if horizontal
+                                   window-safe-min-width
+                                 window-safe-min-width))))
+          ;; SIZE specified as new size of old window.  If the new size
+          ;; is larger than the old size or the size of the new window
+          ;; would be less than the safe minimum, signal an error.
+          (error "Window %s too small for splitting" window))
+         (resize
+          ;; SIZE specified, resizing.
+          (unless (window-sizable-p parent (- new-size) horizontal)
+            ;; If we cannot resize the parent give up.
+            (error "Window %s too small for splitting" parent)))
+         ((or (< new-size
+                 (if horizontal window-safe-min-width window-safe-min-height))
+              (< (- old-size new-size)
+                 (if horizontal window-safe-min-width window-safe-min-height)))
+          ;; SIZE specification violates minimum size restrictions.
+          (error "Window %s too small for splitting" window)))
 
-(defun find-function-noselect (function &optional lisp-only)
-  "Return a pair (BUFFER . POINT) pointing to the definition of FUNCTION.
+        (window--resize-reset frame horizontal)
 
-Finds the source file containing the definition of FUNCTION
-in a buffer and the point of the definition.  The buffer is
-not selected.  If the function definition can't be found in
-the buffer, returns (BUFFER).
+        (setq new-parent
+              ;; Make new-parent non-nil if we need a new parent window;
+              ;; either because we want to nest or because WINDOW is not
+              ;; iso-combined.
+              (or (eq window-combination-limit t)
+                  (not (window-combined-p window horizontal))))
+        (setq new-normal
+              ;; Make new-normal the normal size of the new window.
+              (cond
+               (size (/ (float new-size) (if new-parent old-size parent-size)))
+               (new-parent 0.5)
+               (resize (/ 1.0 (1+ (window-combinations parent horizontal))))
+               (t (/ (window-normal-size window horizontal) 2.0))))
 
-If FUNCTION is a built-in function, this function normally
-attempts to find it in the Emacs C sources; however, if LISP-ONLY
-is non-nil, signal an error instead.
+        (if resize
+            ;; Try to get space from OLD's siblings.  We could go "up" and
+            ;; try getting additional space from surrounding windows but
+            ;; we won't be able to return space to those windows when we
+            ;; delete the one we create here.  Hence we do not go up.
+            (progn
+              (window--resize-child-windows parent (- new-size) horizontal)
+              (let* ((normal (- 1.0 new-normal))
+                     (sub (window-child parent)))
+                (while sub
+                  (set-window-new-normal
+                   sub (* (window-normal-size sub horizontal) normal))
+                  (setq sub (window-right sub)))))
+          ;; Get entire space from WINDOW.
+          (set-window-new-total window (- old-size new-size))
+          (window--resize-this-window window (- new-size) horizontal)
+          (set-window-new-normal
+           window (- (if new-parent 1.0 (window-normal-size window horizontal))
+                     new-normal)))
 
-If the file where FUNCTION is defined is not known, then it is
-searched for in `find-function-source-path' if non-nil, otherwise
-in `load-path'."
-  (if (not function)
-      (error "You didn't specify a function"))
-  (let ((def (symbol-function (find-function-advised-original function)))
-        aliases)
-    ;; FIXME for completeness, it might be nice to print something like:
-    ;; foo (which is advised), which is an alias for bar (which is advised).
-    (while (symbolp def)
-      (or (eq def function)
-          (if aliases
-              (setq aliases (concat aliases
-                                    (format ", which is an alias for `%s'"
-                                            (symbol-name def))))
-            (setq aliases (format "`%s' is an alias for `%s'"
-                                  function (symbol-name def)))
-            )
-          )
-      (setq function (symbol-function (find-function-advised-original function))
-            def (symbol-function (find-function-advised-original function)))
-      )
-    (if aliases
-        (message "%s" aliases))
-    (let ((library (cond ((autoloadp def)
-                          (nth 1 def)
-                          )
-                         ((subrp def)
-                          (if lisp-only
-                              (error "%s is a built-in function" function)
-                            )
-                          (help-C-file-name def 'subr)
-                          )
-                         ((symbol-file function 'defun)
-                          )
-                         ))
-          )
-      ;; KEY !=============================================>
-      (find-function-search-for-symbol function nil library)
-      ;; <==================================================
-      )
-    )
-  )
+        (let* ((new (split-window-internal window new-size side new-normal)))
+          ;; Assign window-side parameters, if any.
+          (when (eq window-combination-resize 'side)
+            (let ((window-side
+                   (cond
+                    (window-side window-side)
+                    ((eq side 'above) 'top)
+                    ((eq side 'below) 'bottom)
+                    (t side))))
+              ;; We made a new side window.
+              (set-window-parameter new 'window-side window-side)
+              (when (and new-parent (window-parameter window 'window-side))
+                ;; We've been splitting a side root window.  Give the
+                ;; new parent the same window-side parameter.
+                (set-window-parameter
+                 (window-parent new) 'window-side window-side))))
 
-(defun find-variable-noselect (variable &optional file)
-  "Return a pair `(BUFFER . POINT)' pointing to the definition of VARIABLE.
-
-Finds the library containing the definition of VARIABLE in a buffer and
-the point of the definition.  The buffer is not selected.
-If the variable's definition can't be found in the buffer, return (BUFFER).
-
-The library where VARIABLE is defined is searched for in FILE or
-`find-function-source-path', if non-nil, otherwise in `load-path'."
-  (if (not variable)
-      (error "You didn't specify a variable")
-    (let ((library (or file
-                       (symbol-file variable 'defvar)
-                       (help-C-file-name variable 'var))))
-      (find-function-search-for-symbol variable 'defvar library)
-      )
-    )
-  )
-
-(defun find-function-search-for-symbol (symbol type library)
-  "Search for SYMBOL's definition of type TYPE in LIBRARY.
-Visit the library in a buffer, and return a cons cell (BUFFER . POSITION),
-or just (BUFFER . nil) if the definition can't be found in the file.
-
-If TYPE is nil, look for a function definition.
-Otherwise, TYPE specifies the kind of definition,
-and it is interpreted via `find-function-regexp-alist'.
-The search is done in the source for library LIBRARY."
-  (if (null library)
-      (error "Don't know where `%s' is defined" symbol)
-    )
-  ;; Some functions are defined as part of the construct
-  ;; that defines something else.
-  (while (and (symbolp symbol) (get symbol 'definition-name))
-    (setq symbol (get symbol 'definition-name))
-    )
-  (if (string-match "\\`src/\\(.*\\.\\(c\\|m\\)\\)\\'" library)
-      (find-function-C-source symbol (match-string 1 library) type)
-    (when (string-match "\\.el\\(c\\)\\'" library)
-      (setq library (substring library 0 (match-beginning 1)))
-      )
-    ;; Strip extension from .emacs.el to make sure symbol is searched in
-    ;; .emacs too.
-    (when (string-match "\\.emacs\\(.el\\)" library)
-      (setq library (substring library 0 (match-beginning 1)))
-      )
-    (let* ((filename (find-library-name library))
-           (regexp-symbol (cdr (assq type find-function-regexp-alist))))
-      (with-current-buffer (find-file-noselect filename)
-        (let ((regexp (format (symbol-value regexp-symbol)
-                              ;; Entry for ` (backquote) macro in loaddefs.el,
-                              ;; (defalias (quote \`)..., has a \ but
-                              ;; (symbol-name symbol) doesn't.  Add an
-                              ;; optional \ to catch this.
-                              (concat "\\\\?"
-                                      (regexp-quote (symbol-name symbol)))))
-              (case-fold-search)
-              )
-          (with-syntax-table emacs-lisp-mode-syntax-table
-            (goto-char (point-min))
-            (if (or (re-search-forward regexp nil t)
-                    ;; `regexp' matches definitions using known forms like
-                    ;; `defun', or `defvar'.  But some functions/variables
-                    ;; are defined using special macros (or functions), so
-                    ;; if `regexp' can't find the definition, we look for
-                    ;; something of the form "(SOMETHING <symbol> ...)".
-                    ;; This fails to distinguish function definitions from
-                    ;; variable declarations (or even uses thereof), but is
-                    ;; a good pragmatic fallback.
-                    (re-search-forward
-                     (concat "^([^ ]+" find-function-space-re "['(]?"
-                             (regexp-quote (symbol-name symbol))
-                             "\\_>")
-                     nil t))
-                (progn
-                  (beginning-of-line)
-                  (cons (current-buffer) (point)))
-              (cons (current-buffer) nil))
-            )
+          (run-window-configuration-change-hook frame)
+          (window--check frame)
+          ;; Always return the new window.
+          new
           )
         )
-      )
-    )
-  )
-
-(defun function-called-at-point ()
-  "Return a function around point or else called by the list containing point.
-If that doesn't give a function, return nil."
-  (with-syntax-table emacs-lisp-mode-syntax-table
-    (or (condition-case ()
-            (save-excursion
-              (or (not (zerop (skip-syntax-backward "_w")))
-                  (eq (char-syntax (following-char)) ?w)
-                  (eq (char-syntax (following-char)) ?_)
-                  (forward-sexp -1)
-                  )
-              (skip-chars-forward "'")
-              (let ((obj (read (current-buffer))))
-                (and (symbolp obj) (fboundp obj) obj)
-                )
-              )
-          (error nil)
-          )
-        (condition-case ()
-            (save-excursion
-              (save-restriction
-                (narrow-to-region (max (point-min)
-                                       (- (point) 1000)) (point-max))
-                ;; Move up to surrounding paren, then after the open.
-                (backward-up-list 1)
-                (forward-char 1)
-                ;; If there is space here, this is probably something
-                ;; other than a real Lisp function call, so ignore it.
-                (if (looking-at "[ \t]")
-                    (error "Probably not a Lisp function call")
-                  )
-                (let ((obj (read (current-buffer))))
-                  (and (symbolp obj) (fboundp obj) obj)
-                  )
-                )
-              )
-          (error nil))
-        (let* ((str (find-tag-default))
-               (sym (if str (intern-soft str))))
-          (if (and sym (fboundp sym))
-              sym
-            (save-match-data
-              (when (and str (string-match "\\`\\W*\\(.*?\\)\\W*\\'" str))
-                (setq sym (intern-soft (match-string 1 str)))
-                (and (fboundp sym) sym)
-                )
-              )
-            )
-          )
-        )
-    )
-  )
-
-(defun variable-at-point (&optional any-symbol)
-  "Return the bound variable symbol found at or before point.
-Return 0 if there is no such symbol.
-If ANY-SYMBOL is non-nil, don't insist the symbol be bound."
-  (with-syntax-table emacs-lisp-mode-syntax-table
-    (or (condition-case ()
-	    (save-excursion
-	      (skip-chars-forward "'")
-	      (or (not (zerop (skip-syntax-backward "_w")))
-            (eq (char-syntax (following-char)) ?w)
-            (eq (char-syntax (following-char)) ?_)
-            (forward-sexp -1))
-	      (skip-chars-forward "'")
-	      (let ((obj (read (current-buffer))))
-          (and (symbolp obj) (boundp obj) obj)
-          )
-        )
-      (error nil))
-        (let* ((str (find-tag-default))
-               (sym (if str (intern-soft str))))
-          (if (and sym (or any-symbol (boundp sym)))
-              sym
-            (save-match-data
-              (when (and str (string-match "\\`\\W*\\(.*?\\)\\W*\\'" str))
-                (setq sym (intern-soft (match-string 1 str)))
-                (and (or any-symbol (boundp sym)) sym)
-                )
-              )
-            )
-          )
-        0)
-    )
-  )
-
-(defun find-variable-noselect (variable &optional file)
-  "Return a pair `(BUFFER . POINT)' pointing to the definition of VARIABLE.
-
-Finds the library containing the definition of VARIABLE in a buffer and
-the point of the definition.  The buffer is not selected.
-If the variable's definition can't be found in the buffer, return (BUFFER).
-
-The library where VARIABLE is defined is searched for in FILE or
-`find-function-source-path', if non-nil, otherwise in `load-path'."
-  (if (not variable)
-      (error "You didn't specify a variable")
-    (let ((library (or file
-                       (symbol-file variable 'defvar)
-                       (help-C-file-name variable 'var))))
-      (find-function-search-for-symbol variable 'defvar library)
       )
     )
   )

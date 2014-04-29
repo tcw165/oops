@@ -62,6 +62,8 @@
 
 ;; ESC
 (global-set-key (kbd "<escape>") 'oops-common-escape)
+;; Ctrl + ESC
+(global-set-key (kbd "C-x <escape>") 'delete-other-windows)
 
 ;; Ctrl + w, command + w
 (global-set-key (kbd "C-w") 'oops-kill-current-buffer)
