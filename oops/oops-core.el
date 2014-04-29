@@ -165,9 +165,53 @@
   (oops-move-lines 1)
   )
 
-(defun oops-common-escape ()
-  ""
+;; Navigation ==================================================================
+
+(defun oops-prev-history ()
+  "Navigate to previous history by looking element in the `global-mark-ring'."
   (interactive)
+  (pop-global-mark)
+  (message "[%s] - %s" global-mark-ring-max global-mark-ring)
+  )
+
+(defun oops-next-history ()
+  "Navigate to next history by looking element in the `global-mark-ring'."
+  (interactive)
+  (message "(oops-next-history) Yet ready...")
+  )
+
+(defun oops-common-escape ()
+  "Exit the current \"mode\" (in a generalized sense of the word).
+This command can exit an interactive command such as `query-replace',
+can clear out a prefix argument or a region,
+can get out of the minibuffer or other recursive edit,
+cancel the use of the current buffer (for special-purpose buffers),
+or go back to just one window (by deleting all but the selected window)."
+  (interactive)
+  (cond
+   ((eq last-command 'mode-exited) nil
+    )
+   ((region-active-p)
+    (deactivate-mark)
+    )
+   ((> (minibuffer-depth) 0)
+    (abort-recursive-edit)
+    )
+   (current-prefix-arg
+    nil)
+   ((> (recursion-depth) 0)
+    (exit-recursive-edit)
+    )
+   (buffer-quit-function
+    (funcall buffer-quit-function)
+    )
+   ;; ((not (one-window-p t))
+   ;;  (delete-other-windows)
+   ;;  )
+   ((string-match "^ \\*" (buffer-name (current-buffer)))
+    (bury-buffer)
+    )
+   )
   )
 
 ;; `imenu' =====================================================================

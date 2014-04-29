@@ -61,7 +61,7 @@
   )
 
 ;; ESC
-(global-set-key (kbd "<escape>") 'keyboard-escape-quit)
+(global-set-key (kbd "<escape>") 'oops-common-escape)
 
 ;; Ctrl + w, command + w
 (global-set-key (kbd "C-w") 'oops-kill-current-buffer)
@@ -86,14 +86,22 @@
 (global-set-key (kbd "C-<up>") 'oops-move-lines-up)
 ;; Ctrl + down
 (global-set-key (kbd "C-<down>") 'oops-move-lines-down)
+;; Alt + [
+(global-set-key (kbd "M-[") 'oops-prev-history)
+;; Alt + ]
+(global-set-key (kbd "M-]") 'oops-next-history)
 
 ;; Ctrl + o
 (global-set-key (kbd "C-o") 'oops-goto-symbol)
-;; Alt + o
-(global-set-key (kbd "M-o") 'oops-goto-symbol)
 
 ;; Ctrl + x, Ctrl + b
 (global-set-key (kbd "C-x C-b") 'ido-switch-buffer)
+
+;; Alt + left/right/up/down
+(global-set-key (kbd "M-<left>") 'windmove-left)
+(global-set-key (kbd "M-<right>") 'windmove-right)
+(global-set-key (kbd "M-<up>") 'windmove-up)
+(global-set-key (kbd "M-<down>") 'windmove-down)
 
 ;; TAB
 (global-set-key "\t" 'oops-indent-or-company)
