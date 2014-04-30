@@ -43,9 +43,6 @@
 ;;       +---- a very narrow window with width just fits with digit number.
 ;;
 
-(defvar oops-dbufs nil
-  "A list containing buffer that dedicated to show definition.")
-
 (make-variable-frame-local
  (defvar oops--is-hsplit-perspective nil))
 
@@ -163,13 +160,16 @@
                         (> toggle 0))
                     ;; toggle == nil.
                     (not oops--is-hsplit-perspective)
-                    ))
-          (win (oops--get-edit-win)))
+                    )))
       (if enable
-          (split-window win nil 'right)
+          (split-window oops--edit-win nil 'right)
         ;; else:
-        (delete-window (or (window-next-sibling)
-                           (window-prev-sibling)))
+        (if oops--is-basic-perspective
+            ;; 1
+            ;; 2
+            )
+        (delete-window (or (window-next-sibling oops--edit-win)
+                           (window-prev-sibling oops--edit-win)))
         )
       ;; Update flag.
       (setq oops--is-hsplit-perspective enable)
@@ -203,11 +203,23 @@
                     ;; toggle == nil.
                     (not oops--is-basic-perspective)
                     ))
-          (win (oops--get-edit-win))
+          (win (cond
+                ;; Only one window.
+                ((window-live-p (frame-root-window))
+                 (selected-window)
+                 )
+                ;; Clean v-split windows.
+                ((and oops--is-hsplit-perspective
+                      (= (length (window-list)) 2))
+                 (window-parent oops--edit-win)
+                 )
+                ;; Default
+                (t oops--edit-win)
+                ))
           (w (/ (window-total-width) -5))
           (h (/ (window-total-height) -4)))
       (if enable
-          ;; New windows.
+          ;; Enable basic perspective.
           (progn
             (if (null oops--outline-win)
               (setq oops--outline-win (split-window win w 'left))
@@ -216,7 +228,7 @@
               (setq oops--help-win (split-window win h 'below))
               )
             )
-        ;; Delete windows.
+        ;; Disable basic perspective.
         (unless (null oops--outline-win)
           (delete-window oops--outline-win)
           (setq oops--outline-win nil)
@@ -270,8 +282,8 @@
     (dolist (alist oops--win-hook-alist)
       (remove-hook (car alist) (cdr alist)))
     ;; Clean all.
-    (oops-toggle-basic-perspective -1)
     (oops-toggle-hsplit-perspective -1)
+    (oops-toggle-basic-perspective -1)
     )
   )
 
