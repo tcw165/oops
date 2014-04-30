@@ -100,10 +100,10 @@
 (global-set-key (kbd "C-x C-b") 'ido-switch-buffer)
 
 ;; Alt + left/right/up/down
-(global-set-key (kbd "M-<left>") 'windmove-left)
-(global-set-key (kbd "M-<right>") 'windmove-right)
-(global-set-key (kbd "M-<up>") 'windmove-up)
-(global-set-key (kbd "M-<down>") 'windmove-down)
+(global-set-key (kbd "M-<left>") 'oops-windmove-left)
+(global-set-key (kbd "M-<right>") 'oops-windmove-right)
+(global-set-key (kbd "M-<up>") 'oops-windmove-up)
+(global-set-key (kbd "M-<down>") 'oops-windmove-down)
 
 ;; TAB
 (global-set-key "\t" 'oops-indent-or-company)
