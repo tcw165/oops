@@ -43,6 +43,9 @@
 ;;       +---- a very narrow window with width just fits with digit number.
 ;;
 
+(defvar oops--win-idtimer nil
+  "The idle timer.")
+
 (make-variable-frame-local
  (defvar oops--is-hsplit-perspective nil))
 
@@ -66,11 +69,11 @@
    "The help number window."))
 
 (defconst oops--win-hook-alist '(
-                                ;; (window-configuration-change-hook . oops-window-configuration-change-hook)
+                                ;; (window-configuration-change-hook . oops--update-edit-win)
                                 )
   "")
 
-;; = Windows ===================================================================
+;; = Internal ==================================================================
 
 (defun oops--kill-gnu-windows ()
   (dolist (win (window-list))
@@ -82,75 +85,79 @@
     )
   )
 
-(defun oops--update-edit-win ()
+(defun oops--update-edit-win (&optional param)
   "Set new editing window if the test for selected window is passed."
   (let* ((win (selected-window))
          (buf (window-buffer win))
-         (name (buffer-name buf)))
-    (unless (or (string-match "^[*]+[a-zA-Z ]+[*]+$" name)
-                (memq win (list
-                           oops--outline-win
-                           oops--help-win
-                           oops--help-num-win))
-                (window-minibuffer-p win)
-                )
-      (setq oops--edit-win win)
-      (message "%s" oops--edit-win)
+         (name (buffer-name buf))
+         (candidate (unless (or (string-match "^[*]+[a-zA-Z ]+[*]+$" name)
+                                (memq win (list
+                                           oops--outline-win
+                                           oops--help-win
+                                           oops--help-num-win))
+                                (minibuffer-window-active-p win))
+                      win)))
+    (if candidate
+        (setq oops--edit-win candidate)
+      )
+    ;; Activate basic perspective.
+;;    (oops-toggle-basic-perspective 1)
+    )
+  )
+;; (oops-toggle-basic-perspective   1)
+;; (oops-toggle-basic-perspective  -1)
+;; (oops-toggle-hsplit-perspective  1)
+;; (oops-toggle-hsplit-perspective -1)
+
+(defun oops--win-idle-timer (enable)
+  "Create the `oops--win-idtimer' if `enable' is t. Destory it if `enable' is nil.
+
+!DO NOT use this function in your lisp, or there would be side effects!"
+  (if enable
+      ;; Enable idle timer.
+      (if (null oops--win-idtimer)
+          (setq oops--win-idtimer
+                (run-with-idle-timer 0.1 t 'oops--update-edit-win))
+          )
+    ;; Disable idle timer.
+    (unless (null oops--win-idtimer)
+      (cancel-timer oops--win-idtimer)
+      (setq oops--win-idtimer nil)
       )
     )
   )
 
-(defun oops--get-edit-win ()
-  "Return editing window or the internal window containing editing windows."
-  (interactive)
-  (cond
-   ;; Only one window.
-   ((window-live-p (frame-root-window))
-    (selected-window)
-    )
-   ;; Clean v-split windows.
-   ((and oops--is-hsplit-perspective
-         (= (length (window-list)) 2))
-    (window-parent oops--edit-win)
-    )
-   ;; Default
-   (t nil)
-   )
-  )
+;; = For User ==================================================================
 
 (defun oops-windmove-left ()
   "Select the window to the left of the current one."
   (interactive)
   (windmove-left)
-  (oops--update-edit-win)
   )
 
 (defun oops-windmove-right ()
   "Select the window to the right of the current one."
   (interactive)
   (windmove-right)
-  (oops--update-edit-win)
   )
 
 (defun oops-windmove-up ()
   "Select the window to the above of the current one."
   (interactive)
   (windmove-up)
-  (oops--update-edit-win)
   )
 
 (defun oops-windmove-down ()
   "Select the window to the below of the current one."
   (interactive)
   (windmove-down)
-  (oops--update-edit-win)
+  ;; (oops--update-edit-win)
   )
-
-;; =============================================================================
 
 (defun oops-toggle-hsplit-perspective (&optional toggle)
   (interactive)
-  (when oops-win-mode
+  (when (and oops-win-mode
+             oops--edit-win)
     ;; Kill all the GNU windows.
     (oops--kill-gnu-windows)
     (let ((enable (if toggle
@@ -192,7 +199,8 @@
 '---'------------------'
 "
   (interactive)
-  (when oops-win-mode
+  (when (and oops-win-mode
+             oops--edit-win)
     ;; Kill all the GNU windows.
     (oops--kill-gnu-windows)
     (let ((enable (if toggle
@@ -246,7 +254,7 @@
     )
   )
 
-;; =============================================================================
+;; = For Other Lisp ============================================================
 
 (defun oops-update-help (data)
   ""
@@ -254,12 +262,6 @@
 
 (defun oops-update-outline (data)
   ""
-  )
-
-(defun oops-window-configuration-change-hook ()
-  ""
-  ;; Check definition window status.
-  (message "window is changed.")
   )
 
 ;; = Minor Mode ===============================================================>
@@ -271,14 +273,18 @@
   ;; TODO: add key map, oops-windmove-left, oops-windmove-right, ...
 
   (if oops-win-mode
-      ;; Enable.
+      ;; Enable:
       (progn
+        ;; Init idle timer.
+        (oops--win-idle-timer 1)
+        ;; Init hook
         (dolist (alist oops--win-hook-alist)
           (add-hook (car alist) (cdr alist)))
-        ;; Try to get new editing window.
-        (oops--update-edit-win)
         )
-    ;; Disable.
+    ;; Disable:
+    ;; Destory idle timer.
+    (oops--win-idle-timer -1)
+    ;; Destory hook.
     (dolist (alist oops--win-hook-alist)
       (remove-hook (car alist) (cdr alist)))
     ;; Clean all.
