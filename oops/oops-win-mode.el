@@ -43,9 +43,6 @@
 ;;       +---- a very narrow window with width just fits with digit number.
 ;;
 
-(defvar oops--win-idtimer nil
-  "The idle timer.")
-
 (make-variable-frame-local
  (defvar oops--is-hsplit-perspective nil))
 
@@ -68,10 +65,17 @@
  (defvar oops--help-num-win nil
    "The help number window."))
 
-(defconst oops--win-hook-alist '(
-                                ;; (window-configuration-change-hook . oops--update-edit-win)
-                                )
-  "")
+(defvar oops--win-idtimer nil
+  "The idle timer.")
+
+(defconst oops--win-major-modes '(emacs-lisp-mode
+                                  lisp-interaction-mode
+                                  )
+  "A list containing the supported major mode.")
+
+(defconst oops--win-hooks '(;; (window-configuration-change-hook . oops--update-edit-win)
+                            )
+  "An association list containing the hook descriptions.")
 
 ;; = Internal ==================================================================
 
@@ -85,8 +89,8 @@
     )
   )
 
-(defun oops--update-edit-win (&optional param)
-  "Set new editing window if the test for selected window is passed."
+(defun oops--update-edit-win ()
+  "Find and set new editing window if the test for selected window is passed."
   (let* ((win (selected-window))
          (buf (window-buffer win))
          (name (buffer-name buf))
@@ -97,27 +101,30 @@
                                            oops--help-num-win))
                                 (minibuffer-window-active-p win))
                       win)))
-    (if candidate
-        (setq oops--edit-win candidate)
+    ;; Update `oops--edit-win'.
+    (when candidate
+      (setq oops--edit-win candidate)
       )
-    ;; Activate basic perspective.
-;;    (oops-toggle-basic-perspective 1)
+    ;; If `selected-window' eauals to `oops--edit-win''s current value (no matter the value is updated or not),
+    ;; enable basic perspective. Or disable it.
+    ;; (when (eq oops--edit-win win)
+    ;;   ;; Activate basic perspective.
+    ;;   (if (memq major-mode oops--win-major-modes)
+    ;;       (oops-toggle-basic-perspective 1)
+    ;;     (oops-toggle-hsplit-perspective -1)
+    ;;     (oops-toggle-basic-perspective -1)
+    ;;     )
+    ;;   )
     )
   )
-;; (oops-toggle-basic-perspective   1)
-;; (oops-toggle-basic-perspective  -1)
-;; (oops-toggle-hsplit-perspective  1)
-;; (oops-toggle-hsplit-perspective -1)
 
-(defun oops--win-idle-timer (enable)
-  "Create the `oops--win-idtimer' if `enable' is t. Destory it if `enable' is nil.
-
-!DO NOT use this function in your lisp, or there would be side effects!"
-  (if enable
+(defun oops--win-init-idtimer (enable)
+  "Create the `oops--win-idtimer' if `enable' is 1. Destory it if `enable' is -1."
+  (if (> enable 0)
       ;; Enable idle timer.
       (if (null oops--win-idtimer)
           (setq oops--win-idtimer
-                (run-with-idle-timer 0.1 t 'oops--update-edit-win))
+                (run-with-idle-timer 0.5 t 'oops--update-edit-win))
           )
     ;; Disable idle timer.
     (unless (null oops--win-idtimer)
@@ -151,92 +158,76 @@
   "Select the window to the below of the current one."
   (interactive)
   (windmove-down)
-  ;; (oops--update-edit-win)
   )
 
 (defun oops-toggle-hsplit-perspective (&optional toggle)
   (interactive)
-  (when (and oops-win-mode
-             oops--edit-win)
-    ;; Kill all the GNU windows.
-    (oops--kill-gnu-windows)
-    (let ((enable (if toggle
-                      ;; toggle == t or numeric number.
-                      (if (booleanp toggle)
-                          t
-                        (> toggle 0))
-                    ;; toggle == nil.
-                    (not oops--is-hsplit-perspective)
-                    )))
+  ;; Kill all the GNU windows.
+  (oops--kill-gnu-windows)
+
+  (let ((enable (if toggle
+                    ;; toggle == t or numeric number.
+                    (if (booleanp toggle)
+                        t
+                      (> toggle 0))
+                  ;; toggle == nil.
+                  (not oops--is-hsplit-perspective)
+                  )))
+    (unless (equal enable oops--is-hsplit-perspective)
       (if enable
+          ;; Enable hsplit perspective:
           (split-window oops--edit-win nil 'right)
-        ;; else:
-        (if oops--is-basic-perspective
-            ;; 1
-            ;; 2
-            )
+        ;; Disable hsplit perspective:
         (delete-window (or (window-next-sibling oops--edit-win)
                            (window-prev-sibling oops--edit-win)))
         )
       ;; Update flag.
       (setq oops--is-hsplit-perspective enable)
       )
-    ;; Try to get new editing window.
-    (oops--update-edit-win)
     )
   )
 
 (defun oops-toggle-basic-perspective (&optional toggle)
-  "
-.---.------------------.
-|   |                  |
-|   |                  |
-|   |        E         |
-| O |                  |
-|   |                  |
-|   |------------------|
-|   |        H         |
-'---'------------------'
-"
   (interactive)
-  (when (and oops-win-mode
-             oops--edit-win)
-    ;; Kill all the GNU windows.
-    (oops--kill-gnu-windows)
-    (let ((enable (if toggle
-                      ;; toggle == t or numeric number.
-                      (if (booleanp toggle)
-                          t
-                        (> toggle 0))
-                    ;; toggle == nil.
-                    (not oops--is-basic-perspective)
-                    ))
-          (win (cond
-                ;; Only one window.
-                ((window-live-p (frame-root-window))
-                 (selected-window)
-                 )
-                ;; Clean v-split windows.
-                ((and oops--is-hsplit-perspective
-                      (= (length (window-list)) 2))
-                 (window-parent oops--edit-win)
-                 )
-                ;; Default
-                (t oops--edit-win)
-                ))
-          (w (/ (window-total-width) -5))
-          (h (/ (window-total-height) -4)))
+  ;; Kill all the GNU windows.
+  (oops--kill-gnu-windows)
+
+  (let ((enable (if toggle
+                    ;; toggle == t or numeric number.
+                    (if (booleanp toggle)
+                        t
+                      (> toggle 0))
+                  ;; toggle == nil.
+                  (not oops--is-basic-perspective)
+                  ))
+        (win (cond
+              ;; Only one window.
+              ((window-live-p (frame-root-window))
+               (selected-window)
+               )
+              ;; Clean v-split windows.
+              ((and oops--is-hsplit-perspective
+                    (= (length (window-list)) 2))
+               (window-parent oops--edit-win)
+               )
+              ;; Default
+              (t oops--edit-win)
+              ))
+        (w (/ (window-total-width) -5))
+        (h (/ (window-total-height) -4)))
+    ;; Only if `enable' is not equal to `oops--is-basic-perspective'.
+    (unless (equal enable oops--is-basic-perspective)
       (if enable
-          ;; Enable basic perspective.
+          ;; Enable basic perspective:
           (progn
             (if (null oops--outline-win)
-              (setq oops--outline-win (split-window win w 'left))
+                (setq oops--outline-win (split-window win w 'left))
               )
             (if (null oops--help-win)
-              (setq oops--help-win (split-window win h 'below))
+                (setq oops--help-win (split-window win h 'below))
               )
             )
-        ;; Disable basic perspective.
+        ;; Disable basic perspective:
         (unless (null oops--outline-win)
           (delete-window oops--outline-win)
           (setq oops--outline-win nil)
@@ -245,12 +236,10 @@
           (delete-window oops--help-win)
           (setq oops--help-win nil)
           )
+        ;; Update flag.
+        (setq oops--is-basic-perspective enable)
         )
-      ;; Update flag.
-      (setq oops--is-basic-perspective enable)
       )
-    ;; Try to get new editing window.
-    (oops--update-edit-win)
     )
   )
 
@@ -258,10 +247,33 @@
 
 (defun oops-update-help (data)
   ""
+  (when (and oops--is-basic-perspective
+             (eq (selected-window) oops--edit-win))
+    ;; (let* ((orig-point (point))
+    ;;        (orig-buf (window-buffer))
+    ;;        (orig-buffers (buffer-list))
+    ;;        (buffer-point (save-excursion
+    ;;                        (find-definition-noselect symbol type)))
+    ;;        (new-buf (car buffer-point))
+    ;;        (new-point (cdr buffer-point)))
+    ;;   (when buffer-point
+    ;;     (when (memq new-buf orig-buffers)
+    ;;       (push-mark orig-point)
+    ;;       )
+    ;;     (funcall switch-fn new-buf)
+    ;;     (when new-point
+    ;;       (goto-char new-point)
+    ;;       )
+    ;;     (recenter find-function-recenter-line)
+    ;;     (run-hooks 'find-function-after-hook))
+    ;;   )
+    )
   )
 
 (defun oops-update-outline (data)
   ""
+  (unless (null oops--outline-win)
+    )
   )
 
 ;; = Minor Mode ===============================================================>
@@ -270,22 +282,23 @@
 (define-minor-mode oops-win-mode
   "Window manager mode for ..."
   :global t
+  :lighter "  Oops-Win"
   ;; TODO: add key map, oops-windmove-left, oops-windmove-right, ...
 
   (if oops-win-mode
       ;; Enable:
       (progn
-        ;; Init idle timer.
-        (oops--win-idle-timer 1)
-        ;; Init hook
-        (dolist (alist oops--win-hook-alist)
+        ;; Enable idle timer.
+        (oops--win-init-idtimer 1)
+        ;; Enable hook
+        (dolist (alist oops--win-hooks)
           (add-hook (car alist) (cdr alist)))
         )
     ;; Disable:
     ;; Destory idle timer.
-    (oops--win-idle-timer -1)
+    (oops--win-init-idtimer -1)
     ;; Destory hook.
-    (dolist (alist oops--win-hook-alist)
+    (dolist (alist oops--win-hooks)
       (remove-hook (car alist) (cdr alist)))
     ;; Clean all.
     (oops-toggle-hsplit-perspective -1)

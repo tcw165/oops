@@ -20,20 +20,20 @@
 ;;     '------'   '-----------------'
 ;;
 
-(defun oops-add-to-list-with-subdirs (base exclude)
+(defun oops--update-loadpath (base exclude)
   "Add sub-directories recursively to `load-path'.
 The `base' should be a directory string and the `exclude' should be a list that to be skipped."
   (dolist (f (directory-files base))
     (let ((name (concat base "/" f)))
       (when (and (file-directory-p name)
                  (not (member f exclude)))
-        (oops-add-to-list-with-subdirs name exclude)
+        (oops--update-loadpath name exclude)
         )
       )
     )
   (add-to-list 'load-path base)
   )
-(oops-add-to-list-with-subdirs "~/.emacs.d" '("." ".." ".svn" ".git"))
+(oops--update-loadpath "~/.emacs.d" '("." ".." ".svn" ".git"))
 
 ;; 3rd party library ===========================================================
 (require 'highlight-symbol)
@@ -55,16 +55,53 @@ The `base' should be a directory string and the `exclude' should be a list that 
 
 ;; =============================================================================
 
-(defconst oops-hook-alist
+(defconst oops--hooks
   '(;; imenu
     (emacs-lisp-mode-hook . imenu-add-menubar-index)
     (lisp-interaction-mode-hook . imenu-add-menubar-index))
   "An association list that indicates the bindings of major mode and minor mode. Its format should be (MAJOR-MODE-HOOK . MINOR-MODE-HOOK)")
 
-(defvar oops-idle-timer nil
-  "An idle timer that ask `oops-idle-timer-function' to do something.")
+(defvar oops--idtimer nil
+  "An idle timer that ask `oops--idtimer-function' to do something.")
 
-;; =============================================================================
+;; = Internal ==================================================================
+
+(defun oops--idtimer-function ()
+  "The function for `oops--idtimer' do the following things:
+  * Detect the symbol nearby the `point', and show symbol's definition in another window. Normally, the definition window is under the current window."
+  (when oops-mode
+    (cond
+     ;; lisp
+     ((or (eq major-mode 'emacs-lisp-mode)
+          (eq major-mode 'lisp-interaction-mode))
+      (oops-lisp-show-definition-atpt)
+      )
+     ;; c
+     ;; c++-mode
+     ;; python-mode
+     ;; eshell
+     )
+    )
+  )
+
+(defun oops--init-idtimer (enable)
+  "Create the `oops--idtimer' if `enable' is 1. Destory it if -1.
+
+!DO NOT use this function in your lisp, or there would be side effects!"
+  (if (> enable 0)
+      ;; Enable idle timer.
+      (when (null oops--idtimer)
+        (setq oops--idtimer (run-with-idle-timer 0.5 t 'oops--idtimer-function))
+        )
+    ;; Disable idle timer.
+    (when oops--idtimer
+      (cancel-timer oops--idtimer)
+      (setq oops--idtimer nil)
+      )
+    )
+  )
+
+;; = User Interactive ==========================================================
 
 (defun oops-jump-to-definition-atpt ()
   "Find the symbol's definition. If there's only one result, open the file in the current window. If there're multiple results, show a list under the current window.
@@ -87,43 +124,6 @@ For Python, it doesn't support yet."
     )
   )
 
-(defun oops-idle-timer-function ()
-  "The function for `oops-idle-timer' do the following things:
-  * Detect the symbol nearby the `point', and show symbol's definition in another window. Normally, the definition window is under the current window."
-  (when oops-mode
-    (cond
-     ;; lisp
-     ((or (eq major-mode 'emacs-lisp-mode)
-          (eq major-mode 'lisp-interaction-mode))
-      (oops-lisp-show-definition-atpt)
-      )
-     ;; c
-     ;; c++-mode
-     ;; python-mode
-     ;; eshell
-     )
-    )
-  )
-
-(defun oops-init-idle-timer (enable)
-  "Create the `oops-idle-timer' if `enable' is t. Destory it if `enable' is nil.
-
-!DO NOT use this function in your lisp, or there would be side effects!"
-  (if enable
-      ;; Enable idle timer.
-      (if (null oops-idle-timer)
-          (setq oops-idle-timer
-                (run-with-idle-timer 0.2 t 'oops-idle-timer-function))
-          )
-    ;; Disable idle timer.
-    (if (and (not (null oops-idle-timer))
-             (timerp oops-idle-timer))
-        (progn (cancel-timer oops-idle-timer)
-               (setq oops-idle-timer nil))
-        )
-    )
-  )
-
 ;; ;; ###autoload
 ;; (defun oops-mode (&optional toggle)
 ;;   "A convenient way to let `oops-everywhere-mode' automatically and globally enabled for all the supported languages.
@@ -138,7 +138,7 @@ For Python, it doesn't support yet."
 ;;                   ;; toggle == nil.
 ;;                   (not oops-everywhere-mode))))
 ;;     ;; idle timer.
-;;     (oops-init-idle-timer enable)
+;;     (oops--init-idtimer enable)
 
 ;;     ;; togggle mode.
 ;;     (oops-everywhere-mode (if enable 1 -1))
@@ -156,17 +156,17 @@ For Python, it doesn't support yet."
 
   (if oops-mode
       ;; Enable.
-      (progn (dolist (l oops-hook-alist)
+      (progn (dolist (l oops--hooks)
                (add-hook (car l) (cdr l)))
 
-             (oops-init-idle-timer 1)
+             (oops--init-idtimer 1)
              (oops-win-mode 1)
              )
     ;; Disable.
-    (progn (dolist (l oops-hook-alist)
+    (progn (dolist (l oops--hooks)
              (remove-hook (car l) (cdr l)))
 
-           (oops-init-idle-timer -1)
+           (oops--init-idtimer -1)
            (oops-win-mode -1)
            )
     )

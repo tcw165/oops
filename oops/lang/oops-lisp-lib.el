@@ -1,7 +1,54 @@
 ;; =============================================================================
 
 (defun oops-lisp-show-definition-atpt ()
-  ""
+  ;; (let* ((orig-point (point))
+  ;;        (orig-buf (window-buffer))
+  ;;        (orig-buffers (buffer-list))
+  ;;        (buffer-point (save-excursion
+  ;;                        (find-definition-noselect symbol type)))
+  ;;        (new-buf (car buffer-point))
+  ;;        (new-point (cdr buffer-point)))
+  ;;   (when buffer-point
+  ;;     (when (memq new-buf orig-buffers)
+  ;;       (push-mark orig-point)
+  ;;       )
+  ;;     (funcall switch-fn new-buf)
+  ;;     (when new-point
+  ;;       (goto-char new-point)
+  ;;       )
+  ;;     (recenter find-function-recenter-line)
+  ;;     (run-hooks 'find-function-after-hook))
+  ;;   )
+  (let* ((text (oops-thing-at-point))
+         (symb (and (not (null text))
+                    (read text)))
+         (buffer-point (cond
+                        ;; Native function or variable:
+                        ((subrp symb)
+                         nil
+                         )
+                        ;; Library:
+                        ((featurep symb)
+                         nil
+                         )
+                        ;; Function:
+                        ((fboundp symb)
+                         (save-excursion
+                           (find-function-noselect symb t)
+                           )
+                         )
+                        ;; Variable:
+                        ((boundp symb)
+                         (save-excursion
+                           (find-variable-noselect symb)
+                           )
+                         )))
+         )
+    (when buffer-point
+      (message "Symbol (%s) is at %s" symb buffer-point)
+      (oops-update-help buffer-point)
+      )
+    )
   )
 
 ;; =============================================================================
