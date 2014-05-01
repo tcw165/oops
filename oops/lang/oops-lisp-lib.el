@@ -1,27 +1,17 @@
 ;; =============================================================================
 
-(defun oops-lisp-show-definition-atpt ()
-  ;; (let* ((orig-point (point))
-  ;;        (orig-buf (window-buffer))
-  ;;        (orig-buffers (buffer-list))
-  ;;        (buffer-point (save-excursion
-  ;;                        (find-definition-noselect symbol type)))
-  ;;        (new-buf (car buffer-point))
-  ;;        (new-point (cdr buffer-point)))
-  ;;   (when buffer-point
-  ;;     (when (memq new-buf orig-buffers)
-  ;;       (push-mark orig-point)
-  ;;       )
-  ;;     (funcall switch-fn new-buf)
-  ;;     (when new-point
-  ;;       (goto-char new-point)
-  ;;       )
-  ;;     (recenter find-function-recenter-line)
-  ;;     (run-hooks 'find-function-after-hook))
-  ;;   )
-  (let* ((text (oops-thing-at-point))
-         (symb (and (not (null text))
-                    (read text)))
+(defun oops--lisp-thingatpt ()
+  "Return string on which the point is or just string of selection."
+  (if mark-active
+      ;; return the selection.
+      (buffer-substring-no-properties (region-beginning) (region-end))
+    ;; else.
+    (format "%s" (thing-at-point 'symbol))
+    )
+  )
+
+(defun oops--lisp-show-help-atpt ()
+  (let* ((symb (read (oops--lisp-thingatpt)))
          (buffer-point (cond
                         ;; Native function or variable:
                         ((subrp symb)
@@ -45,7 +35,7 @@
                          )))
          )
     (when buffer-point
-      (message "Symbol (%s) is at %s" symb buffer-point)
+      ;; (message "Symbol (%s) is at %s" symb buffer-point)
       (oops-update-help buffer-point)
       )
     )
@@ -75,7 +65,7 @@
   ;; * advising function list!
   ;; * variable and function with same name!
   ;; * add local variable navigation!
-  (let* ((text (oops-thing-at-point))
+  (let* ((text (oops--lisp-thingatpt))
          (symb (and (not (null text))
                     (read text)))
          (is-var-fun (and (not (null symb))

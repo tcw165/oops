@@ -6,21 +6,8 @@
 
 ;; Text Operation ==============================================================
 
-(defun oops-thing-at-point (&optional skip-select)
-  "Return string on which the point is or just string of selection."
-  (if mark-active
-      (if (null skip-select)
-          ;; return the selection.
-          (buffer-substring-no-properties (region-beginning) (region-end))
-        ;; skip selection, return nil
-        nil)
-    ;; else.
-    (thing-at-point 'symbol)
-    )
-  )
-
 (defun oops-undo ()
-  "Just undo something without caring the region."
+  "Discard the selection and then undo something."
   (interactive)
   (deactivate-mark)
   (undo)
@@ -109,7 +96,7 @@
     )
   )
 
-(defun oops-move-lines (step)
+(defun oops--move-lines (step)
   "Move the current line or the lines covered by region upward or downward without modifying `kill-ring'."
   ;; There're two situation:
   ;; (point) ---------------
@@ -156,13 +143,13 @@
 (defun oops-move-lines-up ()
   "Move the current line or the lines covered by region upward without modifying `kill-ring'."
   (interactive)
-  (oops-move-lines -1)
+  (oops--move-lines -1)
   )
 
 (defun oops-move-lines-down ()
   "Move the current line or the lines covered by region downward without modifying `kill-ring'."
   (interactive)
-  (oops-move-lines 1)
+  (oops--move-lines 1)
   )
 
 (defun oops-indent-or-company ()
@@ -180,7 +167,7 @@
   "Navigate to previous history by looking element in the `global-mark-ring'."
   (interactive)
   (pop-global-mark)
-  (message "[%s] - %s" global-mark-ring-max global-mark-ring)
+  ;; (message "[%s] - %s" global-mark-ring-max global-mark-ring)
   )
 
 (defun oops-next-history ()

@@ -74,7 +74,7 @@ The `base' should be a directory string and the `exclude' should be a list that 
      ;; lisp
      ((or (eq major-mode 'emacs-lisp-mode)
           (eq major-mode 'lisp-interaction-mode))
-      (oops-lisp-show-definition-atpt)
+      (oops--lisp-show-help-atpt)
       )
      ;; c
      ;; c++-mode
@@ -91,7 +91,7 @@ The `base' should be a directory string and the `exclude' should be a list that 
   (if (> enable 0)
       ;; Enable idle timer.
       (when (null oops--idtimer)
-        (setq oops--idtimer (run-with-idle-timer 0.5 t 'oops--idtimer-function))
+        (setq oops--idtimer (run-with-idle-timer 0.2 t 'oops--idtimer-function))
         )
     ;; Disable idle timer.
     (when oops--idtimer

@@ -136,30 +136,35 @@
 
 ;; = For User ==================================================================
 
+;;;###autoload
 (defun oops-windmove-left ()
   "Select the window to the left of the current one."
   (interactive)
   (windmove-left)
   )
 
+;;;###autoload
 (defun oops-windmove-right ()
   "Select the window to the right of the current one."
   (interactive)
   (windmove-right)
   )
 
+;;;###autoload
 (defun oops-windmove-up ()
   "Select the window to the above of the current one."
   (interactive)
   (windmove-up)
   )
 
+;;;###autoload
 (defun oops-windmove-down ()
   "Select the window to the below of the current one."
   (interactive)
   (windmove-down)
   )
 
+;;;###autoload
 (defun oops-toggle-hsplit-perspective (&optional toggle)
   (interactive)
   ;; Kill all the GNU windows.
@@ -173,20 +178,19 @@
                   ;; toggle == nil.
                   (not oops--is-hsplit-perspective)
                   )))
-    (unless (equal enable oops--is-hsplit-perspective)
-      (if enable
-          ;; Enable hsplit perspective:
-          (split-window oops--edit-win nil 'right)
-        ;; Disable hsplit perspective:
-        (delete-window (or (window-next-sibling oops--edit-win)
-                           (window-prev-sibling oops--edit-win)))
-        )
-      ;; Update flag.
-      (setq oops--is-hsplit-perspective enable)
+    (if enable
+        ;; Enable hsplit perspective:
+        (split-window oops--edit-win nil 'right)
+      ;; Disable hsplit perspective:
+      (delete-window (or (window-next-sibling oops--edit-win)
+                         (window-prev-sibling oops--edit-win)))
       )
+    ;; Update flag.
+    (setq oops--is-hsplit-perspective enable)
     )
   )
 
+;;;###autoload
 (defun oops-toggle-basic-perspective (&optional toggle)
   (interactive)
   ;; Kill all the GNU windows.
@@ -215,58 +219,56 @@
               ))
         (w (/ (window-total-width) -5))
         (h (/ (window-total-height) -4)))
-    ;; Only if `enable' is not equal to `oops--is-basic-perspective'.
-    (unless (equal enable oops--is-basic-perspective)
-      (if enable
-          ;; Enable basic perspective:
-          (progn
-            (if (null oops--outline-win)
-                (setq oops--outline-win (split-window win w 'left))
-              )
-            (if (null oops--help-win)
-                (setq oops--help-win (split-window win h 'below))
-              )
+    (if enable
+        ;; Enable basic perspective:
+        (progn
+          ;; (if (null oops--outline-win)
+          ;;     (setq oops--outline-win (split-window win w 'left))
+          ;;   )
+          (if (null oops--help-win)
+              (setq oops--help-win (split-window win h 'below))
             )
-        ;; Disable basic perspective:
-        (unless (null oops--outline-win)
-          (delete-window oops--outline-win)
-          (setq oops--outline-win nil)
           )
-        (unless (null oops--help-win)
-          (delete-window oops--help-win)
-          (setq oops--help-win nil)
-          )
-        ;; Update flag.
-        (setq oops--is-basic-perspective enable)
+      ;; Disable basic perspective:
+      ;; (unless (null oops--outline-win)
+      ;;   (delete-window oops--outline-win)
+      ;;   (setq oops--outline-win nil)
+      ;;   )
+      (unless (null oops--help-win)
+        (delete-window oops--help-win)
+        (setq oops--help-win nil)
         )
       )
+    ;; Update flag.
+    (setq oops--is-basic-perspective enable)
     )
   )
 
 ;; = For Other Lisp ============================================================
 
 (defun oops-update-help (data)
-  ""
+  "The `data' must be one of the following format:
+1. (BUFFER . POINT)"
+  ;; Only work on the situation that the basic perspective is enabled and
+  ;; the edit win is ready.
   (when (and oops--is-basic-perspective
              (eq (selected-window) oops--edit-win))
-    ;; (let* ((orig-point (point))
-    ;;        (orig-buf (window-buffer))
-    ;;        (orig-buffers (buffer-list))
-    ;;        (buffer-point (save-excursion
-    ;;                        (find-definition-noselect symbol type)))
-    ;;        (new-buf (car buffer-point))
-    ;;        (new-point (cdr buffer-point)))
-    ;;   (when buffer-point
-    ;;     (when (memq new-buf orig-buffers)
-    ;;       (push-mark orig-point)
-    ;;       )
-    ;;     (funcall switch-fn new-buf)
-    ;;     (when new-point
-    ;;       (goto-char new-point)
-    ;;       )
-    ;;     (recenter find-function-recenter-line)
-    ;;     (run-hooks 'find-function-after-hook))
-    ;;   )
+    (cond
+     ;; Format of (BUFFER . POINT):
+     ((consp data)
+      (let ((buf (car data))
+            (pt (cdr data)))
+        (with-selected-window oops--help-win
+          (set-window-buffer nil buf)
+          (goto-char pt)
+          (recenter find-function-recenter-line)
+          ;; TODO:
+          ;; Seperate the buffers that are opened by user and opened by help function.
+          ;; Discard the old buffers that are opened by help function.
+          )
+        )
+      )
+     )
     )
   )
 
@@ -282,7 +284,6 @@
 (define-minor-mode oops-win-mode
   "Window manager mode for ..."
   :global t
-  :lighter "  Oops-Win"
   ;; TODO: add key map, oops-windmove-left, oops-windmove-right, ...
 
   (if oops-win-mode
