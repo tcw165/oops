@@ -94,7 +94,9 @@
 (global-set-key (kbd "M-]") 'oops-next-history)
 
 ;; Ctrl + o
-(global-set-key (kbd "C-o") 'oops-goto-symbol)
+(global-set-key (kbd "C-o") 'oops-goto-local-symbol)
+;; Ctrl + Shift + o
+(global-set-key (kbd "C-S-o") 'oops-goto-global-symbol)
 
 ;; Ctrl + x, Ctrl + b
 (global-set-key (kbd "C-x C-b") 'ido-switch-buffer)

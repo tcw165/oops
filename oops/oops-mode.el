@@ -74,7 +74,9 @@ The `base' should be a directory string and the `exclude' should be a list that 
      ;; lisp
      ((or (eq major-mode 'emacs-lisp-mode)
           (eq major-mode 'lisp-interaction-mode))
-      (oops--lisp-show-help-atpt)
+      (when oops--is-basic-perspective
+        (oops--lisp-show-help-atpt)
+        )
       )
      ;; c
      ;; c++-mode
@@ -103,6 +105,7 @@ The `base' should be a directory string and the `exclude' should be a list that 
 
 ;; = User Interactive ==========================================================
 
+;; ###autoload
 (defun oops-jump-to-definition-atpt ()
   "Find the symbol's definition. If there's only one result, open the file in the current window. If there're multiple results, show a list under the current window.
 
@@ -110,18 +113,46 @@ For lisp, it supports symbol of `defun', `defadvice', `defvar' and `provide'.
 For C/C++, it doesn't support yet.
 For Python, it doesn't support yet."
   (interactive)
-  (when oops-mode
-    (cond
-     ;; lisp
-     ((or (eq major-mode 'emacs-lisp-mode)
-          (eq major-mode 'lisp-interaction-mode))
-      (oops-lisp-jump-to-definition-atpt)
-      )
-     ;; c
-     ;; c++
-     ;; python
-     )
+  (cond
+   ;; lisp
+   ((or (eq major-mode 'emacs-lisp-mode)
+        (eq major-mode 'lisp-interaction-mode))
+    (oops--lisp-jump-to-definition-atpt)
     )
+   ;; c
+   ;; c++
+   ;; python
+   )
+  )
+
+;; ###autoload
+(defun oops-goto-global-symbol ()
+  ""
+  (interactive)
+  (cond
+   ;; lisp
+   ((or (eq major-mode 'emacs-lisp-mode)
+        (eq major-mode 'lisp-interaction-mode))
+    )
+   ;; c
+   ;; c++
+   ;; python
+   )
+  )
+
+;; ###autoload
+(defun oops-goto-local-symbol ()
+  (interactive)
+  (cond
+   ;; lisp
+   ((or (eq major-mode 'emacs-lisp-mode)
+        (eq major-mode 'lisp-interaction-mode))
+    (oops--goto-lsymb)
+    )
+   ;; c
+   ;; c++
+   ;; python
+   )
   )
 
 ;; ;; ###autoload

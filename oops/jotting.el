@@ -1,15 +1,37 @@
-(keymap
- (menu-bar keymap
-           (lisp "Lisp" keymap
-                 (ind-sexp menu-item "Indent sexp" indent-sexp :help "Indent each line of the list starting just after point")
-                 (ev-def menu-item "Eval defun" lisp-eval-defun :help "Send the current defun to the Lisp process made by M-x run-lisp")
-                 (run-lisp menu-item "Run inferior Lisp" run-lisp :help "Run an inferior Lisp process, input and output via buffer `*inferior-lisp*'")
-                 "Lisp"))
- (3 keymap
-    (26 . run-lisp))
- (27 keymap
-     (24 . lisp-eval-defun))
- keymap
- (127 . backward-delete-char-untabify)
- (27 keymap
-     (17 . indent-sexp)))
+;; (help-setup-xref (list #'describe-function function)
+;;                  (called-interactively-p 'interactive))
+
+(defun describe-function (function)
+  "Display the full documentation of FUNCTION (a symbol)."
+  (interactive
+   (let ((fn (function-called-at-point))
+         (enable-recursive-minibuffers t)
+         val)
+     (setq val (completing-read (if fn
+                                    (format "Describe function (default %s): " fn)
+                                  "Describe function: ")
+                                obarray 'fboundp t nil nil
+                                (and fn (symbol-name fn))))
+     (list (if (equal val "")
+               fn
+             (intern val)
+             ))
+     )
+   )
+  (if (null function)
+      (message "You didn't specify a function")
+    (help-setup-xref (list #'describe-function function)
+                     (called-interactively-p 'interactive))
+    (save-excursion
+      (with-help-window (help-buffer)
+        (prin1 function)
+        ;; Use " is " instead of a colon so that
+        ;; it is easier to get out the function name using forward-sexp.
+        (princ " is ")
+        (describe-function-1 function)
+        (with-current-buffer standard-output
+          ;; Return the text we displayed.
+          (buffer-string)))
+      )
+    )
+  )
