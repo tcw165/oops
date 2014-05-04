@@ -6,37 +6,192 @@
       ;; return the selection.
       (buffer-substring-no-properties (region-beginning) (region-end))
     ;; else.
-    (format "%s" (thing-at-point 'symbol))
+    (thing-at-point 'symbol)
     )
   )
 
-(defun oops--lisp-show-help-atpt ()
-  (let* ((symb (read (oops--lisp-thingatpt)))
-         (buffer-point (cond
-                        ;; Native function or variable:
-                        ((subrp symb)
-                         nil
-                         )
-                        ;; Library:
-                        ((featurep symb)
-                         nil
-                         )
-                        ;; Function:
-                        ((fboundp symb)
-                         (save-excursion
-                           (find-function-noselect symb t)
-                           )
-                         )
-                        ;; Variable:
-                        ((boundp symb)
-                         (save-excursion
-                           (find-variable-noselect symb)
-                           )
-                         )))
+(defun oops--lisp-help-buffer (&optional clean-buf)
+  (let ((buf (get-buffer-create "**Help**")))
+    (when (and clean-buf
+               (> clean-buf 0))
+      (with-current-buffer buf
+        (erase-buffer))
+      )
+    ;; (with-current-buffer buf
+    ;;   (read-only-mode 1))
+    buf
+    )
+  )
+
+(defun oops--lisp-describle-function-1 (function)
+  (let* ((advised (and (symbolp function) (featurep 'advice)
+                       (ad-get-advice-info function)))
+         ;; If the function is advised, use the symbol that has the
+         ;; real definition, if that symbol is already set up.
+         (real-function (or (and advised
+                                 (let ((origname (cdr (assq 'origname advised))))
+                                   (and (fboundp origname) origname)))
+                            function))
+         ;; Get the real definition.
+         (def (if (symbolp real-function)
+                  (symbol-function real-function)
+                function))
+         (aliased (symbolp def))
+         (real-def (if aliased
+                       (let ((f def))
+                         (while (and (fboundp f)
+                                     (symbolp (symbol-function f)))
+                           (setq f (symbol-function f)))
+                         f)
+                     def))
+         (file-name (find-lisp-object-file-name function def))
+         ;; (pt1 (with-current-buffer (help-buffer) (point)))
+         (beg (if (and (or (byte-code-function-p def)
+                           (keymapp def)
+                           (memq (car-safe def) '(macro lambda closure)))
+                       file-name
+                       (help-fns--autoloaded-p function file-name))
+                  (if (commandp def)
+                      "an interactive autoloaded "
+                    "an autoloaded ")
+                (if (commandp def) "an interactive " "a ")))
          )
-    (when buffer-point
-      ;; (message "Symbol (%s) is at %s" symb buffer-point)
-      (oops-update-help buffer-point)
+
+    ;; Print what kind of function-like object FUNCTION is.
+    (princ (cond ((or (stringp def) (vectorp def))
+                  "a keyboard macro")
+                 ((subrp def)
+                  (if (eq 'unevalled (cdr (subr-arity def)))
+                      (concat beg "special form")
+                    (concat beg "built-in function")))
+                 ((byte-code-function-p def)
+                  (concat beg "compiled Lisp function"))
+                 (aliased
+                  (format "an alias for `%s'" real-def))
+                 ((eq (car-safe def) 'lambda)
+                  (concat beg "Lisp function"))
+                 ((eq (car-safe def) 'macro)
+                  (concat beg "Lisp macro"))
+                 ((eq (car-safe def) 'closure)
+                  (concat beg "Lisp closure"))
+                 ((autoloadp def)
+                  (format "%s autoloaded %s"
+                          (if (commandp def) "an interactive" "an")
+                          (if (eq (nth 4 def) 'keymap) "keymap"
+                            (if (nth 4 def) "Lisp macro" "Lisp function"))))
+                 ((keymapp def)
+                  (let ((is-full nil)
+                        (elts (cdr-safe def)))
+                    (while elts
+                      (if (char-table-p (car-safe elts))
+                          (setq is-full t
+                                elts nil))
+                      (setq elts (cdr-safe elts)))
+                    (concat beg (if is-full "keymap" "sparse keymap"))))
+                 (t "")))
+
+    (if (and aliased (not (fboundp real-def)))
+        (princ ",\nwhich is not defined.  Please make a bug report.")
+      (with-current-buffer standard-output
+        (save-excursion
+          (save-match-data
+            (when (re-search-backward "alias for `\\([^`']+\\)'" nil t)
+              (help-xref-button 1 'help-function real-def))))
+        )
+
+      (when file-name
+        (princ " in `")
+        ;; We used to add .el to the file name,
+        ;; but that's completely wrong when the user used load-file.
+        (princ (if (eq file-name 'C-source)
+                   "C source code"
+                 (file-name-nondirectory file-name)))
+        (princ "'")
+        ;; Make a hyperlink to the library.
+        (with-current-buffer standard-output
+          (save-excursion
+            (re-search-backward "`\\([^`']+\\)'" nil t)
+            (help-xref-button 1 'help-function-def function file-name))
+          )
+        )
+      (princ ".")
+      ;; (with-current-buffer (help-buffer)
+      ;;   (fill-region-as-paragraph (save-excursion (goto-char pt1) (forward-line 0) (point))
+      ;;                             (point)))
+      (terpri)(terpri)
+
+      (let* ((doc-raw (documentation function t))
+             ;; If the function is autoloaded, and its docstring has
+             ;; key substitution constructs, load the library.
+             (doc (progn
+                    (and (autoloadp real-def) doc-raw
+                         help-enable-auto-load
+                         (string-match "\\([^\\]=\\|[^=]\\|\\`\\)\\\\[[{<]"
+                                       doc-raw)
+                         (load (cadr real-def) t))
+                    (substitute-command-keys doc-raw))))
+
+        (help-fns--key-bindings function)
+        (with-current-buffer standard-output
+          (setq doc (help-fns--signature function doc real-def real-function))
+
+          (help-fns--compiler-macro function)
+          (help-fns--parent-mode function)
+          (help-fns--obsolete function)
+
+          (insert "\n"
+                  (or doc "Not documented."))
+          )
+        )
+      )
+    )
+  )
+
+;; (oops--lisp-describle-function 'subr-arity)
+(defun oops--lisp-describle-function (function)
+  "Display the full documentation of FUNCTION (a symbol)."
+  (when function
+    (let ((standard-output (oops--lisp-help-buffer 1)))
+      (prin1 function)
+      (princ " is ")
+      (oops--lisp-describle-function-1 function)
+      )
+    (with-current-buffer (oops--lisp-help-buffer)
+      (goto-char 1)
+      )
+    )
+  )
+
+;; (subrp 'princ)
+;; (subrp (symbol-function 'princ))
+;; (subrp (symbol-value 'major-mode))
+;; (subrp 'major-mode)
+;; (subrp (symbol-function 'major-mode))
+(defun oops--lisp-show-help-atpt ()
+  (let* ((symb (intern-soft (oops--lisp-thingatpt))))
+    (when symb
+      (cond
+       ;; Library:
+       ;; ((featurep symb)
+       ;;  nil
+       ;;  )
+       ;; Variable:
+       ((boundp symb)
+        (oops-update-help (save-excursion
+                            (find-variable-noselect symb)))
+        )
+       ;; Function:
+       ((fboundp symb)
+        (if (subrp (symbol-function symb))
+            (progn
+              (oops--lisp-describle-function symb)
+              (oops-update-help (oops--lisp-help-buffer))
+              )
+          (oops-update-help (save-excursion
+                              (find-function-noselect symb t)))
+          )
+        )
+       )
       )
     )
   )
@@ -65,27 +220,15 @@
   ;; * advising function list!
   ;; * variable and function with same name!
   ;; * add local variable navigation!
-  (let* ((text (oops--lisp-thingatpt))
-         (symb (and (not (null text))
-                    (read text)))
-         (is-var-fun (and (not (null symb))
-                          (boundp symb)
-                          (fboundp symb)))
-         )
+  (let* ((symb (intern-soft (oops--lisp-thingatpt))))
     ;; Force to unselect text.
     (deactivate-mark)
     (cond
-     ;; nil
-     ((or (null text)
-          (null symb))
-      ;; DO NOTHING
-      nil
-      )
      ;; library
-     ((and symb (featurep symb))
-      (find-library text)
+     ((featurep symb)
+      (find-library (symbol-name symb))
       ;; TODO/FIXME: go to (require 'text) line
-      (message "library: %s" text)
+      (message "library: %s" symb)
       )
      ;; TODO/FIXME =======================================================>
      ;; ;; Variable and Function with the same name:
@@ -94,19 +237,20 @@
      ;;  )
      ;; <==================================================================
      ;; Function:
-     ((and symb (fboundp symb))
-      (find-function symb)
-      (message "function: %s" text)
+     ((fboundp symb)
+      (if (subrp (symbol-function symb))
+          (message "Not support built-in function: %s." symb)
+        (find-function-do-it symb nil 'switch-to-buffer)
+        (message "function: %s" symb)
+        )
       )
      ;; Variable:
-     ((and symb (boundp symb))
-      (find-variable symb)
-      (message "variable: %s" text)
+     ((boundp symb)
+      (find-function-do-it symb 'defvar 'switch-to-buffer)
+      (message "variable: %s" symb)
       )
      ;; Unknown symbol:
-     (t
-      (message "unknown symbol: %s" text)
-      )
+     (t (message "unknown symbol: %s" symb))
      )
     )
   )

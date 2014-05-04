@@ -268,6 +268,10 @@
           )
         )
       )
+     ;; Single BUFFER
+     ((bufferp data)
+      (set-window-buffer oops--help-win data)
+      )
      )
     )
   )
