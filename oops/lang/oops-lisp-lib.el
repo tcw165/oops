@@ -148,6 +148,7 @@
   )
 
 ;; (oops--lisp-describle-function 'subr-arity)
+;; standard-output
 (defun oops--lisp-describle-function (function)
   "Display the full documentation of FUNCTION (a symbol)."
   (when function
@@ -162,12 +163,9 @@
     )
   )
 
-;; (subrp 'princ)
-;; (subrp (symbol-function 'princ))
-;; (subrp (symbol-value 'major-mode))
-;; (subrp 'major-mode)
-;; (subrp (symbol-function 'major-mode))
-(defun oops--lisp-show-help-atpt ()
+;; (find-lisp-object-file-name 'standard-output 'defvar)
+;; (string-match "[.]\\(c\\|cpp\\)$" (find-lisp-object-file-name 'standard-output 'defvar))
+(defun oops-lisp-show-help-atpt ()
   (let* ((symb (intern-soft (oops--lisp-thingatpt))))
     (when symb
       (cond
@@ -177,8 +175,15 @@
        ;;  )
        ;; Variable:
        ((boundp symb)
-        (oops-update-help (save-excursion
-                            (find-variable-noselect symb)))
+        (let ((fname (find-lisp-object-file-name symb 'defvar)))
+          (if (or (eq fname 'C-source)
+                  (string-match "[.]\\(c\\|cpp\\)$" fname))
+              (message "Yet support for built-in variable: %s." symb)
+            ;; Try not to use `find-variable-noselect'.
+            (oops-update-help (save-excursion
+                                (find-variable-noselect symb)))
+            )
+          )
         )
        ;; Function:
        ((fboundp symb)
@@ -187,6 +192,8 @@
               (oops--lisp-describle-function symb)
               (oops-update-help (oops--lisp-help-buffer))
               )
+          ;; TODO:
+          ;; Try not to use `find-function-noselect'.
           (oops-update-help (save-excursion
                               (find-function-noselect symb t)))
           )
@@ -214,7 +221,7 @@
   ""
   )
 
-(defun oops--lisp-jump-to-definition-atpt ()
+(defun oops-lisp-jump-to-definition-atpt ()
   ""
   ;; TODO/FIXME:
   ;; * advising function list!
@@ -256,7 +263,7 @@
   )
 
 ;; require `imenu'.
-(defun oops--goto-lsymb (&optional symbol-list)
+(defun oops-lisp-goto-lsymb (&optional symbol-list)
   "Refresh imenu and jump to a place in the buffer using Ido."
   (interactive)
   (unless (featurep 'imenu)
@@ -274,7 +281,7 @@
       (while (progn
                (imenu--cleanup)
                (setq imenu--index-alist nil)
-               (oops--goto-lsymb (imenu--make-index-alist))
+               (oops-lisp-goto-lsymb (imenu--make-index-alist))
                (setq selected-symbol
                      (ido-completing-read "Find symbol in file: " symbol-names))
                (string= (car imenu--rescan-item) selected-symbol)))
@@ -292,7 +299,7 @@
       (let (name position)
         (cond
          ((and (listp symbol) (imenu--subalist-p symbol))
-          (oops--goto-lsymb symbol))
+          (oops-lisp-goto-lsymb symbol))
          ((listp symbol)
           (setq name (car symbol))
           (setq position (cdr symbol)))

@@ -75,7 +75,7 @@ The `base' should be a directory string and the `exclude' should be a list that 
      ((or (eq major-mode 'emacs-lisp-mode)
           (eq major-mode 'lisp-interaction-mode))
       (when oops--is-basic-perspective
-        (oops--lisp-show-help-atpt)
+        (oops-lisp-show-help-atpt)
         )
       )
      ;; c
@@ -117,7 +117,7 @@ For Python, it doesn't support yet."
    ;; lisp
    ((or (eq major-mode 'emacs-lisp-mode)
         (eq major-mode 'lisp-interaction-mode))
-    (oops--lisp-jump-to-definition-atpt)
+    (oops-lisp-jump-to-definition-atpt)
     )
    ;; c
    ;; c++
@@ -147,7 +147,7 @@ For Python, it doesn't support yet."
    ;; lisp
    ((or (eq major-mode 'emacs-lisp-mode)
         (eq major-mode 'lisp-interaction-mode))
-    (oops--goto-lsymb)
+    (oops-lisp-goto-lsymb)
     )
    ;; c
    ;; c++
