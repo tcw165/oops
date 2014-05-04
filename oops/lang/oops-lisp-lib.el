@@ -23,7 +23,7 @@
     )
   )
 
-(defun oops--lisp-describle-function-1 (function)
+(defun oops--lisp-describe-function-1 (function)
   (let* ((advised (and (symbolp function) (featurep 'advice)
                        (ad-get-advice-info function)))
          ;; If the function is advised, use the symbol that has the
@@ -147,19 +147,17 @@
     )
   )
 
-;; (oops--lisp-describle-function 'subr-arity)
+;; (oops--lisp-describe-function 'subr-arity)
 ;; standard-output
-(defun oops--lisp-describle-function (function)
+(defun oops--lisp-describe-function (function)
   "Display the full documentation of FUNCTION (a symbol)."
-  (when function
-    (let ((standard-output (oops--lisp-help-buffer 1)))
-      (prin1 function)
-      (princ " is ")
-      (oops--lisp-describle-function-1 function)
-      )
-    (with-current-buffer (oops--lisp-help-buffer)
-      (goto-char 1)
-      )
+  (let ((standard-output (oops--lisp-help-buffer 1)))
+    (prin1 function)
+    (princ " is ")
+    (oops--lisp-describe-function-1 function)
+    )
+  (with-current-buffer (oops--lisp-help-buffer)
+    (goto-char 1)
     )
   )
 
@@ -189,7 +187,7 @@
        ((fboundp symb)
         (if (subrp (symbol-function symb))
             (progn
-              (oops--lisp-describle-function symb)
+              (oops--lisp-describe-function symb)
               (oops-update-help (oops--lisp-help-buffer))
               )
           ;; TODO:
