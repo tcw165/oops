@@ -1,14 +1,25 @@
 ;; (find-lisp-object-file-name 'major-mode 'defvar)
 ;; (find-lisp-object-file-name 'oops-mode 'defvar)
 
+;; (let ((a 123))
+;;   (message "%d" a)
+;;   (variable-binding-locus 'a)
+;;   )
+;; (variable-binding-locus 'company-mode)
+;; (variable-binding-locus 'oops-mode)
+;; (symbol-value 'oops-mode)
+
+;; (oops-lisp-describe-variable 'oops-mode)
+;; (prin1 'oops-mode)
+
 ;; (defun describe-variable (variable &optional buffer frame)
 (defun oops-lisp-describe-variable (variable)
   (let ((standard-output (oops--lisp-help-buffer 1))
         file-name)
     (save-excursion
       (let ((permanent-local (get variable 'permanent-local))
-            (locus (variable-binding-locus variable)) ;; TODO: unless valvoid???
-            (val (symbol-value variable)) ;; TODO: unless valvoid???
+            (locus (variable-binding-locus variable))
+            (val (symbol-value variable))
             val-start-pos
             )
         (with-current-buffer (current-buffer)
@@ -22,17 +33,16 @@
                            "C source code"
                          (file-name-nondirectory file-name)))
                 (princ "'.\n")
-                (with-current-buffer standard-output
-                  (save-excursion
-                    (re-search-backward "`\\([^`']+\\)'" nil t)
-                    (help-xref-button 1 'help-variable-def
-                                      variable file-name)
-                    )
-                  )
+                ;; (with-current-buffer standard-output
+                ;;   (save-excursion
+                ;;     (re-search-backward "`\\([^`']+\\)'" nil t)
+                ;;     (help-xref-button 1 'help-variable-def
+                ;;                       variable file-name)
+                ;;     )
+                ;;   )
                 )
             )
           )
-        ;; (unless valvoid
         (with-current-buffer standard-output
           (setq val-start-pos (point))
           (princ "value is ")
@@ -68,7 +78,6 @@
               )
             )
           )
-        ;; )
         (terpri)
         (when locus
           (cond
