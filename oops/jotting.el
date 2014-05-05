@@ -6,20 +6,11 @@
   (let ((standard-output (oops--lisp-help-buffer 1))
         file-name)
     (save-excursion
-      (let ((valvoid (not (with-current-buffer (current-buffer) (boundp variable))))
-            (permanent-local (get variable 'permanent-local))
+      (let ((permanent-local (get variable 'permanent-local))
             (locus (variable-binding-locus variable)) ;; TODO: unless valvoid???
             (val (symbol-value variable)) ;; TODO: unless valvoid???
             val-start-pos
             )
-        ;; Extract the value before setting up the output (current-buffer),
-        ;; in case `current-buffer' *is* the output buffer.
-        ;; (unless valvoid
-        ;;   (with-current-buffer (current-buffer)
-        ;;     (setq val (symbol-value variable)
-        ;;           locus (variable-binding-locus variable))
-        ;;     )
-        ;;   )
         (with-current-buffer (current-buffer)
           (prin1 variable)
           (setq file-name (find-lisp-object-file-name variable 'defvar))
@@ -38,54 +29,46 @@
                                       variable file-name)
                     )
                   )
-                (if valvoid
-                    (princ "It is void as a variable.")
-                  (princ "Its ")
-                  )
                 )
-            (if valvoid
-                (princ " is void as a variable.")
-              (princ "'s ")
-              )
             )
           )
-        (unless valvoid
-          (with-current-buffer standard-output
-            (setq val-start-pos (point))
-            (princ "value is ")
-            (let ((from (point))
-                  (line-beg (line-beginning-position))
-                  (print-rep
-                   (let ((print-quoted t))
-                     (prin1-to-string val))))
-              (if (< (+ (length print-rep) (point) (- line-beg)) 68)
-                  (insert print-rep)
-                (terpri)
-                (pp val)
-                (if (< (point) (+ 68 (line-beginning-position 0)))
-                    (delete-region from (1+ from))
-                  (delete-region (1- from) from)
-                  )
+        ;; (unless valvoid
+        (with-current-buffer standard-output
+          (setq val-start-pos (point))
+          (princ "value is ")
+          (let ((from (point))
+                (line-beg (line-beginning-position))
+                (print-rep
+                 (let ((print-quoted t))
+                   (prin1-to-string val))))
+            (if (< (+ (length print-rep) (point) (- line-beg)) 68)
+                (insert print-rep)
+              (terpri)
+              (pp val)
+              (if (< (point) (+ 68 (line-beginning-position 0)))
+                  (delete-region from (1+ from))
+                (delete-region (1- from) from)
                 )
-              (let* ((sv (get variable 'standard-value))
-                     (origval (and (consp sv)
-                                   (condition-case nil
-                                       (eval (car sv))
-                                     (error :help-eval-error)))))
-                (when (and (consp sv)
-                           (not (equal origval val))
-                           (not (equal origval :help-eval-error)))
-                  (princ "\nOriginal value was \n")
-                  (setq from (point))
-                  (pp origval)
-                  (if (< (point) (+ from 20))
-                      (delete-region (1- from) from)
-                    )
+              )
+            (let* ((sv (get variable 'standard-value))
+                   (origval (and (consp sv)
+                                 (condition-case nil
+                                     (eval (car sv))
+                                   (error :help-eval-error)))))
+              (when (and (consp sv)
+                         (not (equal origval val))
+                         (not (equal origval :help-eval-error)))
+                (princ "\nOriginal value was \n")
+                (setq from (point))
+                (pp origval)
+                (if (< (point) (+ from 20))
+                    (delete-region (1- from) from)
                   )
                 )
               )
             )
           )
+        ;; )
         (terpri)
         (when locus
           (cond
