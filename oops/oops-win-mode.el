@@ -178,6 +178,8 @@
                   ;; toggle == nil.
                   (not oops--is-hsplit-perspective)
                   )))
+    ;; TODO:
+    ;; What if somebody kills the split window?
     (if enable
         ;; Enable hsplit perspective:
         (split-window oops--edit-win nil 'right)
@@ -187,6 +189,8 @@
       )
     ;; Update flag.
     (setq oops--is-hsplit-perspective enable)
+
+    (message "[OOPS] hsplit perspective is %s." (if oops--is-hsplit-perspective "on" "off"))
     )
   )
 
@@ -230,17 +234,20 @@
             )
           )
       ;; Disable basic perspective:
-      ;; (unless (null oops--outline-win)
+      ;; (when (window-valid-p oops--outline-win)
       ;;   (delete-window oops--outline-win)
-      ;;   (setq oops--outline-win nil)
       ;;   )
-      (unless (null oops--help-win)
+      ;; (setq oops--outline-win nil)
+
+      (when (window-valid-p oops--help-win)
         (delete-window oops--help-win)
-        (setq oops--help-win nil)
         )
+      (setq oops--help-win nil)
       )
     ;; Update flag.
     (setq oops--is-basic-perspective enable)
+
+    (message "[OOPS] basic perspective is %s." (if oops--is-basic-perspective "on" "off"))
     )
   )
 
