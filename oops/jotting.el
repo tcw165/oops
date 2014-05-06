@@ -8,6 +8,15 @@
 ;; (variable-binding-locus 'company-mode)
 ;; (variable-binding-locus 'oops-mode)
 ;; (symbol-value 'oops-mode)
+;; (read "123")
+
+(setq useless-list (append "XY()" nil))
+(defun useless-stream (&optional unread)
+  (if unread
+      (setq useless-list (cons unread useless-list))
+    (prog1 (car useless-list)
+      (setq useless-list (cdr useless-list)))))
+(useless-stream)
 
 ;; (oops-lisp-temp-buffer)
 (defun oops--lisp-temp-buffer ()
@@ -51,7 +60,8 @@
               (line-beg (line-beginning-position))
               (print-rep
                (let ((print-quoted t))
-                 (prin1-to-string val))))
+                 (prin1-to-string val)
+                 )))
           (if (< (+ (length print-rep) (point) (- line-beg)) 68)
               (insert print-rep)
             (terpri)
