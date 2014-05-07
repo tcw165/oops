@@ -74,10 +74,10 @@
 ;; Ctrl + z
 (global-set-key (kbd "C-z") 'oops-undo)
 
-;; Alt + l
-(global-set-key (kbd "M-l") 'ido-switch-buffer)
 ;; Ctrl + l
 (global-set-key (kbd "C-l") 'goto-line)
+;; Ctrl + Shift + l
+(global-set-key (kbd "C-S-l") 'ido-switch-buffer)
 
 ;; Ctrl + /
 (global-set-key (kbd "C-/") 'oops-toggle-comment)
