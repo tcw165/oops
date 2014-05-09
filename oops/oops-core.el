@@ -166,8 +166,29 @@
 (defun oops-prev-history ()
   "Navigate to previous history by looking element in the `global-mark-ring'."
   (interactive)
-  (pop-global-mark)
-  ;; (message "[%s] - %s" global-mark-ring-max global-mark-ring)
+  ;; Pop entries which refer to non-existent buffers.
+  (while (and global-mark-ring
+              (not (marker-buffer (car global-mark-ring))))
+    (setq global-mark-ring (cdr global-mark-ring))
+    )
+  (if global-mark-ring
+      (let* ((marker (car global-mark-ring))
+             (buffer (marker-buffer marker))
+             (position (marker-position marker)))
+        (setq global-mark-ring (nconc (cdr global-mark-ring)
+                                      (list (car global-mark-ring))))
+        (set-buffer buffer)
+        (or (and (>= position (point-min))
+                 (<= position (point-max)))
+            (if widen-automatically
+                (widen)
+              (error "Global mark position is outside accessible part of buffer")))
+        (goto-char position)
+        (switch-to-buffer buffer)
+        (message "[%s/%s] - %s" (length global-mark-ring) global-mark-ring-max global-mark-ring)
+        )
+    (message "No global mark was set!")
+    )
   )
 
 (defun oops-next-history ()
