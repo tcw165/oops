@@ -194,9 +194,82 @@
 (defun oops-next-history ()
   "Navigate to next history by looking element in the `global-mark-ring'."
   (interactive)
-  (message "(oops-next-history) Yet ready...")
+  ;; Pop entries which refer to non-existent buffers.
+  (while (and global-mark-ring
+              (not (marker-buffer (car global-mark-ring))))
+    (setq global-mark-ring (cdr global-mark-ring))
+    )
+  (if global-mark-ring
+      (let* ((marker (car global-mark-ring))
+             (buffer (marker-buffer marker))
+             (position (marker-position marker)))
+        (setq global-mark-ring (nconc (last global-mark-ring)
+                                      (butlast global-mark-ring)))
+        (set-buffer buffer)
+        (or (and (>= position (point-min))
+                 (<= position (point-max)))
+            (if widen-automatically
+                (widen)
+              (error "Global mark position is outside accessible part of buffer")))
+        (goto-char position)
+        (switch-to-buffer buffer)
+        (message "[%s/%s] - %s" (length global-mark-ring) global-mark-ring-max global-mark-ring)
+        )
+    (message "No global mark was set!")
+    )
   )
 
+;; ###autoload
+(defun oops-jump-to-definition-atpt ()
+  "Find the symbol's definition. If there's only one result, open the file in the current window. If there're multiple results, show a list under the current window.
+
+For lisp, it supports symbol of `defun', `defadvice', `defvar' and `provide'.
+For C/C++, it doesn't support yet.
+For Python, it doesn't support yet."
+  (interactive)
+  (cond
+   ;; lisp
+   ((or (eq major-mode 'emacs-lisp-mode)
+        (eq major-mode 'lisp-interaction-mode))
+    (oops-lisp-jump-to-definition-atpt)
+    )
+   ;; c
+   ;; c++
+   ;; python
+   )
+  )
+
+;; ###autoload
+(defun oops-goto-global-symbol ()
+  ""
+  (interactive)
+  (cond
+   ;; lisp
+   ((or (eq major-mode 'emacs-lisp-mode)
+        (eq major-mode 'lisp-interaction-mode))
+    )
+   ;; c
+   ;; c++
+   ;; python
+   )
+  )
+
+;; ###autoload
+(defun oops-goto-local-symbol ()
+  (interactive)
+  (cond
+   ;; lisp
+   ((or (eq major-mode 'emacs-lisp-mode)
+        (eq major-mode 'lisp-interaction-mode))
+    (oops-lisp-goto-lsymb)
+    )
+   ;; c
+   ;; c++
+   ;; python
+   )
+  )
+
+;; ###autoload
 (defun oops-common-escape ()
   "Exit the current \"mode\" (in a generalized sense of the word).
 This command can exit an interactive command such as `query-replace',
