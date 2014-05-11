@@ -449,17 +449,18 @@
   ;; * advising function list!
   ;; * variable and function with same name!
   ;; * add local variable navigation!
-  (let* ((symb (intern-soft (oops--lisp-thingatpt))))
-    ;; Add current point as a mark into history.
-    (oops--push-history)
+  (let* ((symb (intern-soft (oops--lisp-thingatpt)))
+         (bound (bounds-of-thing-at-point 'symbol)))
+    ;; Push history.
+    (oops--push-history (car bound) (cdr bound))
     ;; Force to unselect text.
     (setq mark-active nil)
     (cond
      ;; library
      ((featurep symb)
       (find-library (symbol-name symb))
-      ;; Add current point as a mark into history.
-      (oops--push-history)
+      ;; Push history.
+      (oops--push-history (point) (point))
       ;; TODO/FIXME: go to (require 'text) line
       (message "library: %s" symb)
       )
@@ -473,17 +474,19 @@
      ((fboundp symb)
       (if (subrp (symbol-function symb))
           (message "Not support built-in function: %s." symb)
+        ;; TODO: select symbol
         (find-function-do-it symb nil 'switch-to-buffer)
-        ;; Add current point as a mark into history.
-        (oops--push-history)
+        ;; Push history.
+        (oops--push-history (point) (point))
         (message "function: %s" symb)
         )
       )
      ;; Variable:
      ((boundp symb)
       (find-function-do-it symb 'defvar 'switch-to-buffer)
-      ;; Add current point as a mark into history.
-      (oops--push-history)
+      ;; TODO: select symbol
+      ;; Push history.
+      (oops--push-history (point) (point))
       (message "variable: %s" symb)
       )
      ;; Unknown symbol:

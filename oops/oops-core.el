@@ -1,8 +1,14 @@
-;; GNU library =================================================================
+;; GNU Library =================================================================
 (require 'ido)
 (require 'imenu)
 (require 'thingatpt)
 (require 'company)
+
+;; Oops Library ================================================================
+(require 'oops-lisp-lib)
+(require 'oops-python-lib)
+(require 'oops-c-lib)
+(require 'oops-cpp-lib)
 
 ;; Text Operation ==============================================================
 
@@ -26,9 +32,9 @@
         (end (line-end-position)))
     (when mark-active
       (setq beg (save-excursion
-                    (goto-char (region-beginning))
-                    (beginning-of-line)
-                    (point))
+                  (goto-char (region-beginning))
+                  (beginning-of-line)
+                  (point))
             end (save-excursion
                   (goto-char (region-end))
                   (end-of-line)
@@ -82,10 +88,10 @@
   (let ((beg (line-beginning-position 1))
         (end (line-beginning-position 2)))
     (when mark-active
-       (setq beg (save-excursion
-                    (goto-char (region-beginning))
-                    (beginning-of-line 1)
-                    (point))
+      (setq beg (save-excursion
+                  (goto-char (region-beginning))
+                  (beginning-of-line 1)
+                  (point))
             end (save-excursion
                   (goto-char (region-end))
                   (beginning-of-line 2)
@@ -163,75 +169,138 @@
 
 ;; Navigation ==================================================================
 
-(defun oops--push-history ()
-  ;; TODO: test for symbol's point adjustment.
-  (set-marker (mark-marker) (point))
-  (setq global-mark-ring (cons (copy-marker (mark-marker)) global-mark-ring))
-  (when (> (length global-mark-ring) global-mark-ring-max)
-    (set-marker (car (nthcdr global-mark-ring-max global-mark-ring)) nil)
-    (setcdr (nthcdr (1- global-mark-ring-max) global-mark-ring) nil)
+(defvar oops-history-max 16)
+(defvar oops-history nil
+  "The history is a list containing element with format of \(MARKER . BOUND-BEGINNING\). The MARKER's position is actually the BOUND-END.")
+
+
+;; ###autoload
+(defun oops--push-history (bound-beg bound-end)
+  "Push the history item into history and remove the duplicate elements. Check `oops-history' for the details of the history element."
+  ;; Remove duplicate history.
+  (if (listp oops-history)
+      (dolist (history-item oops-history)
+        (let ((beg (cdr history-item))
+              (end (marker-position (car history-item)))
+              (buffer (marker-buffer (car history-item))))
+          (when (and (eq bound-beg beg)
+                     (eq bound-end end)
+                     (eq (current-buffer) buffer))
+            (setq oops-history (delq history-item oops-history))
+            )
+          )
+        )
+    )
+  ;; Push history.
+  (let ((history-item (cons (copy-marker (set-marker (mark-marker) bound-end))
+                            bound-beg)))
+    (if (null oops-history)
+        ;; 1st history element.
+        (setq oops-history (list history-item))
+      ;; else.
+      (setq oops-history (cons history-item oops-history))
+      )
+    )
+  ;; Keep the lenght less than maximum length.
+  (when (> (length oops-history) oops-history-max)
+    (set-marker (car (nthcdr oops-history-max oops-history)) nil)
+    (setcdr (nthcdr (1- oops-history-max) oops-history) nil)
     )
   )
 
+;; test code ====================>
+(defun test1 ()
+  )
+
+(defun test2 ()
+  (test1)
+  )
+
+(defun test3 ()
+  (test1)
+  (test2)
+  )
+;; (setq oops-history nil)
+;; <==================== test code
+
+;; ###autoload
 (defun oops-prev-history ()
-  "Navigate to previous history by rotating the `global-mark-ring'.
-\(1 2 3 4 5\) => \(2 3 4 5 1\)"
+  "Navigate to previous history by rotating the `oops-history'.
+\(1 2 3 4 5\) => \(2 3 4 5 1\) and use \(2\) history."
   (interactive)
   ;; Pop entries which refer to non-existent buffers.
-  (while (and global-mark-ring
-              (not (marker-buffer (car global-mark-ring))))
-    (setq global-mark-ring (cdr global-mark-ring))
+  (while (and oops-history
+              (not (marker-buffer (caar oops-history))))
+    (setq oops-history (cdr oops-history))
     )
   ;; Rotate the history.
-  (setq global-mark-ring (nconc (cdr global-mark-ring)
-                                (list (car global-mark-ring))))
-  (if global-mark-ring
-      (let* ((marker (car global-mark-ring))
+  (setq oops-history (nconc (cdr oops-history)
+                            (list (car oops-history))))
+  (if oops-history
+      (let* ((marker (caar oops-history))
              (buffer (marker-buffer marker))
-             (position (marker-position marker)))
+             (beg (cdar oops-history))
+             (end (marker-position marker)))
         (set-buffer buffer)
-        (or (and (>= position (point-min))
-                 (<= position (point-max)))
+        ;; Disable region.
+        (setq mark-active nil)
+        (or (and (>= end (point-min))
+                 (<= end (point-max)))
             (if widen-automatically
                 (widen)
-              (error "Global mark position is outside accessible part of buffer")))
-        (goto-char position)
+              )
+            )
+        (set-marker (mark-marker) beg)
+        (goto-char end)
         (switch-to-buffer buffer)
+        ;; Enable region.
+        (unless (= beg end)
+          (setq mark-active t)
+          )
         (message "Go to previous navigation history.")
-        ;; (message "[%s/%s] - %s" (length global-mark-ring) global-mark-ring-max global-mark-ring)
+        ;; (message "[%s/%s] - %s" (length oops-history) oops-history-max oops-history)
         )
-    (message "No global mark was set!")
+    (message "No history was set!")
     )
   )
 
 (defun oops-next-history ()
-  "Navigate to next history by rotating the `global-mark-ring'.
-\(2 3 4 5 1\) => \(1 2 3 4 5\)"
+  "Navigate to next history by rotating the `oops-history'.
+\(2 3 4 5 1\) => \(1 2 3 4 5\) and use \(1\) history."
   (interactive)
   ;; Pop entries which refer to non-existent buffers.
-  (while (and global-mark-ring
-              (not (marker-buffer (car (last global-mark-ring)))))
-    (setq global-mark-ring (butlast global-mark-ring))
+  (while (and oops-history
+              (not (marker-buffer (caar (last oops-history)))))
+    (setq oops-history (butlast oops-history))
     )
   ;; Rotate the history.
-  (setq global-mark-ring (nconc (last global-mark-ring)
-                                (butlast global-mark-ring)))
-  (if global-mark-ring
-      (let* ((marker (car global-mark-ring))
+  (setq oops-history (nconc (last oops-history)
+                            (butlast oops-history)))
+  (if oops-history
+      (let* ((marker (caar oops-history))
              (buffer (marker-buffer marker))
-             (position (marker-position marker)))
+             (beg (cdar oops-history))
+             (end (marker-position marker)))
         (set-buffer buffer)
-        (or (and (>= position (point-min))
-                 (<= position (point-max)))
+        ;; Disable region.
+        (setq mark-active nil)
+        (or (and (>= end (point-min))
+                 (<= end (point-max)))
             (if widen-automatically
                 (widen)
-              (error "Global mark position is outside accessible part of buffer")))
-        (goto-char position)
+              )
+            )
+        (set-marker (mark-marker) beg)
+        (goto-char end)
         (switch-to-buffer buffer)
+        ;; Enable region.
+        (unless (= beg end)
+          (setq mark-active t)
+          )
         (message "Go to next navigation history.")
-        ;; (message "[%s/%s] - %s" (length global-mark-ring) global-mark-ring-max global-mark-ring)
+        ;; (message "[%s/%s] - %s" (length oops-history) oops-history-max oops-history)
         )
-    (message "No global mark was set!")
+    (message "No history was set!")
     )
   )
 
