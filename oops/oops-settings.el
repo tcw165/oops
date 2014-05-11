@@ -76,8 +76,8 @@
 
 ;; Ctrl + l
 (global-set-key (kbd "C-l") 'goto-line)
-;; Ctrl + Shift + l
-(global-set-key (kbd "C-S-l") 'ido-switch-buffer)
+;; Ctrl + Alt + l
+(global-set-key (kbd "C-M-l") 'ido-switch-buffer)
 
 ;; Ctrl + /
 (global-set-key (kbd "C-/") 'oops-toggle-comment)

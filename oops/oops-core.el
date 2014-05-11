@@ -163,20 +163,32 @@
 
 ;; Navigation ==================================================================
 
+(defun oops--push-history ()
+  ;; TODO: test for symbol's point adjustment.
+  (set-marker (mark-marker) (point))
+  (setq global-mark-ring (cons (copy-marker (mark-marker)) global-mark-ring))
+  (when (> (length global-mark-ring) global-mark-ring-max)
+    (set-marker (car (nthcdr global-mark-ring-max global-mark-ring)) nil)
+    (setcdr (nthcdr (1- global-mark-ring-max) global-mark-ring) nil)
+    )
+  )
+
 (defun oops-prev-history ()
-  "Navigate to previous history by looking element in the `global-mark-ring'."
+  "Navigate to previous history by rotating the `global-mark-ring'.
+\(1 2 3 4 5\) => \(2 3 4 5 1\)"
   (interactive)
   ;; Pop entries which refer to non-existent buffers.
   (while (and global-mark-ring
               (not (marker-buffer (car global-mark-ring))))
     (setq global-mark-ring (cdr global-mark-ring))
     )
+  ;; Rotate the history.
+  (setq global-mark-ring (nconc (cdr global-mark-ring)
+                                (list (car global-mark-ring))))
   (if global-mark-ring
       (let* ((marker (car global-mark-ring))
              (buffer (marker-buffer marker))
              (position (marker-position marker)))
-        (setq global-mark-ring (nconc (cdr global-mark-ring)
-                                      (list (car global-mark-ring))))
         (set-buffer buffer)
         (or (and (>= position (point-min))
                  (<= position (point-max)))
@@ -185,26 +197,29 @@
               (error "Global mark position is outside accessible part of buffer")))
         (goto-char position)
         (switch-to-buffer buffer)
-        (message "[%s/%s] - %s" (length global-mark-ring) global-mark-ring-max global-mark-ring)
+        (message "Go to previous navigation history.")
+        ;; (message "[%s/%s] - %s" (length global-mark-ring) global-mark-ring-max global-mark-ring)
         )
     (message "No global mark was set!")
     )
   )
 
 (defun oops-next-history ()
-  "Navigate to next history by looking element in the `global-mark-ring'."
+  "Navigate to next history by rotating the `global-mark-ring'.
+\(2 3 4 5 1\) => \(1 2 3 4 5\)"
   (interactive)
   ;; Pop entries which refer to non-existent buffers.
   (while (and global-mark-ring
-              (not (marker-buffer (car global-mark-ring))))
-    (setq global-mark-ring (cdr global-mark-ring))
+              (not (marker-buffer (car (last global-mark-ring)))))
+    (setq global-mark-ring (butlast global-mark-ring))
     )
+  ;; Rotate the history.
+  (setq global-mark-ring (nconc (last global-mark-ring)
+                                (butlast global-mark-ring)))
   (if global-mark-ring
       (let* ((marker (car global-mark-ring))
              (buffer (marker-buffer marker))
              (position (marker-position marker)))
-        (setq global-mark-ring (nconc (last global-mark-ring)
-                                      (butlast global-mark-ring)))
         (set-buffer buffer)
         (or (and (>= position (point-min))
                  (<= position (point-max)))
@@ -213,7 +228,8 @@
               (error "Global mark position is outside accessible part of buffer")))
         (goto-char position)
         (switch-to-buffer buffer)
-        (message "[%s/%s] - %s" (length global-mark-ring) global-mark-ring-max global-mark-ring)
+        (message "Go to next navigation history.")
+        ;; (message "[%s/%s] - %s" (length global-mark-ring) global-mark-ring-max global-mark-ring)
         )
     (message "No global mark was set!")
     )
