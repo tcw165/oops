@@ -169,139 +169,38 @@
 
 ;; Navigation ==================================================================
 
-(defvar oops-history-max 16)
-(defvar oops-history nil
-  "The history is a list containing element with format of \(MARKER . BOUND-BEGINNING\). The MARKER's position is actually the BOUND-END.")
-
-
-;; ###autoload
-(defun oops--push-history (bound-beg bound-end)
-  "Push the history item into history and remove the duplicate elements. Check `oops-history' for the details of the history element."
-  ;; Remove duplicate history.
-  (if (listp oops-history)
-      (dolist (history-item oops-history)
-        (let ((beg (cdr history-item))
-              (end (marker-position (car history-item)))
-              (buffer (marker-buffer (car history-item))))
-          (when (and (eq bound-beg beg)
-                     (eq bound-end end)
-                     (eq (current-buffer) buffer))
-            (setq oops-history (delq history-item oops-history))
-            )
-          )
-        )
-    )
-  ;; Push history.
-  (let ((history-item (cons (copy-marker (set-marker (mark-marker) bound-end))
-                            bound-beg)))
-    (if (null oops-history)
-        ;; 1st history element.
-        (setq oops-history (list history-item))
-      ;; else.
-      (setq oops-history (cons history-item oops-history))
-      )
-    )
-  ;; Keep the lenght less than maximum length.
-  (when (> (length oops-history) oops-history-max)
-    (set-marker (car (nthcdr oops-history-max oops-history)) nil)
-    (setcdr (nthcdr (1- oops-history-max) oops-history) nil)
-    )
-  )
-
-;; test code ====================>
-(defun test1 ()
-  )
-
-(defun test2 ()
-  (test1)
-  )
-
-(defun test3 ()
-  (test1)
-  (test2)
-  )
-;; (setq oops-history nil)
-;; <==================== test code
+;; TODO: customization support.
+(defvar oops-history-max 3)
 
 ;; ###autoload
 (defun oops-prev-history ()
-  "Navigate to previous history by rotating the `oops-history'.
-\(1 2 3 4 5\) => \(2 3 4 5 1\) and use \(2\) history."
+  "Navigate to previous record in the history."
   (interactive)
-  ;; Pop entries which refer to non-existent buffers.
-  (while (and oops-history
-              (not (marker-buffer (caar oops-history))))
-    (setq oops-history (cdr oops-history))
+  (cond
+   ;; lisp
+   ((or (eq major-mode 'emacs-lisp-mode)
+        (eq major-mode 'lisp-interaction-mode))
+    (oops-lisp-prev-history)
     )
-  ;; Rotate the history.
-  (setq oops-history (nconc (cdr oops-history)
-                            (list (car oops-history))))
-  (if oops-history
-      (let* ((marker (caar oops-history))
-             (buffer (marker-buffer marker))
-             (beg (cdar oops-history))
-             (end (marker-position marker)))
-        (set-buffer buffer)
-        ;; Disable region.
-        (setq mark-active nil)
-        (or (and (>= end (point-min))
-                 (<= end (point-max)))
-            (if widen-automatically
-                (widen)
-              )
-            )
-        (set-marker (mark-marker) beg)
-        (goto-char end)
-        (switch-to-buffer buffer)
-        ;; Enable region.
-        (unless (= beg end)
-          (setq mark-active t)
-          )
-        (message "Go to previous navigation history.")
-        ;; (message "[%s/%s] - %s" (length oops-history) oops-history-max oops-history)
-        )
-    (message "No history was set!")
-    )
+   ;; c
+   ;; c++
+   ;; python
+   )
   )
 
 (defun oops-next-history ()
-  "Navigate to next history by rotating the `oops-history'.
-\(2 3 4 5 1\) => \(1 2 3 4 5\) and use \(1\) history."
+  "Navigate to next record in the history."
   (interactive)
-  ;; Pop entries which refer to non-existent buffers.
-  (while (and oops-history
-              (not (marker-buffer (caar (last oops-history)))))
-    (setq oops-history (butlast oops-history))
+  (cond
+   ;; lisp
+   ((or (eq major-mode 'emacs-lisp-mode)
+        (eq major-mode 'lisp-interaction-mode))
+    (oops-lisp-next-history)
     )
-  ;; Rotate the history.
-  (setq oops-history (nconc (last oops-history)
-                            (butlast oops-history)))
-  (if oops-history
-      (let* ((marker (caar oops-history))
-             (buffer (marker-buffer marker))
-             (beg (cdar oops-history))
-             (end (marker-position marker)))
-        (set-buffer buffer)
-        ;; Disable region.
-        (setq mark-active nil)
-        (or (and (>= end (point-min))
-                 (<= end (point-max)))
-            (if widen-automatically
-                (widen)
-              )
-            )
-        (set-marker (mark-marker) beg)
-        (goto-char end)
-        (switch-to-buffer buffer)
-        ;; Enable region.
-        (unless (= beg end)
-          (setq mark-active t)
-          )
-        (message "Go to next navigation history.")
-        ;; (message "[%s/%s] - %s" (length oops-history) oops-history-max oops-history)
-        )
-    (message "No history was set!")
-    )
+   ;; c
+   ;; c++
+   ;; python
+   )
   )
 
 ;; ###autoload

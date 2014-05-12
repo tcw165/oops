@@ -1,3 +1,5 @@
+(require 'find-func)
+
 ;; =============================================================================
 
 (defun oops--lisp-thingatpt ()
@@ -427,20 +429,116 @@
 
 ;; =============================================================================
 
-(defun oops--lisp-find-function (function)
-  ""
-  (let* ((def (symbol-function function))
-         (library (cond ((autoloadp def)
-                         (nth 1 def))
-                        (t
-                         (symbol-file function 'defun))
-                        )))
-    (find-function-search-for-symbol function nil library)
+(defconst oops--lisp-search-symbol-regexp-alist
+  '((defun . find-function-regexp)
+    (defvar . find-variable-regexp)
+    (defface . find-face-regexp))
+  "Alist mapping definition types into regexp variables. Each regexp variable's value should actually be a format string to be used to substitute the desired symbol name into the regexp.")
+
+
+(defun oops--lisp-search-for-symbol (symbol type library)
+  "Search for SYMBOL's definition of type TYPE in LIBRARY. Visit the library in a buffer, and return a list (BUFFER POS-BEG POS-END), or just nil if the definition can't be found in the file.
+
+TYPE specifies the kind of definition, and it is interpreted via `oops--lisp-search-symbol-regexp-alist'."
+  ;; Some functions are defined as part of the construct that defines something else.
+  (while (and (symbolp symbol)
+              (get symbol 'definition-name))
+    (setq symbol (get symbol 'definition-name))
+    )
+
+  (cond
+   ((string-match "\\.el\\(c\\)\\'" library)
+    (setq library (substring library 0 (match-beginning 1)))
+    )
+   ;; Strip extension from .emacs.el to make sure symbol is searched in
+   ;; .emacs too.
+   ((string-match "\\.emacs\\(.el\\)" library)
+    (setq library (substring library 0 (match-beginning 1)))
+    )
+   )
+
+  (let* ((filename (find-library-name library))
+         (regexp-symbol (cdr (assq type oops--lisp-search-symbol-regexp-alist))))
+    (with-current-buffer (find-file-noselect filename)
+      (let ((regexp (format (symbol-value regexp-symbol)
+                            ;; Entry for ` (backquote) macro in loaddefs.el,
+                            ;; (defalias (quote \`)..., has a \ but
+                            ;; (symbol-name symbol) doesn't.  Add an
+                            ;; optional \ to catch this.
+                            (concat "\\\\?"
+                                    (regexp-quote (symbol-name symbol)))))
+            (case-fold-search))
+        (with-syntax-table emacs-lisp-mode-syntax-table
+          (goto-char (point-min))
+          (if (or (re-search-forward regexp nil t)
+                  ;; `regexp' matches definitions using known forms like
+                  ;; `defun', or `defvar'.  But some functions/variables
+                  ;; are defined using special macros (or functions), so
+                  ;; if `regexp' can't find the definition, we look for
+                  ;; something of the form "(SOMETHING <symbol> ...)".
+                  ;; This fails to distinguish function definitions from
+                  ;; variable declarations (or even uses thereof), but is
+                  ;; a good pragmatic fallback.
+                  (re-search-forward
+                   (concat "^([^ ]+" find-function-space-re "['(]?"
+                           (regexp-quote (symbol-name symbol))
+                           "\\_>")
+                   nil t))
+              (let ((beg (save-excursion
+                           (forward-thing 'symbol -1)
+                           (point)
+                           ))
+                    (end (point)))
+                (list (current-buffer) beg end)
+                )
+            ;; Not found, return nil
+            nil
+            )
+          )
+        )
+      )
+    )
+  )
+
+;; (oops--lisp-find-function 'subrp)
+;; (oops--lisp-find-function 'define-minor-mode)
+;; (oops--lisp-find-function 'oops-mode)
+(defun oops--lisp-find-function (symbol)
+  "Return a list (BUFFER POS-BEG POS-END) pointing to the definition of FUNCTION. Return nil if symbol is a built-in function."
+  (let ((def (symbol-function (find-function-advised-original symbol)))
+        aliases)
+    ;; FIXME for completeness, it might be nice to print something like:
+    ;; foo (which is advised), which is an alias for bar (which is advised).
+    (while (symbolp def)
+      (or (eq def symbol)
+          (if aliases
+              (setq aliases (concat aliases
+                                    (format ", which is an alias for `%s'"
+                                            (symbol-name def))))
+            (setq aliases (format "`%s' is an alias for `%s'"
+                                  symbol (symbol-name def)))
+            )
+          )
+      (setq symbol (symbol-function (find-function-advised-original symbol))
+            def (symbol-function (find-function-advised-original symbol)))
+      )
+    (if aliases
+        (message "%s" aliases)
+      )
+
+    ;; Find library and return the result.
+    (let ((library (cond ((autoloadp def)
+                          (nth 1 def)
+                          )
+                         ((subrp def) nil)
+                         ((symbol-file symbol 'defun))
+                         )))
+      (and library (oops--lisp-search-for-symbol symbol 'defun library))
+      )
     )
   )
 
 (defun oops--lisp-find-variable (variable)
-  ""
   )
 
 (defun oops-lisp-jump-to-definition-atpt ()
@@ -450,47 +548,55 @@
   ;; * variable and function with same name!
   ;; * add local variable navigation!
   (let* ((symb (intern-soft (oops--lisp-thingatpt)))
-         (bound (bounds-of-thing-at-point 'symbol)))
-    ;; Push history.
-    (oops--push-history (car bound) (cdr bound))
-    ;; Force to unselect text.
+         search-result)
+
+    ;; Disable region.
     (setq mark-active nil)
+
     (cond
      ;; library
      ((featurep symb)
       (find-library (symbol-name symb))
-      ;; Push history.
-      (oops--push-history (point) (point))
       ;; TODO/FIXME: go to (require 'text) line
       (message "library: %s" symb)
       )
-     ;; TODO/FIXME =======================================================>
-     ;; ;; Variable and Function with the same name:
-     ;; (is-var-fun
-     ;;  (message "%s is type of \"is-var-fun\" and is not ready yet" text)
-     ;;  )
-     ;; <==================================================================
+
      ;; Function:
      ((fboundp symb)
       (if (subrp (symbol-function symb))
+          ;; Built-in function.
           (message "Not support built-in function: %s." symb)
-        ;; TODO: select symbol
-        (find-function-do-it symb nil 'switch-to-buffer)
-        ;; Push history.
-        (oops--push-history (point) (point))
-        (message "function: %s" symb)
+        ;; Lisp function.
+        (setq search-result (oops--lisp-find-function symb))
+        (when search-result
+          ;; Save current state before switching.
+          ;; (oops--lisp-push-history (symbol-name symb) 'defun)
+          (switch-to-buffer (car search-result))
+          ;; Save new state after switching.
+          ;; (oops--lisp-push-history (point) (point))
+          ;; Enable region.
+          (set-marker (mark-marker) (nth 1 search-result))
+          (goto-char (nth 2 search-result))
+          (setq mark-active t)
+          (message "function: %s" symb)
+          )
         )
       )
+
      ;; Variable:
      ((boundp symb)
-      (find-function-do-it symb 'defvar 'switch-to-buffer)
-      ;; TODO: select symbol
-      ;; Push history.
-      (oops--push-history (point) (point))
-      (message "variable: %s" symb)
+      ;; (find-function-do-it symb 'defvar 'switch-to-buffer)
+      ;; Lisp variable.
+      (setq search-result (oops--lisp-find-variable symb))
+      (when search-result
+        (switch-to-buffer (car search-result))
+        ;; Enable region.
+        (set-marker (mark-marker) (nth 1 search-result))
+        (goto-char (nth 2 search-result))
+        (setq mark-active t)
+        (message "variable: %s" symb)
+        )
       )
-     ;; Unknown symbol:
-     (t (message "unknown symbol: %s" symb))
      )
     )
   )
@@ -546,6 +652,133 @@
           (add-to-list 'name-and-pos (cons name position)))))
     )
    )
+  )
+
+;; Navigation ==================================================================
+
+;; test code ====================>
+(defun test1 ()
+  )
+
+(defun test2 ()
+  (test1)
+  )
+
+(defun test3 ()
+  (test1)
+  (test2)
+  )
+;; (setq oops--lisp-history nil)
+;; <==================== test code
+
+(defvar oops--lisp-history nil
+  "The history is a list containing records with following format:
+
+\(SYMBOL-NAME TYPE BUFFER\)
+   This kind of record is for destination usage.
+   TYPE is one of 'defun, 'defvar and 'defface.
+
+\(SYMBOL-NAME MARKER\)
+   This kind of record is for origin usage.")
+
+(defun oops--lisp-push-history (record)
+  "Push the current state as a record into history. Check `oops--lisp-history' for the details."
+  ;; ;; Remove duplicate records.
+  ;; (if (listp oops-history)
+  ;;     (dolist (history-item oops-history)
+  ;;       (let ((beg (cdr history-item))
+  ;;             (end (marker-position (car history-item)))
+  ;;             (buffer (marker-buffer (car history-item))))
+  ;;         (when (and (eq bound-beg beg)
+  ;;                    (eq bound-end end)
+  ;;                    (eq (current-buffer) buffer)) 
+  ;;           (setq oops-history (delq history-item oops-history))
+  ;;           )
+  ;;         )
+  ;;       )
+  ;;   )
+  ;; Push history.
+  (if (null oops--lisp-history)
+      ;; 1st history element.
+      (setq oops--lisp-history (list record))
+    ;; else.
+    (setq oops--lisp-history (cons record oops--lisp-history))
+    )
+  ;; Keep the lenght less than maximum length.
+  (when (> (length oops--lisp-history) oops-history-max)
+    ;; (set-marker (car (nthcdr oops-history-max oops--lisp-history)) nil)
+    (setcdr (nthcdr (1- oops-history-max) oops--lisp-history) nil)
+    )
+  )
+
+(defun oops--lisp-use-history ()
+  (if (and oops--lisp-history
+           (> (length oops--lisp-history) 1))
+      (let* ((record (car oops--lisp-history))
+             (element1 (nth 0 record))
+             (element2 (nth 1 record)))
+        (cond
+         ;; (SYMBOL-NAME TYPE BUFFER) type:
+         ((assq element2 oops--lisp-search-symbol-regexp-alist)
+          ;; (oops--lisp-find-function)
+          ;; (oops--lisp-search-for-symbol 0)
+          ;; ;; Disable region.
+          ;; (setq mark-active nil)
+          ;; ;; Enable region.
+          ;; (unless (= beg end)
+          ;;   (setq mark-active t)
+          ;;   )
+          ;; )
+          )
+         ;; (SYMBOL-NAME MARKER) type:
+         ((markerp element2)
+          (let ((buffer (marker-buffer element2))
+                (pos (marker-position element2)))
+            ;; Disable region.
+            (setq mark-active nil)
+            ;; Switch buffer.
+            (switch-to-buffer buffer)
+            (goto-char pos)
+            )
+          )
+         )
+        )
+    ;;   (set-marker (mark-marker) beg)
+    ;; (message "[history] navigate to previous record.")
+    ;; (message "[%s/%s] - %s" (length oops--lisp-history) oops-history-max oops--lisp-history)
+    (message "[History] no record was set!")
+    )
+  )
+
+(defun oops-lisp-prev-history ()
+  "Navigate to previous history by rotating the `oops--lisp-history'.
+\(1 2 3 4 5\) => \(2 3 4 5 1\) and use \(2\) history."
+  (interactive)
+  ;; ;; Pop invalid records whom's buffer is invalid.
+  ;; (while (and oops--lisp-history
+  ;;             (markerp (nth 1 (car oops--lisp-history)))
+  ;;             (not (marker-buffer (nth 1 (car oops--lisp-history)))))
+  ;;   (setq oops--lisp-history (cdr oops--lisp-history))
+  ;;   )
+  ;; Rotate the history.
+  (setq oops--lisp-history (nconc (cdr oops--lisp-history)
+                                  (list (car oops--lisp-history))))
+  (oops--lisp-use-history)
+  )
+
+(defun oops-lisp-next-history ()
+  "Navigate to next history by rotating the `oops--lisp-history'.
+\(2 3 4 5 1\) => \(1 2 3 4 5\) and use \(1\) history."
+  (interactive)
+  ;; ;; Pop entries which refer to non-existent buffers.
+  ;; (while (and oops--lisp-history
+  ;;             (not (marker-buffer (caar (last oops--lisp-history)))))
+  ;;   (setq oops--lisp-history (butlast oops--lisp-history))
+  ;;   )
+  ;; Rotate the history.
+  (setq oops--lisp-history (nconc (last oops--lisp-history)
+                            (butlast oops--lisp-history)))
+  (oops--lisp-use-history)
   )
 
 (provide 'oops-lisp-lib)
