@@ -126,7 +126,6 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
               (not (buffer-live-p (nth 3 (car oops--lisp-history)))))
     (setq oops--lisp-history (cdr oops--lisp-history))
     )
-  ;; TODO: If user kill the buffer relative with target record, earse this record.
 
   (if (and oops--lisp-history
            (> (length oops--lisp-history) 0))
@@ -160,7 +159,6 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
               (not (buffer-live-p (nth 3 (car (last oops--lisp-history))))))
     (setq oops--lisp-history (butlast oops--lisp-history))
     )
-  ;; TODO: If user kill the buffer relative with target record, earse this record.
 
   (if (and oops--lisp-history
            (> (length oops--lisp-history) 0))
