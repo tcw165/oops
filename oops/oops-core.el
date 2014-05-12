@@ -170,7 +170,7 @@
 ;; Navigation ==================================================================
 
 ;; TODO: customization support.
-(defvar oops-history-max 3)
+(defvar oops-history-max 32)
 
 ;; ###autoload
 (defun oops-prev-history ()
