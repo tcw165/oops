@@ -189,9 +189,13 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
     )
   )
 
-(defun oops--lisp-describe-function-1 (function)
-  (let* ((advised (and (symbolp function) (featurep 'advice)
+(defun oops--lisp-describe-function (function)
+  (let* ((standard-output (oops--lisp-help-buffer 1))
+         (advised (and (symbolp function) (featurep 'advice)
                        (ad-get-advice-info function)))
+         (prin1 function)
+         (princ " is ")
+
          ;; If the function is advised, use the symbol that has the
          ;; real definition, if that symbol is already set up.
          (real-function (or (and advised
@@ -219,9 +223,10 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
                        (help-fns--autoloaded-p function file-name))
                   (if (commandp def)
                       "an interactive autoloaded "
-                    "an autoloaded ")
-                (if (commandp def) "an interactive " "a ")))
-         )
+                    "an autoloaded "
+                    )
+                (if (commandp def) "an interactive " "a ")
+                )))
 
     ;; Print what kind of function-like object FUNCTION is.
     (princ (cond ((or (stringp def) (vectorp def))
@@ -307,23 +312,26 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
 
           (insert "\n"
                   (or doc "Not documented."))
+
+          (goto-char 1)
           )
         )
       )
+    standard-output
     )
   )
 
-(defun oops--lisp-describe-function (function)
-  "Display the full documentation of FUNCTION (a symbol)."
-  (let ((standard-output (oops--lisp-help-buffer 1)))
-    (prin1 function)
-    (princ " is ")
-    (oops--lisp-describe-function-1 function)
-    )
-  (with-current-buffer (oops--lisp-help-buffer)
-    (goto-char 1)
-    )
-  )
+;; (defun oops--lisp-describe-function (function)
+;;   "Display the full documentation of FUNCTION (a symbol)."
+;;   (let ((standard-output (oops--lisp-help-buffer 1)))
+;;     (prin1 function)
+;;     (princ " is ")
+;;     (oops--lisp-describe-function-1 function)
+;;     )
+;;   (with-current-buffer (oops--lisp-help-buffer)
+;;     (goto-char 1)
+;;     )
+;;   )
 
 ;; (oops--lisp-describe-variable 'standard-output)
 (defun oops--lisp-describe-variable (variable)
@@ -546,44 +554,38 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
     (with-current-buffer standard-output
       (goto-char 1)
       )
+    standard-output
     )
   )
 
 (defun oops-lisp-show-help-atpt ()
-  (let* ((symb (intern-soft (oops--lisp-thingatpt))))
+  (let* ((symb (intern-soft (oops--lisp-thingatpt)))
+         search-result)
     (when symb
       (cond
+       ;; TODO: Support feature.
        ;; Library:
        ;; ((featurep symb)
        ;;  nil
        ;;  )
-       ;; Variable:
-       ((boundp symb)
-        (let ((fname (find-lisp-object-file-name symb 'defvar)))
-          (if (or (eq fname 'C-source)
-                  (string-match "[.]\\(c\\|cpp\\)$" fname))
-              ;; (message "Yet support for built-in variable: %s." symb)
-              (progn
-                (oops--lisp-describe-variable symb)
-                (oops-update-help (oops--lisp-help-buffer))
-                )
-            ;; Try not to use `find-variable-noselect'.
-            (oops-update-help (save-excursion
-                                (find-variable-noselect symb)))
-            )
-          )
-        )
        ;; Function:
        ((fboundp symb)
-        (if (subrp (symbol-function symb))
-            (progn
-              (oops--lisp-describe-function symb)
-              (oops-update-help (oops--lisp-help-buffer))
-              )
-          ;; TODO:
-          ;; Try not to use `find-function-noselect'.
-          (oops-update-help (save-excursion
-                              (find-function-noselect symb t)))
+        (setq search-result (oops--lisp-find-function symb))
+        (message "%s" search-result)
+        (if search-result
+            (oops-update-help search-result)
+          ;; Built-in function, show HELP.
+          (oops-update-help (oops--lisp-describe-function symb))
+          )
+        )
+       ;; Variable:
+       ((boundp symb)
+        (setq search-result (oops--lisp-find-variable symb))
+        (message "%s" search-result)
+        (if search-result
+            (oops-update-help search-result)
+          ;; Built-in variable, show HELP.
+          (oops-update-help (oops--lisp-describe-variable symb))
           )
         )
        )

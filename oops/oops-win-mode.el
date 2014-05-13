@@ -256,18 +256,18 @@
 (defun oops-update-help (data)
   "The `data' must be one of the following format:
 1. (BUFFER . POINT)"
-  ;; Only work on the situation that the basic perspective is enabled and
-  ;; the edit win is ready.
+  ;; Only work on the situation that the basic perspective is enabled and the edit win is ready.
   (when (and oops--is-basic-perspective
              (eq (selected-window) oops--edit-win))
     (cond
-     ;; Format of (BUFFER . POINT):
-     ((consp data)
-      (let ((buf (car data))
-            (pt (cdr data)))
+     ;; Format of (BUFFER BEG END):
+     ((listp data)
+      (let ((buffer (nth 0 data))
+            (beg (nth 1 data))
+            (end (nth 2 data)))
         (with-selected-window oops--help-win
-          (set-window-buffer nil buf)
-          (goto-char pt)
+          (set-window-buffer nil buffer)
+          (goto-char beg)
           (recenter find-function-recenter-line)
           ;; TODO:
           ;; Seperate the buffers that are opened by user and opened by help function.
