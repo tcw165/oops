@@ -106,6 +106,7 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
         )
       )
      )
+    ;; (message "[%s/%s] - %s" (length oops--lisp-history) oops-history-max oops--lisp-history)
     )
   )
 
@@ -135,8 +136,7 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
         (setq oops--lisp-history (nconc (cdr oops--lisp-history)
                                         (list (car oops--lisp-history))))
         (oops--lisp-use-history)
-        ;; (message "[history] navigate to previous record.")
-        (message "[%s/%s] - %s" (length oops--lisp-history) oops-history-max oops--lisp-history)
+        (message "[History] navigate to previous record.")
         )
     (message "[History] no record was set!")
     )
@@ -168,8 +168,7 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
         (setq oops--lisp-history (nconc (last oops--lisp-history)
                                         (butlast oops--lisp-history)))
         (oops--lisp-use-history)
-        ;; (message "[history] navigate to previous record.")
-        (message "[%s/%s] - %s" (length oops--lisp-history) oops-history-max oops--lisp-history)
+        (message "[History] navigate to previous record.")
         )
     (message "[History] no record was set!")
     )
@@ -652,11 +651,12 @@ TYPE specifies the kind of definition, and it is interpreted via `oops--lisp-sea
                              (regexp-quote (symbol-name symbol))
                              "\\_>")
                      nil t))
-                (let ((beg (save-excursion
+                ;; Return the struct.
+                (let ((end (point))
+                      (beg (progn
                              (forward-thing 'symbol -1)
                              (point)
-                             ))
-                      (end (point)))
+                             )))
                   (list (current-buffer) beg end)
                   )
               ;; Not found, return nil
@@ -712,8 +712,15 @@ TYPE specifies the kind of definition, and it is interpreted via `oops--lisp-sea
     )
   )
 
+(defun oops--lisp-find-library (symbol)
+  "Return a list (BUFFER POS-BEG POS-END) pointing to the definition of LIBRARY.
+\(It was written by refering to GNU function, `find-library'.\)
+"
+  ;; TODO: implement it!
+  )
+
 (defun oops-lisp-jump-to-definition-atpt ()
-  ;; TODO/FIXME:
+  ;; TODO:
   ;; * advising function list!
   ;; * variable, function and feature with same name!
   ;; * add local variable navigation!
@@ -779,7 +786,7 @@ TYPE specifies the kind of definition, and it is interpreted via `oops--lisp-sea
      ;; library
      ((featurep symb)
       (find-library (symbol-name symb))
-      ;; TODO/FIXME: go to (require 'text) line
+      ;; TODO: go to (require 'text) line
       (message "[Definition] library: %s" symb)
       )
      )
