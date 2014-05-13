@@ -34,36 +34,41 @@
 (defvar oops--lisp-history nil
   "The history is a list containing records with following format:
 
-\('target SYMBOL TYPE BUFFER\)
+\('symbol-record SYMBOL TYPE BUFFER\)
    This kind of record is for the time after jumping to the definition.
    TYPE is one of 'defun, 'defvar or 'defface.
 
-\('origin SYMBOL MARKER\)
+\('marker-record SYMBOL MARKER\)
    This kind of record is for the time before jumping to the definition.
 
-The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'target.")
-(defvar oops--lisp-history-indicator nil)
+The 1st element of all the records is RECORD-TYPE, which value is 'marker-record or 'symbol-record.")
+
+(defvar oops--lisp-history-indicator nil
+  "An history indicator that points to the record you access last time.")
 
 (defun oops--lisp-push-history (record-type symbol &optional type buffer)
   "Push the current state as a record into history. Check `oops--lisp-history' for the details."
   (let ((record (cond
-                 ((eq record-type 'target)
-                  (list 'target symbol type buffer)
+                 ((eq record-type 'symbol-record)
+                  (list 'symbol-record symbol type buffer)
                   )
-                 ((eq record-type 'origin)
-                  (list 'origin symbol (copy-marker (set-marker (mark-marker) (point))))
+                 ((eq record-type 'marker-record)
+                  (list 'marker-record symbol (copy-marker (set-marker (mark-marker) (point))))
                   )
                  )))
     ;; Push history.
     (if (null oops--lisp-history)
         ;; 1st history element.
-        (setq oops--lisp-history (list record))
+        (progn
+          (setq oops--lisp-history (list record))
+          (setq oops--lisp-history-indicator (car oops--lisp-history))
+          )
       ;; else.
+      ;; TODO: discard those behind the indicator.
       (setq oops--lisp-history (cons record oops--lisp-history))
       )
     ;; Keep the lenght less than maximum length.
     (when (> (length oops--lisp-history) oops-history-max)
-      ;; (set-marker (car (nthcdr oops-history-max oops--lisp-history)) nil)
       (setcdr (nthcdr (1- oops-history-max) oops--lisp-history) nil)
       )
     )
@@ -73,8 +78,8 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
   (let* ((record (car oops--lisp-history))
          (record-type (car record)))
     (cond
-     ;; ('target SYMBOL TYPE BUFFER):
-     ((eq record-type 'target)
+     ;; ('symbol-record SYMBOL TYPE BUFFER):
+     ((eq record-type 'symbol-record)
       (let* ((symbol (nth 1 record))
              (type (nth 2 record))
              (predicate (cdr (assq type '((defun . oops--lisp-find-function)
@@ -96,8 +101,8 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
           )
         )
       )
-     ;; ('origin SYMBOL MARKER)
-     ((eq record-type 'origin)
+     ;; ('marker-record SYMBOL MARKER)
+     ((eq record-type 'marker-record)
       (let ((buffer (marker-buffer (nth 2 record)))
             (pos (marker-position (nth 2 record))))
         ;; Switch buffer.
@@ -108,7 +113,7 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
         )
       )
      )
-    ;; (message "[%s/%s] - %s" (length oops--lisp-history) oops-history-max oops--lisp-history)
+    (message "[%s/%s] - %s" (length oops--lisp-history) oops-history-max oops--lisp-history)
     )
   )
 
@@ -117,15 +122,15 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
 \(1 2 3 4 5\) => \(2 3 4 5 1\) and use \(2\) history."
   (interactive)
   ;; Pop records which refer to killed buffers.
-  ;; ('origin SYMBOL MARKER)
+  ;; ('marker-record SYMBOL MARKER)
   (while (and oops--lisp-history
-              (eq 'origin (caar oops--lisp-history))
+              (eq 'marker-record (caar oops--lisp-history))
               (not (marker-buffer (nth 2 (car oops--lisp-history)))))
     (setq oops--lisp-history (cdr oops--lisp-history))
     )
-  ;; ('target SYMBOL TYPE BUFFER)
+  ;; ('symbol-record SYMBOL TYPE BUFFER)
   (while (and oops--lisp-history
-              (eq 'target (caar oops--lisp-history))
+              (eq 'symbol-record (caar oops--lisp-history))
               (not (buffer-live-p (nth 3 (car oops--lisp-history)))))
     (setq oops--lisp-history (cdr oops--lisp-history))
     )
@@ -138,7 +143,7 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
         (setq oops--lisp-history (nconc (cdr oops--lisp-history)
                                         (list (car oops--lisp-history))))
         (oops--lisp-use-history)
-        (message "[History] navigate to previous record.")
+        ;; (message "[History] navigate to previous record.")
         )
     (message "[History] no record was set!")
     )
@@ -149,15 +154,15 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
 \(2 3 4 5 1\) => \(1 2 3 4 5\) and use \(1\) history."
   (interactive)
   ;; Pop records which refer to killed buffers.
-  ;; ('origin SYMBOL MARKER)
+  ;; ('marker-record SYMBOL MARKER)
   (while (and oops--lisp-history
-              (eq 'origin (caar (last oops--lisp-history)))
+              (eq 'marker-record (caar (last oops--lisp-history)))
               (not (marker-buffer (nth 2 (car (last oops--lisp-history))))))
     (setq oops--lisp-history (butlast oops--lisp-history))
     )
-  ;; ('target SYMBOL TYPE BUFFER)
+  ;; ('symbol-record SYMBOL TYPE BUFFER)
   (while (and oops--lisp-history
-              (eq 'target (caar (last oops--lisp-history)))
+              (eq 'symbol-record (caar (last oops--lisp-history)))
               (not (buffer-live-p (nth 3 (car (last oops--lisp-history))))))
     (setq oops--lisp-history (butlast oops--lisp-history))
     )
@@ -170,7 +175,7 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
         (setq oops--lisp-history (nconc (last oops--lisp-history)
                                         (butlast oops--lisp-history)))
         (oops--lisp-use-history)
-        (message "[History] navigate to next record.")
+        ;; (message "[History] navigate to next record.")
         )
     (message "[History] no record was set!")
     )
@@ -719,12 +724,12 @@ TYPE specifies the kind of definition, and it is interpreted via `oops--lisp-sea
           (message "[Definition] No support for built-in function: %s." symb)
         ;; Lisp function.
         ;; Save current state before switching.
-        (oops--lisp-push-history 'origin symb)
+        (oops--lisp-push-history 'marker-record symb)
 
         (switch-to-buffer (car search-result))
 
         ;; Save new state after switching.
-        (oops--lisp-push-history 'target symb 'defun (car search-result))
+        (oops--lisp-push-history 'symbol-record symb 'defun (car search-result))
 
         ;; Enable region.
         (set-marker (mark-marker) (nth 1 search-result))
@@ -745,12 +750,12 @@ TYPE specifies the kind of definition, and it is interpreted via `oops--lisp-sea
           ;; Built-in variable.
           (message "[Definition] No support for built-in variable: %s." symb)
         ;; Save current state before switching.
-        (oops--lisp-push-history 'origin symb)
+        (oops--lisp-push-history 'marker-record symb)
 
         (switch-to-buffer (car search-result))
 
         ;; Save new state after switching.
-        (oops--lisp-push-history 'target symb 'defvar (car search-result))
+        (oops--lisp-push-history 'symbol-record symb 'defvar (car search-result))
 
         ;; Enable region.
         (set-marker (mark-marker) (nth 1 search-result))
