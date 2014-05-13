@@ -189,44 +189,46 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
     )
   )
 
-(defun oops--lisp-describe-function (function)
+;; (defadvice)
+;; (subrp)
+(defun oops--lisp-describe-function (symbol)
+  "Display the full documentation of FUNCTION \(a symbol\).
+\(It was written by refering to the GNU functions, `describe-function' and `describe-function-1'.\)
+"
   (let* ((standard-output (oops--lisp-help-buffer 1))
-         (advised (and (symbolp function) (featurep 'advice)
-                       (ad-get-advice-info function)))
-         (prin1 function)
-         (princ " is ")
-
-         ;; If the function is advised, use the symbol that has the
-         ;; real definition, if that symbol is already set up.
+         (advised (and (featurep 'advice)
+                       (ad-get-advice-info symbol)))
          (real-function (or (and advised
                                  (let ((origname (cdr (assq 'origname advised))))
                                    (and (fboundp origname) origname)))
-                            function))
-         ;; Get the real definition.
-         (def (if (symbolp real-function)
-                  (symbol-function real-function)
-                function))
+                            symbol))
+         (def (symbol-function real-function))
          (aliased (symbolp def))
          (real-def (if aliased
                        (let ((f def))
                          (while (and (fboundp f)
                                      (symbolp (symbol-function f)))
-                           (setq f (symbol-function f)))
-                         f)
-                     def))
-         (file-name (find-lisp-object-file-name function def))
-         ;; (pt1 (with-current-buffer (help-buffer) (point)))
+                           (setq f (symbol-function f))
+                           )
+                         f
+                         )
+                     def
+                     ))
+         (file-name (find-lisp-object-file-name symbol def))
          (beg (if (and (or (byte-code-function-p def)
                            (keymapp def)
                            (memq (car-safe def) '(macro lambda closure)))
                        file-name
-                       (help-fns--autoloaded-p function file-name))
+                       (help-fns--autoloaded-p symbol file-name))
                   (if (commandp def)
                       "an interactive autoloaded "
                     "an autoloaded "
                     )
                 (if (commandp def) "an interactive " "a ")
                 )))
+
+    (prin1 symbol)
+    (princ " is ")
 
     ;; Print what kind of function-like object FUNCTION is.
     (princ (cond ((or (stringp def) (vectorp def))
@@ -271,19 +273,13 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
         )
 
       (when file-name
-        (princ " in `")
+        (princ " in \"")
         ;; We used to add .el to the file name,
         ;; but that's completely wrong when the user used load-file.
         (princ (if (eq file-name 'C-source)
                    "C source code"
                  (file-name-nondirectory file-name)))
-        (princ "'")
-        ;; Make a hyperlink to the library.
-        (with-current-buffer standard-output
-          (save-excursion
-            (re-search-backward "`\\([^`']+\\)'" nil t)
-            (help-xref-button 1 'help-function-def function file-name))
-          )
+        (princ "\"")
         )
       (princ ".")
       ;; (with-current-buffer (help-buffer)
@@ -291,7 +287,7 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
       ;;                             (point)))
       (terpri)(terpri)
 
-      (let* ((doc-raw (documentation function t))
+      (let* ((doc-raw (documentation symbol t))
              ;; If the function is autoloaded, and its docstring has
              ;; key substitution constructs, load the library.
              (doc (progn
@@ -302,13 +298,13 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
                          (load (cadr real-def) t))
                     (substitute-command-keys doc-raw))))
 
-        (help-fns--key-bindings function)
+        (help-fns--key-bindings symbol)
         (with-current-buffer standard-output
-          (setq doc (help-fns--signature function doc real-def real-function))
+          (setq doc (help-fns--signature symbol doc real-def real-function))
 
-          (help-fns--compiler-macro function)
-          (help-fns--parent-mode function)
-          (help-fns--obsolete function)
+          (help-fns--compiler-macro symbol)
+          (help-fns--parent-mode symbol)
+          (help-fns--obsolete symbol)
 
           (insert "\n"
                   (or doc "Not documented."))
@@ -321,63 +317,53 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
     )
   )
 
-;; (defun oops--lisp-describe-function (function)
-;;   "Display the full documentation of FUNCTION (a symbol)."
-;;   (let ((standard-output (oops--lisp-help-buffer 1)))
-;;     (prin1 function)
-;;     (princ " is ")
-;;     (oops--lisp-describe-function-1 function)
-;;     )
-;;   (with-current-buffer (oops--lisp-help-buffer)
-;;     (goto-char 1)
-;;     )
-;;   )
-
 ;; (oops--lisp-describe-variable 'standard-output)
-(defun oops--lisp-describe-variable (variable)
+(defun oops--lisp-describe-variable (symbol)
+  "Display the full documentation of VARIABLE \(a symbol\).
+\(It was written by refering to the GNU function, `describe-variable'.\)
+"
   (let* ((standard-output (oops--lisp-help-buffer 1))
          (alias (condition-case nil
-                    (indirect-variable variable)
-                  (error variable)))
+                    (indirect-variable symbol)
+                  (error symbol)))
          (doc (or (documentation-property
-                   variable 'variable-documentation)
+                   symbol 'variable-documentation)
                   (documentation-property
                    alias 'variable-documentation)))
-         (val (symbol-value variable))
-         (locus (variable-binding-locus variable))
-         (file-name (find-lisp-object-file-name variable 'defvar))
-         (permanent-local (get variable 'permanent-local))
-         (obsolete (get variable 'byte-obsolete-variable))
-         (safe-var (get variable 'safe-local-variable))
+         (val (symbol-value symbol))
+         (locus (variable-binding-locus symbol))
+         (file-name (find-lisp-object-file-name symbol 'defvar))
+         (permanent-local (get symbol 'permanent-local))
+         (obsolete (get symbol 'byte-obsolete-variable))
+         (safe-var (get symbol 'safe-local-variable))
          (print-length 32)
          (print-level 3)
          )
-    ;; TODO: Make variable text with hyper-link property.
+    ;; TODO: Make symbol text with hyper-link property.
 
     ;; Indicate where is its definition and current value.
-    (princ (format "`%s'" variable))
-    (princ " is a variable defined in `")
+    (princ (format "%s" symbol))
+    (princ " is a symbol defined in \"")
     (princ (if (eq file-name 'C-source)
                "C source code"
              (file-name-nondirectory file-name)))
-    (princ "'.")
+    (princ "\".")
     (terpri)
     (terpri)
-    (princ "Its value is `")
+    (princ "Its value is ")
     (pp val)
-    (princ "'.")
     ;; Add hyper-link property to file-name text.
     ;; (with-current-buffer standard-output
     ;;   (save-excursion
     ;;     (re-search-backward "`\\([^`']+\\)'" nil t)
     ;;     (help-xref-button 1 'help-variable-def
-    ;;                       variable file-name)
+    ;;                       symbol file-name)
     ;;     )
     ;;   )
 
     ;; If it is a customizable variable, show its original value.
     ;; "Original value was?"
-    (let* ((sv (get variable 'standard-value))
+    (let* ((sv (get symbol 'standard-value))
            (origval (and (consp sv)
                          (condition-case nil
                              (eval (car sv))
@@ -409,9 +395,9 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
        (t (princ (format "\nit is local to %S." locus)))
        )
 
-      (if (not (default-boundp variable))
+      (if (not (default-boundp symbol))
           (princ "\nglobally void")
-        (let ((global-val (default-value variable)))
+        (let ((global-val (default-value symbol)))
           (princ "\nglobal value is ")
           (if (eq val global-val)
               (princ "the same.")
@@ -426,10 +412,10 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
     ;; Indicate which kind of local variable it is.
     (terpri)
     (cond
-     ((and (local-variable-if-set-p variable)
-           (or (not (local-variable-p variable))
+     ((and (local-variable-if-set-p symbol)
+           (or (not (local-variable-p symbol))
                (with-temp-buffer
-                 (local-variable-if-set-p variable))))
+                 (local-variable-if-set-p symbol))))
       (princ "\n  Automatically becomes ")
       (if permanent-local
           (princ "permanently "))
@@ -444,7 +430,7 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
      )
 
     ;; Indicate it is a alias.
-    (unless (eq alias variable)
+    (unless (eq alias symbol)
       (princ (format "\n  This variable is an alias for `%s'." alias))
       )
 
@@ -468,8 +454,8 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
       )
 
     ;; Indicate ???
-    (when (member (cons variable val) file-local-variables-alist)
-      (if (member (cons variable val) dir-local-variables-alist)
+    (when (member (cons symbol val) file-local-variables-alist)
+      (if (member (cons symbol val) dir-local-variables-alist)
           ;; dir-local:
           (let ((file (and (buffer-file-name)
                            (not (file-remote-p (buffer-file-name)))
@@ -501,13 +487,13 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
       )
 
     ;; Indicate ???
-    (when (memq variable ignored-local-variables)
+    (when (memq symbol ignored-local-variables)
       (princ "\n  This variable is ignored as a file-local variable."))
 
     ;; Indicate it could be both risky and safe, eg auto-fill-function.
-    (when (risky-local-variable-p variable)
+    (when (risky-local-variable-p symbol)
       (princ "\n  This variable may be risky if used as a file-local variable.")
-      (when (assq variable safe-local-variable-values)
+      (when (assq symbol safe-local-variable-values)
         (princ "\n  However, you have added it to `safe-local-variable-values'.")
         )
       )
@@ -528,7 +514,7 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
     (princ (or doc "Not documented as a variable."))
 
     ;; Make a link to customize if this variable can be customized.
-    ;; (when (custom-variable-p variable)
+    ;; (when (custom-variable-p symbol)
     ;;   (let ((customize-label "customize"))
     ;;     (terpri)
     ;;     (terpri)
@@ -537,12 +523,12 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
     ;;       (save-excursion
     ;;         (re-search-backward
     ;;          (concat "\\(" customize-label "\\)") nil t)
-    ;;         (help-xref-button 1 'help-customize-variable variable)
+    ;;         (help-xref-button 1 'help-customize-variable symbol)
     ;;         )
     ;;       )
     ;;     )
     ;;   ;; Note variable's version or package version
-    ;;   (let ((output (describe-variable-custom-version-info variable)))
+    ;;   (let ((output (describe-variable-custom-version-info symbol)))
     ;;     (when output
     ;;       (terpri)
     ;;       (terpri)
@@ -571,7 +557,6 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
        ;; Function:
        ((fboundp symb)
         (setq search-result (oops--lisp-find-function symb))
-        (message "%s" search-result)
         (if search-result
             (oops-update-help search-result)
           ;; Built-in function, show HELP.
@@ -581,7 +566,6 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
        ;; Variable:
        ((boundp symb)
         (setq search-result (oops--lisp-find-variable symb))
-        (message "%s" search-result)
         (if search-result
             (oops-update-help search-result)
           ;; Built-in variable, show HELP.
