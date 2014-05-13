@@ -1,4 +1,5 @@
 (require 'find-func)
+(require 'help-fns)
 
 ;; =============================================================================
 
@@ -41,6 +42,7 @@
    This kind of record is for the time before jumping to the definition.
 
 The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'target.")
+(defvar oops--lisp-history-indicator nil)
 
 (defun oops--lisp-push-history (record-type symbol &optional type buffer)
   "Push the current state as a record into history. Check `oops--lisp-history' for the details."
@@ -168,7 +170,7 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
         (setq oops--lisp-history (nconc (last oops--lisp-history)
                                         (butlast oops--lisp-history)))
         (oops--lisp-use-history)
-        (message "[History] navigate to previous record.")
+        (message "[History] navigate to next record.")
         )
     (message "[History] no record was set!")
     )
@@ -179,23 +181,19 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
 (defun oops--lisp-help-buffer (&optional clean-buf)
   (let ((buf (get-buffer-create "**Help**")))
     (when (and clean-buf
-               (> clean-buf 0))
+               (booleanp clean-buf))
       (with-current-buffer buf
         (erase-buffer))
       )
-    ;; (with-current-buffer buf
-    ;;   (read-only-mode 1))
     buf
     )
   )
 
-;; (defadvice)
-;; (subrp)
 (defun oops--lisp-describe-function (symbol)
   "Display the full documentation of FUNCTION \(a symbol\).
 \(It was written by refering to the GNU functions, `describe-function' and `describe-function-1'.\)
 "
-  (let* ((standard-output (oops--lisp-help-buffer 1))
+  (let* ((standard-output (oops--lisp-help-buffer t))
          (advised (and (featurep 'advice)
                        (ad-get-advice-info symbol)))
          (real-function (or (and advised
@@ -203,6 +201,8 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
                                    (and (fboundp origname) origname)))
                             symbol))
          (def (symbol-function real-function))
+         (file-name (find-lisp-object-file-name symbol def))
+         (doc (documentation symbol))
          (aliased (symbolp def))
          (real-def (if aliased
                        (let ((f def))
@@ -214,44 +214,53 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
                          )
                      def
                      ))
-         (file-name (find-lisp-object-file-name symbol def))
-         (beg (if (and (or (byte-code-function-p def)
-                           (keymapp def)
-                           (memq (car-safe def) '(macro lambda closure)))
-                       file-name
-                       (help-fns--autoloaded-p symbol file-name))
-                  (if (commandp def)
-                      "an interactive autoloaded "
-                    "an autoloaded "
-                    )
-                (if (commandp def) "an interactive " "a ")
-                )))
-
-    (prin1 symbol)
-    (princ " is ")
+         (tmp-string (if (and (or (byte-code-function-p def)
+                                  (keymapp def)
+                                  (memq (car-safe def) '(macro lambda closure)))
+                              file-name
+                              (help-fns--autoloaded-p symbol file-name))
+                         (if (commandp def)
+                             "an interactive autoloaded "
+                           "an autoloaded "
+                           )
+                       (if (commandp def)
+                           "an interactive "
+                         "a "
+                         )
+                       ))
+         )
 
     ;; Print what kind of function-like object FUNCTION is.
+    (princ (format "%s is " symbol))
     (princ (cond ((or (stringp def) (vectorp def))
                   "a keyboard macro")
                  ((subrp def)
                   (if (eq 'unevalled (cdr (subr-arity def)))
-                      (concat beg "special form")
-                    (concat beg "built-in function")))
+                      (concat tmp-string "special form")
+                    (concat tmp-string "built-in function")
+                    )
+                  )
                  ((byte-code-function-p def)
-                  (concat beg "compiled Lisp function"))
+                  (concat tmp-string "compiled Lisp function")
+                  )
                  (aliased
-                  (format "an alias for `%s'" real-def))
+                  (format "an alias for `%s'" real-def)
+                  )
                  ((eq (car-safe def) 'lambda)
-                  (concat beg "Lisp function"))
+                  (concat tmp-string "Lisp function")
+                  )
                  ((eq (car-safe def) 'macro)
-                  (concat beg "Lisp macro"))
+                  (concat tmp-string "Lisp macro")
+                  )
                  ((eq (car-safe def) 'closure)
-                  (concat beg "Lisp closure"))
+                  (concat tmp-string "Lisp closure")
+                  )
                  ((autoloadp def)
                   (format "%s autoloaded %s"
                           (if (commandp def) "an interactive" "an")
                           (if (eq (nth 4 def) 'keymap) "keymap"
-                            (if (nth 4 def) "Lisp macro" "Lisp function"))))
+                            (if (nth 4 def) "Lisp macro" "Lisp function")))
+                  )
                  ((keymapp def)
                   (let ((is-full nil)
                         (elts (cdr-safe def)))
@@ -260,69 +269,53 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
                           (setq is-full t
                                 elts nil))
                       (setq elts (cdr-safe elts)))
-                    (concat beg (if is-full "keymap" "sparse keymap"))))
-                 (t "")))
+                    (concat tmp-string (if is-full
+                                           "keymap"
+                                         "sparse keymap"
+                                         )))
+                  )
+                 (t "")
+                 ))
 
-    (if (and aliased (not (fboundp real-def)))
-        (princ ",\nwhich is not defined.  Please make a bug report.")
-      (with-current-buffer standard-output
-        (save-excursion
-          (save-match-data
-            (when (re-search-backward "alias for `\\([^`']+\\)'" nil t)
-              (help-xref-button 1 'help-function real-def))))
-        )
-
-      (when file-name
-        (princ " in \"")
-        ;; We used to add .el to the file name,
-        ;; but that's completely wrong when the user used load-file.
-        (princ (if (eq file-name 'C-source)
-                   "C source code"
-                 (file-name-nondirectory file-name)))
-        (princ "\"")
-        )
-      (princ ".")
-      ;; (with-current-buffer (help-buffer)
-      ;;   (fill-region-as-paragraph (save-excursion (goto-char pt1) (forward-line 0) (point))
-      ;;                             (point)))
-      (terpri)(terpri)
-
-      (let* ((doc-raw (documentation symbol t))
-             ;; If the function is autoloaded, and its docstring has
-             ;; key substitution constructs, load the library.
-             (doc (progn
-                    (and (autoloadp real-def) doc-raw
-                         help-enable-auto-load
-                         (string-match "\\([^\\]=\\|[^=]\\|\\`\\)\\\\[[{<]"
-                                       doc-raw)
-                         (load (cadr real-def) t))
-                    (substitute-command-keys doc-raw))))
-
-        (help-fns--key-bindings symbol)
-        (with-current-buffer standard-output
-          (setq doc (help-fns--signature symbol doc real-def real-function))
-
-          (help-fns--compiler-macro symbol)
-          (help-fns--parent-mode symbol)
-          (help-fns--obsolete symbol)
-
-          (insert "\n"
-                  (or doc "Not documented."))
-
-          (goto-char 1)
-          )
-        )
+    ;; Indicate where it is from and its documentation.
+    ;; We used to add .el to the file name, but that's completely wrong when the user used load-file.
+    (when file-name
+      (princ " in \"")
+      (princ (if (eq file-name 'C-source)
+                 "C source code"
+               (file-name-nondirectory file-name)))
+      (princ "\"")
       )
+    (princ ".")
+    (terpri)
+    (terpri)
+
+    ;; Print documentation.
+    (with-current-buffer standard-output
+      (help-fns--key-bindings symbol)
+      (help-fns--compiler-macro symbol)
+      (help-fns--parent-mode symbol)
+      (help-fns--obsolete symbol)
+      (setq doc (help-fns--signature symbol doc real-def real-function))
+
+      (terpri)
+      (if doc
+          (princ (format "Documentation:\n%s" doc))
+        (princ "No documentation.")
+        )
+
+      (goto-char 1)
+      )
+    ;; Return buffer.
     standard-output
     )
   )
 
-;; (oops--lisp-describe-variable 'standard-output)
 (defun oops--lisp-describe-variable (symbol)
   "Display the full documentation of VARIABLE \(a symbol\).
 \(It was written by refering to the GNU function, `describe-variable'.\)
 "
-  (let* ((standard-output (oops--lisp-help-buffer 1))
+  (let* ((standard-output (oops--lisp-help-buffer t))
          (alias (condition-case nil
                     (indirect-variable symbol)
                   (error symbol)))
@@ -350,8 +343,7 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
     (princ "\".")
     (terpri)
     (terpri)
-    (princ "Its value is ")
-    (pp val)
+    (princ (format "Its value is %S." val))
     ;; Add hyper-link property to file-name text.
     ;; (with-current-buffer standard-output
     ;;   (save-excursion
@@ -540,6 +532,7 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
     (with-current-buffer standard-output
       (goto-char 1)
       )
+    ;; Return buffer.
     standard-output
     )
   )
