@@ -604,7 +604,9 @@ The 1st element of all the records is RECORD-TYPE, which value is 'origin or 'ta
 (defun oops--lisp-search-for-symbol (symbol type library)
   "Search for SYMBOL's definition of type TYPE in LIBRARY. Visit the library in a buffer, and return a list (BUFFER POS-BEG POS-END), or just nil if the definition can't be found in the file.
 
-TYPE specifies the kind of definition, and it is interpreted via `oops--lisp-search-symbol-regexp-alist'."
+TYPE specifies the kind of definition, and it is interpreted via `oops--lisp-search-symbol-regexp-alist'.
+\(It was written by refering to GNU function, `find-function-search-for-symbol'.\)
+"
   ;; Some functions are defined as part of the construct that defines something else.
   (while (and (symbolp symbol)
               (get symbol 'definition-name))
@@ -668,7 +670,9 @@ TYPE specifies the kind of definition, and it is interpreted via `oops--lisp-sea
   )
 
 (defun oops--lisp-find-function (symbol)
-  "Return a list (BUFFER POS-BEG POS-END) pointing to the definition of FUNCTION. Return nil if symbol is a built-in function."
+  "Return a list (BUFFER POS-BEG POS-END) pointing to the definition of FUNCTION. Return nil if symbol is a built-in function.
+\(It was written by refering to GNU function, `find-function-noselect'.\)
+"
   (let ((def (symbol-function (find-function-advised-original symbol)))
         aliases)
     ;; FIXME for completeness, it might be nice to print something like:
@@ -681,14 +685,11 @@ TYPE specifies the kind of definition, and it is interpreted via `oops--lisp-sea
                                             (symbol-name def))))
             (setq aliases (format "`%s' is an alias for `%s'"
                                   symbol (symbol-name def)))
-            )
-          )
+            ))
       (setq symbol (symbol-function (find-function-advised-original symbol))
             def (symbol-function (find-function-advised-original symbol)))
       )
-    (if aliases
-        (message "%s" aliases)
-      )
+    (and aliases (message "%s" aliases))
 
     ;; Find library and return the result.
     (let ((library (cond ((autoloadp def)
@@ -703,28 +704,27 @@ TYPE specifies the kind of definition, and it is interpreted via `oops--lisp-sea
   )
 
 (defun oops--lisp-find-variable (symbol)
-  "Return a list (BUFFER POS-BEG POS-END) pointing to the definition of VARIABLE. Return nil if symbol is a built-in variable."
+  "Return a list (BUFFER POS-BEG POS-END) pointing to the definition of VARIABLE. Return nil if symbol is a built-in variable.
+\(It was written by refering to GNU function, `find-variable-noselect'.\)
+"
+  (let ((library (symbol-file symbol 'defvar)))
+    (and library (oops--lisp-search-for-symbol symbol 'defun library))
+    )
   )
 
 (defun oops-lisp-jump-to-definition-atpt ()
   ;; TODO/FIXME:
   ;; * advising function list!
-  ;; * variable and function with same name!
+  ;; * variable, function and feature with same name!
   ;; * add local variable navigation!
   (let* ((symb (intern-soft (oops--lisp-thingatpt)))
          search-result)
 
     ;; Disable region.
     (setq mark-active nil)
+    ;; oops-mode
 
     (cond
-     ;; library
-     ((featurep symb)
-      (find-library (symbol-name symb))
-      ;; TODO/FIXME: go to (require 'text) line
-      (message "[Definition] library: %s" symb)
-      )
-
      ;; Function:
      ((fboundp symb)
       (setq search-result (oops--lisp-find-function symb))
@@ -743,7 +743,9 @@ TYPE specifies the kind of definition, and it is interpreted via `oops--lisp-sea
         ;; Enable region.
         (set-marker (mark-marker) (nth 1 search-result))
         (goto-char (nth 2 search-result))
-        (setq mark-active t)
+        (unless (= (marker-position (mark-marker)) (point))
+          (setq mark-active t)
+          )
         (message "[Definition] function: %s" symb)
         )
       )
@@ -767,9 +769,18 @@ TYPE specifies the kind of definition, and it is interpreted via `oops--lisp-sea
         ;; Enable region.
         (set-marker (mark-marker) (nth 1 search-result))
         (goto-char (nth 2 search-result))
-        (setq mark-active t)
+        (unless (= (marker-position (mark-marker)) (point))
+          (setq mark-active t)
+          )
         (message "[Definition] variable: %s" symb)
         )
+      )
+
+     ;; library
+     ((featurep symb)
+      (find-library (symbol-name symb))
+      ;; TODO/FIXME: go to (require 'text) line
+      (message "[Definition] library: %s" symb)
       )
      )
     )
