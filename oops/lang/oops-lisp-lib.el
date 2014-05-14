@@ -154,25 +154,23 @@ The 1st element of all the records is RECORD-TYPE, which value is 'marker-record
   "Navigate to previous history by rotating the `oops--lisp-history'.
 \(1 2 3 4 5\) => \(2 3 4 5 1\) and use \(2\) history."
   (interactive)
-  ;; ;; Pop records which refer to killed buffers.
-  ;; ;; ('marker-record SYMBOL MARKER)
-  ;; (while (and oops--lisp-history
-  ;;             (eq 'marker-record (caar oops--lisp-history))
-  ;;             (not (marker-buffer (nth 2 (car oops--lisp-history)))))
-  ;;   (setq oops--lisp-history (cdr oops--lisp-history))
-  ;;   )
-  ;; ;; ('symbol-record SYMBOL TYPE BUFFER)
-  ;; (while (and oops--lisp-history
-  ;;             (eq 'symbol-record (caar oops--lisp-history))
-  ;;             (not (buffer-live-p (nth 3 (car oops--lisp-history)))))
-  ;;   (setq oops--lisp-history (cdr oops--lisp-history))
-  ;;   )
-
   (if (and oops--lisp-history
            (> (length oops--lisp-history) 0))
       (progn
+        ;; Discard invalid records which refer to killed buffers:
+        (let ((record (car oops--lisp-history-indicator)))
+          (while (or (and (eq 'marker-record (car record))
+                          (not (marker-buffer (nth 2 record))))
+                     (and (eq 'symbol-record (car record))
+                          (not (buffer-live-p (nth 3 record)))))
+            (setq oops--lisp-history (delq record oops--lisp-history))
+            (setq oops--lisp-history-indicator (cdr oops--lisp-history-indicator))
+            (setq record (car oops--lisp-history-indicator))
+            )
+          )
+
+        ;; Move the indicator.
         (unless (null (cdr oops--lisp-history-indicator))
-          ;; Move the indicator.
           (setq oops--lisp-history-indicator (cdr oops--lisp-history-indicator))
           (oops--lisp-use-history)
           )
@@ -189,25 +187,26 @@ The 1st element of all the records is RECORD-TYPE, which value is 'marker-record
   "Navigate to next history by rotating the `oops--lisp-history'.
 \(2 3 4 5 1\) => \(1 2 3 4 5\) and use \(1\) history."
   (interactive)
-  ;; ;; Pop records which refer to killed buffers.
-  ;; ;; ('marker-record SYMBOL MARKER)
-  ;; (while (and oops--lisp-history
-  ;;             (eq 'marker-record (caar (last oops--lisp-history)))
-  ;;             (not (marker-buffer (nth 2 (car (last oops--lisp-history))))))
-  ;;   (setq oops--lisp-history (butlast oops--lisp-history))
-  ;;   )
-  ;; ;; ('symbol-record SYMBOL TYPE BUFFER)
-  ;; (while (and oops--lisp-history
-  ;;             (eq 'symbol-record (caar (last oops--lisp-history)))
-  ;;             (not (buffer-live-p (nth 3 (car (last oops--lisp-history))))))
-  ;;   (setq oops--lisp-history (butlast oops--lisp-history))
-  ;;   )
 
   (if (and oops--lisp-history
            (> (length oops--lisp-history) 0))
       (progn
+        ;; ;; Discard invalid records which refer to killed buffers.
+        ;; ;; Case 1: ('marker-record SYMBOL MARKER)
+        ;; (while (and oops--lisp-history
+        ;;             (eq 'marker-record (caar (last oops--lisp-history)))
+        ;;             (not (marker-buffer (nth 2 (car (last oops--lisp-history))))))
+        ;;   (setq oops--lisp-history (butlast oops--lisp-history))
+        ;;   )
+        ;; ;; Case 2: ('symbol-record SYMBOL TYPE BUFFER)
+        ;; (while (and oops--lisp-history
+        ;;             (eq 'symbol-record (caar (last oops--lisp-history)))
+        ;;             (not (buffer-live-p (nth 3 (car (last oops--lisp-history))))))
+        ;;   (setq oops--lisp-history (butlast oops--lisp-history))
+        ;;   )
+
+        ;; Move the indicator.
         (unless (eq oops--lisp-history-indicator oops--lisp-history)
-          ;; Move the indicator.
           (let* ((full-length (length oops--lisp-history))
                  (indicator-length (length oops--lisp-history-indicator))
                  (indicator-index (- full-length indicator-length))
