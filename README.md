@@ -14,3 +14,4 @@ Add following script in your .emacs file.
 * Create a multiple help buffer framework in `oops-help-buffer.el`.
 * Try to use hook mechanism to make strategy pattern (refer `to company`).
 * Is this feature a mode or a framework? Maybe use `(oops-framework 1)` is better.
+* Add copyright.
