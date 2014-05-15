@@ -12,6 +12,7 @@ Add following script in your .emacs file.
 * Merge `hl-param` and `hl-symb` into it.
 * Design a multiple help window framework in `oops-win-mode.el`.
 * Create a multiple help buffer framework in `oops-help-buffer.el`.
+* Use `helm` to implement multiple help mechanism.
 * Try to use hook mechanism to make strategy pattern (refer `to company`).
 * Is this feature a mode or a framework? Maybe use `(oops-framework 1)` is better.
 * Add copyright.
