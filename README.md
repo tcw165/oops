@@ -1,10 +1,12 @@
 ## Usage
-;; Add following script in your .emacs file.
+Add following script in your .emacs file.
+```
 (add-to-list 'load-path "~/.emacs.d/oops")
 (require 'oops-mode)
 
 ;; Init all the features of `oops-mode'
 (oops-mode 1)
+```
 
 ## TODO List
 * Merge `hl-param' and `hl-symb' into it.
