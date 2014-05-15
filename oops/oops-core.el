@@ -5,6 +5,7 @@
 (require 'company)
 
 ;; Oops Library ================================================================
+(require 'oops-win)
 (require 'oops-lisp-lib)
 (require 'oops-python-lib)
 (require 'oops-c-lib)
@@ -19,10 +20,12 @@
   (undo)
   )
 
-(defun oops-kill-current-buffer ()
+(defun oops-kill-current-buffer-or-window ()
   "Kill the buffer you are focusing which is `current-buffer'."
   (interactive)
   (kill-buffer (current-buffer))
+  ;; Remove invalid history.
+  (oops--clean-history)
   )
 
 (defun oops-toggle-comment ()
@@ -172,14 +175,27 @@
 ;; TODO: customization support.
 (defvar oops-history-max 32)
 
+(defun oops--clean-history ()
+  (cond
+   ;; lisp
+   ((memq major-mode (list 'emacs-lisp-mode
+                           'lisp-interaction-mode))
+    (oops-lisp-clean-history)
+    )
+   ;; c
+   ;; c++
+   ;; python
+   )
+  )
+
 ;; ###autoload
 (defun oops-prev-history ()
   "Navigate to previous record in the history."
   (interactive)
   (cond
    ;; lisp
-   ((or (eq major-mode 'emacs-lisp-mode)
-        (eq major-mode 'lisp-interaction-mode))
+   ((memq major-mode (list 'emacs-lisp-mode
+                           'lisp-interaction-mode))
     (oops-lisp-prev-history)
     )
    ;; c
@@ -193,8 +209,8 @@
   (interactive)
   (cond
    ;; lisp
-   ((or (eq major-mode 'emacs-lisp-mode)
-        (eq major-mode 'lisp-interaction-mode))
+   ((memq major-mode (list 'emacs-lisp-mode
+                           'lisp-interaction-mode))
     (oops-lisp-next-history)
     )
    ;; c
@@ -213,8 +229,8 @@ For Python, it doesn't support yet."
   (interactive)
   (cond
    ;; lisp
-   ((or (eq major-mode 'emacs-lisp-mode)
-        (eq major-mode 'lisp-interaction-mode))
+   ((memq major-mode (list 'emacs-lisp-mode
+                           'lisp-interaction-mode))
     (oops-lisp-jump-to-definition-atpt)
     )
    ;; c
@@ -229,8 +245,8 @@ For Python, it doesn't support yet."
   (interactive)
   (cond
    ;; lisp
-   ((or (eq major-mode 'emacs-lisp-mode)
-        (eq major-mode 'lisp-interaction-mode))
+   ((memq major-mode (list 'emacs-lisp-mode
+                           'lisp-interaction-mode))
     )
    ;; c
    ;; c++
@@ -243,8 +259,8 @@ For Python, it doesn't support yet."
   (interactive)
   (cond
    ;; lisp
-   ((or (eq major-mode 'emacs-lisp-mode)
-        (eq major-mode 'lisp-interaction-mode))
+   ((memq major-mode (list 'emacs-lisp-mode
+                           'lisp-interaction-mode))
     (oops-lisp-goto-lsymb)
     )
    ;; c

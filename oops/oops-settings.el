@@ -66,7 +66,7 @@
 (global-set-key (kbd "C-x <escape>") 'delete-other-windows)
 
 ;; Ctrl + w, command + w
-(global-set-key (kbd "C-w") 'oops-kill-current-buffer)
+(global-set-key (kbd "C-w") 'oops-kill-current-buffer-or-window)
 ;; Ctrl + d
 (global-set-key (kbd "C-d") 'oops-duplicate-lines)
 ;; Ctrl + shift + d

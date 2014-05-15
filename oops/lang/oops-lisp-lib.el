@@ -1,7 +1,7 @@
 (require 'find-func)
 (require 'help-fns)
 
-;; =============================================================================
+;; Common ======================================================================
 
 (defun oops--lisp-thingatpt ()
   "Return string on which the point is or just string of selection."
@@ -14,27 +14,6 @@
   )
 
 ;; History Navigation ==========================================================
-
-;; test code ====================>
-(defun test1 ()
-  )
-
-(defun test2 ()
-  (test1)
-  )
-
-(defun test3 ()
-  (test1)
-  (test2)
-  )
-
-(defun test4 ()
-  (test3)
-  )
-;; (setq oops--lisp-history nil)
-;; (setq oops--lisp-history-indicator nil)
-;; (message "oops--lisp-history (%s):\n%s\n\noops--lisp-history-indicator (%s):\n%s" (length oops--lisp-history) oops--lisp-history (length oops--lisp-history-indicator) oops--lisp-history-indicator)
-;; <==================== test code
 
 (defvar oops--lisp-history nil
   "The history is a list containing records with following format:
@@ -49,7 +28,7 @@
 The 1st element of all the records is RECORD-TYPE, which value is 'marker-record or 'symbol-record.")
 
 (defvar oops--lisp-history-indicator nil
-  "An history indicator that points to the record you access last time.")
+  "An history indicator that points to the record that you access last time.")
 
 
 (defun oops--lisp-push-history (record-type symbol &optional type buffer)
@@ -93,11 +72,6 @@ The 1st element of all the records is RECORD-TYPE, which value is 'marker-record
       (when (> (length oops--lisp-history) oops-history-max)
         (setcdr (nthcdr (1- oops-history-max) oops--lisp-history) nil)
         )
-      ;; (message "oops--lisp-history (%s):\n%s\n\noops--lisp-history-indicator (%s):\n%s"
-      ;;          (length oops--lisp-history)
-      ;;          oops--lisp-history
-      ;;          (length oops--lisp-history-indicator)
-      ;;          oops--lisp-history-indicator)
       )
     )
   )
@@ -121,12 +95,14 @@ The 1st element of all the records is RECORD-TYPE, which value is 'marker-record
         (switch-to-buffer buffer)
         ;; Disable region.
         (setq mark-active nil)
-        (goto-char end)
-        ;; Enable region.
-        (set-marker (mark-marker) beg)
-        (unless (= beg end)
-          (setq mark-active t)
-          )
+        (and beg end
+             (goto-char end)
+             ;; Enable region.
+             (set-marker (mark-marker) beg)
+             (unless (= beg end)
+               (setq mark-active t)
+               )
+             )
         )
       )
      ;; ('marker-record SYMBOL MARKER)
@@ -157,23 +133,11 @@ The 1st element of all the records is RECORD-TYPE, which value is 'marker-record
   (if (and oops--lisp-history
            (> (length oops--lisp-history) 0))
       (progn
-        ;; Discard invalid records which refer to killed buffers:
-        (let ((record (car oops--lisp-history-indicator)))
-          (while (or (and (eq 'marker-record (car record))
-                          (not (marker-buffer (nth 2 record))))
-                     (and (eq 'symbol-record (car record))
-                          (not (buffer-live-p (nth 3 record)))))
-            (setq oops--lisp-history (delq record oops--lisp-history))
-            (setq oops--lisp-history-indicator (cdr oops--lisp-history-indicator))
-            (setq record (car oops--lisp-history-indicator))
-            )
-          )
-
         ;; Move the indicator.
         (unless (null (cdr oops--lisp-history-indicator))
           (setq oops--lisp-history-indicator (cdr oops--lisp-history-indicator))
-          (oops--lisp-use-history)
           )
+        (oops--lisp-use-history)
         (let ((i (length oops--lisp-history))
               (j (length oops--lisp-history-indicator)))
           (message "[History] navigate to previous record: %s\/%s" j i)
@@ -191,20 +155,6 @@ The 1st element of all the records is RECORD-TYPE, which value is 'marker-record
   (if (and oops--lisp-history
            (> (length oops--lisp-history) 0))
       (progn
-        ;; ;; Discard invalid records which refer to killed buffers.
-        ;; ;; Case 1: ('marker-record SYMBOL MARKER)
-        ;; (while (and oops--lisp-history
-        ;;             (eq 'marker-record (caar (last oops--lisp-history)))
-        ;;             (not (marker-buffer (nth 2 (car (last oops--lisp-history))))))
-        ;;   (setq oops--lisp-history (butlast oops--lisp-history))
-        ;;   )
-        ;; ;; Case 2: ('symbol-record SYMBOL TYPE BUFFER)
-        ;; (while (and oops--lisp-history
-        ;;             (eq 'symbol-record (caar (last oops--lisp-history)))
-        ;;             (not (buffer-live-p (nth 3 (car (last oops--lisp-history))))))
-        ;;   (setq oops--lisp-history (butlast oops--lisp-history))
-        ;;   )
-
         ;; Move the indicator.
         (unless (eq oops--lisp-history-indicator oops--lisp-history)
           (let* ((full-length (length oops--lisp-history))
@@ -213,14 +163,35 @@ The 1st element of all the records is RECORD-TYPE, which value is 'marker-record
                  (before-index (1- indicator-index)))
             (setq oops--lisp-history-indicator (nthcdr before-index oops--lisp-history))
             )
-          (oops--lisp-use-history)
           )
+        (oops--lisp-use-history)
         (let ((i (length oops--lisp-history))
               (j (length oops--lisp-history-indicator)))
           (message "[History] navigate to next record: %s\/%s" j i)
           )
         )
     (message "[History] no record was set!")
+    )
+  )
+
+(defun oops-lisp-clean-history ()
+  "Iterate through the history and discard the invalid records."
+  (let* ((temp-list oops--lisp-history)
+         (record (car temp-list)))
+    (while (and temp-list
+                record)
+      (when (or (and (eq 'marker-record (car record))
+                     (not (marker-buffer (nth 2 record))))
+                (and (eq 'symbol-record (car record))
+                     (not (buffer-live-p (nth 3 record)))))
+        (setq oops--lisp-history-indicator (if (eq record (car oops--lisp-history-indicator))
+                                               (cdr oops--lisp-history-indicator)
+                                             oops--lisp-history-indicator))
+        (setq oops--lisp-history (delq record oops--lisp-history))
+        )
+      (setq temp-list (cdr temp-list))
+      (setq record (car temp-list))
+      )
     )
   )
 
@@ -279,7 +250,7 @@ The 1st element of all the records is RECORD-TYPE, which value is 'marker-record
          )
 
     ;; Print what kind of function-like object FUNCTION is.
-    (princ (format "%s is " symbol))
+    (princ (format "`%s` is " symbol))
     (princ (cond ((or (stringp def) (vectorp def))
                   "a keyboard macro")
                  ((subrp def)
@@ -391,7 +362,7 @@ The 1st element of all the records is RECORD-TYPE, which value is 'marker-record
     (princ "\".")
     (terpri)
     (terpri)
-    (princ (format "Its value is %S." val))
+    (princ (format "Its value is `%S`." val))
     ;; Add hyper-link property to file-name text.
     ;; (with-current-buffer standard-output
     ;;   (save-excursion
@@ -411,9 +382,8 @@ The 1st element of all the records is RECORD-TYPE, which value is 'marker-record
       (when (and (consp sv)
                  (not (equal origval val))
                  (not (equal origval :help-eval-error)))
-        (princ "\ncustomizable, original value was `")
-        (pp origval)
-        (princ "'.")
+        (terpri)
+        (princ (format "It's customizable, original value was `%s`." origval))
         )
       )
 
@@ -424,15 +394,21 @@ The 1st element of all the records is RECORD-TYPE, which value is 'marker-record
     (when locus
       (cond
        ((bufferp locus)
-        (princ (format "\nlocal in buffer `%s'." (buffer-name)))
+        (terpri)
+        (princ (format "It's local in buffer `%s`." (buffer-name)))
         )
        ((framep locus)
-        (princ (format "\nframe-local variable."))
+        (terpri)
+        (princ (format "It's frame-local variable."))
         )
        ((terminal-live-p locus)
-        (princ (format "\nterminal-local variable."))
+        (terpri)
+        (princ (format "It's terminal-local variable."))
         )
-       (t (princ (format "\nit is local to %S." locus)))
+       (t
+        (terpri)
+        (princ (format "It's local to %S." locus))
+        )
        )
 
       (if (not (default-boundp symbol))

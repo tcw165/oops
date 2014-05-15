@@ -43,7 +43,7 @@ The `base' should be a directory string and the `exclude' should be a list that 
 
 ;; Core libraries:
 (require 'oops-core)
-(require 'oops-win-mode)
+(require 'oops-win)
 (require 'oops-help)
 ;; Language libraries:
 (require 'oops-c-lib)

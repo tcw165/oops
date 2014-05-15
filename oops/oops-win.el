@@ -122,10 +122,8 @@
   "Create the `oops--win-idtimer' if `enable' is 1. Destory it if `enable' is -1."
   (if (> enable 0)
       ;; Enable idle timer.
-      (if (null oops--win-idtimer)
-          (setq oops--win-idtimer
-                (run-with-idle-timer 0.5 t 'oops--update-edit-win))
-          )
+      (and (null oops--win-idtimer)
+           (setq oops--win-idtimer (run-with-idle-timer 0.5 t 'oops--update-edit-win)))
     ;; Disable idle timer.
     (unless (null oops--win-idtimer)
       (cancel-timer oops--win-idtimer)
@@ -320,4 +318,4 @@
 
 ;; <============================================================================
 
-(provide 'oops-win-mode)
+(provide 'oops-win)
