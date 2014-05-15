@@ -1,5 +1,6 @@
 ## Usage
-;; Add following script in your .emacs file.(add-to-list 'load-path "~/.emacs.d/oops")
+;; Add following script in your .emacs file.
+(add-to-list 'load-path "~/.emacs.d/oops")
 (require 'oops-mode)
 
 ;; Init all the features of `oops-mode'
