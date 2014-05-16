@@ -1,6 +1,15 @@
 ## Usage
 Add following script in your .emacs file.
 ```
+(add-to-list 'load-path "~/.emacs.d/oops")
+(require 'oops-mode)
+
+;; Init all the features of `oops-mode'
+(oops-mode 1)
+```
+
+This is my .emacs setting.
+```
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
@@ -18,7 +27,7 @@ Add following script in your .emacs file.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
  )
- 
+
 (add-to-list 'load-path "~/.emacs.d/oops")
 (require 'oops-mode)
 
