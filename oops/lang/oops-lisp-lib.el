@@ -249,7 +249,7 @@ The 1st element of all the records is RECORD-TYPE.")
          )
 
     ;; Print what kind of function-like object FUNCTION is.
-    (princ (format "`%s` is " symbol))
+    (princ (format "%s is " symbol))
     (princ (cond ((or (stringp def) (vectorp def))
                   "a keyboard macro")
                  ((subrp def)
@@ -354,14 +354,12 @@ The 1st element of all the records is RECORD-TYPE.")
 
     ;; Indicate where is its definition and current value.
     (princ (format "%s" symbol))
-    (princ " is a symbol defined in \"")
-    (princ (if (eq file-name 'C-source)
-               "C source code"
-             (file-name-nondirectory file-name)))
-    (princ "\".")
+    (princ (format " is a symbol defined in \"%s\"." (if (eq file-name 'C-source)
+                                                         "C source code"
+                                                       (file-name-nondirectory file-name))))
     (terpri)
     (terpri)
-    (princ (format "Its value is `%S`." val))
+    (princ (format "Its value is %S." val))
     ;; Add hyper-link property to file-name text.
     ;; (with-current-buffer standard-output
     ;;   (save-excursion
@@ -382,7 +380,7 @@ The 1st element of all the records is RECORD-TYPE.")
                  (not (equal origval val))
                  (not (equal origval :help-eval-error)))
         (terpri)
-        (princ (format "It's customizable, original value was `%s`." origval))
+        (princ (format "It's customizable, original value was %s." origval))
         )
       )
 
@@ -394,7 +392,7 @@ The 1st element of all the records is RECORD-TYPE.")
       (cond
        ((bufferp locus)
         (terpri)
-        (princ (format "It's local in buffer `%s`." (buffer-name)))
+        (princ (format "It's local in buffer \"%s\"." (buffer-name)))
         )
        ((framep locus)
         (terpri)
@@ -411,15 +409,15 @@ The 1st element of all the records is RECORD-TYPE.")
        )
 
       (if (not (default-boundp symbol))
-          (princ "\nglobally void")
-        (let ((global-val (default-value symbol)))
-          (princ "\nglobal value is ")
-          (if (eq val global-val)
-              (princ "the same.")
-            (princ "`")
-            (pp global-val)
-            (princ "'.")
+          (progn
+            (terpri)
+            (princ "It is globally void.")
             )
+        (let ((global-val (default-value symbol)))
+          (terpri)
+          (princ (format "It's global value is %s." (if (eq val global-val)
+                                                       "the same"
+                                                     global-val)))
           )
         )
       )
