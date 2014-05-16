@@ -561,33 +561,36 @@ The 1st element of all the records is RECORD-TYPE.")
   )
 
 (defun oops-lisp-show-help-atpt ()
-  (let* ((symb (intern-soft (oops--lisp-thingatpt)))
+  (let* ((symbol (intern-soft (oops--lisp-thingatpt)))
          search-result)
-    (when symb
+    (when symbol
       (cond
        ;; TODO: Support feature.
        ;; Library:
-       ;; ((featurep symb)
+       ;; ((featurep symbol)
        ;;  nil
        ;;  )
        ;; Function:
-       ((fboundp symb)
-        (setq search-result (oops--lisp-find-function symb))
+       ((fboundp symbol)
+        (setq search-result (oops--lisp-find-function symbol))
         (if search-result
             (oops-update-help search-result)
           ;; Built-in function, show HELP.
-          (oops-update-help (oops--lisp-describe-function symb))
+          (oops-update-help (oops--lisp-describe-function symbol))
           )
         )
        ;; Variable:
-       ((boundp symb)
-        (setq search-result (oops--lisp-find-variable symb))
+       ((boundp symbol)
+        (setq search-result (oops--lisp-find-variable symbol))
         (if search-result
             (oops-update-help search-result)
           ;; Built-in variable, show HELP.
-          (oops-update-help (oops--lisp-describe-variable symb))
+          (oops-update-help (oops--lisp-describe-variable symbol))
           )
         )
+       ;; ;; Keyword:
+       ;; ((keywordp symbol)
+       ;;  )
        )
       )
     )

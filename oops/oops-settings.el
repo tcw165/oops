@@ -10,9 +10,6 @@
 ;; enable CUA mode
 (cua-mode t)
 
-;; turn on highlight matching brackets
-(show-paren-mode 1)
-
 ;; insert brackets by pairs
 (electric-pair-mode 1)
 

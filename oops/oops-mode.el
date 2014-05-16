@@ -93,7 +93,7 @@ The `base' should be a directory string and the `exclude' should be a list that 
   (if (> enable 0)
       ;; Enable idle timer.
       (when (null oops--idtimer)
-        (setq oops--idtimer (run-with-idle-timer 0.2 t 'oops--idtimer-function))
+        (setq oops--idtimer (run-with-idle-timer 0.3 t 'oops--idtimer-function))
         )
     ;; Disable idle timer.
     (when oops--idtimer
