@@ -35,13 +35,6 @@
 (highlight-symbol-mode t)
 (setq highlight-symbol-idle-delay 0)
 
-;; highlight parentheses function, require 'highlight-parentheses
-;; only for:
-;; emacs-lisp-mode-hook
-(add-hook 'emacs-lisp-mode-hook
-          '(lambda ()
-             (highlight-parentheses-mode)))
-
 ;; company mode
 (add-hook 'after-init-hook 'global-company-mode)
 

@@ -18,7 +18,7 @@ This is my .emacs setting.
  '(column-number-mode t)
  '(cua-mode t nil (cua-base))
  '(global-mark-ring-max 128)
- '(hl-paren-background-colors (quote ("cyan")))
+ '(hl-paren-background-colors (quote ("cyan" "wheat1")))
  '(hl-paren-colors (quote ("black")))
  '(show-paren-mode nil))
 (custom-set-faces
