@@ -31,7 +31,7 @@
 
 (eval-when-compile (require 'cl))
 
-(defgroup hi-anything nil
+(defgroup hl-anything nil
   "Highlight anything."
   :group 'faces
   :group 'matching)
@@ -45,22 +45,22 @@
     )
   )
 
-(defcustom hl-paren-colors '("black")
+(defcustom hl-paren-foreground-colors '("black")
   "List of colors for the highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
   :type '(repeat color)
   :set 'hl-paren-set
-  :group 'hi-anything)
+  :group 'hl-anything)
 
 (defcustom hl-paren-background-colors '("cyan" "wheat1")
   "List of colors for the background highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
   :type '(repeat color)
   :set 'hl-paren-set
-  :group 'hi-anything)
+  :group 'hl-anything)
 
 (defface hl-paren-face nil
-  "Face used for highlighting parentheses. Color attributes might be overriden by `hl-paren-colors' and
+  "Face used for highlighting parentheses. Color attributes might be overriden by `hl-paren-foreground-colors' and
 `hl-paren-background-colors'."
-  :group 'hi-anything)
+  :group 'hl-anything)
 
 (defvar hl-paren-overlays nil
   "This buffers currently active overlays.")
@@ -75,8 +75,8 @@
   (unless (= (point) hl-paren-last-point)
     (setq hl-paren-last-point (point))
     (let ((overlays hl-paren-overlays)
-          pos1 pos2
-          (pos (point)))
+          (pos (point))
+          pos1 pos2)
       (save-excursion
         (condition-case err
             (while (and (setq pos1 (cadr (syntax-ppss pos1)))
@@ -98,7 +98,7 @@
   )
 
 (defun hl-paren-create-overlays ()
-  (let ((fg hl-paren-colors)
+  (let ((fg hl-paren-foreground-colors)
         (bg hl-paren-background-colors)
         attributes)
     (while (or fg bg)

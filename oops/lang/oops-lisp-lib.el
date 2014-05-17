@@ -55,6 +55,7 @@ The 1st element of all the records is RECORD-TYPE.")
         (setq oops--lisp-history (if (and (> full-length 1)
                                           (eq :marker-record (caar oops--lisp-history-indicator))
                                           (eq :symbol-record (car (nth before-index oops--lisp-history)))
+                                          (eq (current-buffer) (caar oops--lisp-history-indicator))
                                           )
                                      ;; If the current record and previos record is like a pair of ((:marker-record ...) (:symbol-record ...)), discard them both.
                                      (cdr oops--lisp-history-indicator)
@@ -84,7 +85,8 @@ The 1st element of all the records is RECORD-TYPE.")
       (let* ((symbol (nth 1 record))
              (type (nth 2 record))
              (predicate (cdr (assq type '((defun . oops--lisp-find-function)
-                                          (defvar . oops--lisp-find-variable)))))
+                                          (defvar . oops--lisp-find-variable)
+                                          (defface . oops--lisp-find-face)))))
              (search-result (funcall predicate symbol))
              (buffer (nth 0 search-result))
              (beg (nth 1 search-result))
@@ -586,9 +588,19 @@ The 1st element of all the records is RECORD-TYPE.")
           (oops-update-help (oops--lisp-describe-variable symbol))
           )
         )
-       ;; ;; Keyword:
-       ;; ((keywordp symbol)
-       ;;  )
+       ;; Face:
+       ((facep symbol)
+        (setq search-result (oops--lisp-find-face symbol))
+        (if search-result
+            (oops-update-help search-result)
+          ;; Built-in variable, show HELP.
+          (oops-update-help (oops--lisp-describe-variable symbol))
+          )
+        )
+       ;; Keyword:
+       ((keywordp symbol)
+        (message "[Definition] It's a keyword, %s" symbol)
+        )
        )
       )
     )
@@ -706,12 +718,22 @@ TYPE specifies the kind of definition, and it is interpreted via `oops--lisp-sea
     )
   )
 
+;; (oops--lisp-find-variable 'hl-paren-face)
 (defun oops--lisp-find-variable (symbol)
   "Return a list (BUFFER POS-BEG POS-END) pointing to the definition of VARIABLE. Return nil if symbol is a built-in variable.
 \(It was written by refering to GNU function, `find-variable-noselect'.\)
 "
   (let ((library (symbol-file symbol 'defvar)))
     (and library (oops--lisp-search-for-symbol symbol 'defun library))
+    )
+  )
+
+(defun oops--lisp-find-face (symbol)
+  "Return a list (BUFFER POS-BEG POS-END) pointing to the definition of LIBRARY.
+\(It was written by refering to GNU function, `find-function-noselect'.\)
+"
+  (let ((library (symbol-file 'hl-paren-face 'defface)))
+    (and library (oops--lisp-search-for-symbol symbol 'defface library))
     )
   )
 
@@ -727,29 +749,33 @@ TYPE specifies the kind of definition, and it is interpreted via `oops--lisp-sea
   ;; * advising function list!
   ;; * variable, function and feature with same name!
   ;; * add local variable navigation!
-  (let* ((symb (intern-soft (oops--lisp-thingatpt)))
-         (search-result (oops--lisp-find-function symb))
-         (buffer (nth 0 search-result))
-         (beg (nth 1 search-result))
-         (end (nth 2 search-result)))
+  (let* ((symbol (intern-soft (oops--lisp-thingatpt)))
+         search-result
+         buffer
+         beg
+         end)
 
     ;; Disable region.
     (setq mark-active nil)
 
     (cond
      ;; Function:
-     ((fboundp symb)
+     ((fboundp symbol)
+      (setq search-result (oops--lisp-find-function symbol)
+            buffer (nth 0 search-result)
+            beg (nth 1 search-result)
+            end (nth 2 search-result))
+
       (if (not search-result)
           ;; Built-in function.
-          (message "[Definition] No support for built-in function: %s." symb)
-        ;; Lisp function.
+          (message "[Definition] No support for built-in function: %s." symbol)
         ;; Save current state before switching.
-        (oops--lisp-push-history (oops--lisp-marker-record symb))
+        (oops--lisp-push-history (oops--lisp-marker-record symbol))
 
         (switch-to-buffer buffer)
 
         ;; Save new state after switching.
-        (oops--lisp-push-history (oops--lisp-symbol-record symb 'defun buffer))
+        (oops--lisp-push-history (oops--lisp-symbol-record symbol 'defun buffer))
 
         ;; Enable region.
         (set-marker (mark-marker) beg)
@@ -757,22 +783,27 @@ TYPE specifies the kind of definition, and it is interpreted via `oops--lisp-sea
         (unless (= (marker-position (mark-marker)) (point))
           (setq mark-active t)
           )
-        (message "[Definition] function: %s" symb)
+        (message "[Definition] function: %s" symbol)
         )
       )
 
      ;; Variable:
-     ((boundp symb)
+     ((boundp symbol)
+      (setq search-result (oops--lisp-find-variable symbol)
+            buffer (nth 0 search-result)
+            beg (nth 1 search-result)
+            end (nth 2 search-result))
+
       (if (not search-result)
           ;; Built-in variable.
-          (message "[Definition] No support for built-in variable: %s." symb)
+          (message "[Definition] No support for built-in variable: %s." symbol)
         ;; Save current state before switching.
-        (oops--lisp-push-history (oops--lisp-marker-record symb))
+        (oops--lisp-push-history (oops--lisp-marker-record symbol))
 
         (switch-to-buffer buffer)
 
         ;; Save new state after switching.
-        (oops--lisp-push-history (oops--lisp-symbol-record symb 'defun buffer))
+        (oops--lisp-push-history (oops--lisp-symbol-record symbol 'defvar buffer))
 
         ;; Enable region.
         (set-marker (mark-marker) beg)
@@ -780,15 +811,43 @@ TYPE specifies the kind of definition, and it is interpreted via `oops--lisp-sea
         (unless (= (marker-position (mark-marker)) (point))
           (setq mark-active t)
           )
-        (message "[Definition] variable: %s" symb)
+        (message "[Definition] variable: %s" symbol)
+        )
+      )
+
+     ;; face
+     ((facep symbol)
+      (setq search-result (oops--lisp-find-face symbol)
+            buffer (nth 0 search-result)
+            beg (nth 1 search-result)
+            end (nth 2 search-result))
+
+      (if (not search-result)
+          ;; Built-in variable.
+          (message "[Definition] No support for built-in face: %s." symbol)
+        ;; Save current state before switching.
+        (oops--lisp-push-history (oops--lisp-marker-record symbol))
+
+        (switch-to-buffer buffer)
+
+        ;; Save new state after switching.
+        (oops--lisp-push-history (oops--lisp-symbol-record symbol 'defface buffer))
+
+        ;; Enable region.
+        (set-marker (mark-marker) beg)
+        (goto-char end)
+        (unless (= (marker-position (mark-marker)) (point))
+          (setq mark-active t)
+          )
+        (message "[Definition] face: %s" symbol)
         )
       )
 
      ;; library
-     ((featurep symb)
-      (find-library (symbol-name symb))
+     ((featurep symbol)
+      (find-library (symbol-name symbol))
       ;; TODO: go to (require 'text) line
-      (message "[Definition] library: %s" symb)
+      (message "[Definition] library: %s" symbol)
       )
      )
     )
