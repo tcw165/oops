@@ -15,6 +15,16 @@
 
 ;; History Navigation ==========================================================
 
+;; TODO:
+;; (:from-symbol-record SYMBOL-NAME BEG-MARKER END-MARKER)
+;; (:to-symbol-record SYMBOL-NAME BEG-MARKER END-MARKER)
+;; (:from-file-record MARKER)
+;; (:to-file-record MARKER)
+;; 
+;; # Save beginning position in the BEG-MARKER, and end position in the END-MARKER.
+;; # When pushing record, check if the string of thing-at-point is equal the string in 2nd last record.
+;; # Check if the SYMBOL-NAME is equal to the string from region between BEG-MARKER and END-MARKER. If t, use it. If nil, discard it.
+;;
 (defvar oops--lisp-history nil
   "The history is a list containing records with following format:
 

@@ -1,24 +1,31 @@
+(kill-local-variable 'hl-paren-overlays)
+(mapc 'delete-overlay hl-paren-overlays)
+(hl-paren-create-overlays)
 (defun test ()
   (interactive)
-  (let ((symbol (intern-soft (oops--lisp-thingatpt))))
-    (message "%s" symbol)
+  (let ((overlays hl-paren-overlays)
+        (pos (point))
+        pos1 pos2)
+    (save-excursion
+      (condition-case err
+          (while (and (setq pos1 (cadr (syntax-ppss pos1)))
+                      (cdr overlays))
+            (move-overlay (pop overlays) pos1 (1+ pos1))
+            (when (setq pos2 (scan-sexps pos1 1))
+              (move-overlay (pop overlays) (1- pos2) pos2)
+              )
+            )
+        (error nil)
+        )
+      (goto-char pos)
+      )
+    (dolist (ov overlays)
+      (move-overlay ov 1 1)
+      )
     )
   )
-(symbol-value :foreground)
-(symbol-file :foreground)
-(oops--lisp-find-variable :foreground)
-(oops--lisp-describe-variable :forground)
 
-(font-family-list)
-
-(add-text-properties)
-(link-start)
-
-(face-list)
-(propertize "foo" 'face 'italic 'mouse-face 'bold-italic)
-
-(concat (propertize "foo" 'face 'italic 'mouse-face 'bold-italic)
-        " and ")
+(set-marker (mark-marker) (point))
 
 (defface highlight
   ’((((class color) (min-colors 88) (background light))

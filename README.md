@@ -43,3 +43,4 @@ This is my .emacs setting.
 * Try to use hook mechanism to make strategy pattern (refer `to company`).
 * Is this feature a mode or a framework? Maybe use `(oops-framework 1)` is better.
 * Add copyright.
+* Improve history mechanism since there's already a MARKER-INSERTION-TYPE.
