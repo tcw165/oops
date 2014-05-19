@@ -36,11 +36,12 @@ This is my .emacs setting.
 ```
 
 ## TODO List
-* Merge `hl-param` and `hl-symb` into it.
+* ~~Merge `hl-param` and `hl-symb` into it.~~ The `hl-param` has already been changed to `hl-anything`.
 * Design a multiple help window framework in `oops-win-mode.el`.
 * Create a multiple help buffer framework in `oops-help-buffer.el`.
 * Use `helm` to implement multiple help mechanism.
 * Try to use hook mechanism to make strategy pattern (refer `to company`).
 * Is this feature a mode or a framework? Maybe use `(oops-framework 1)` is better.
 * Add copyright.
-* Improve history mechanism since there's already a MARKER-INSERTION-TYPE.
+* Enhance history mechanism since there's already a MARKER-INSERTION-TYPE.
+* Enhance `hl-anything`, make it flexibly support more languages.
