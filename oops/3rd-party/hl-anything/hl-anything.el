@@ -38,7 +38,7 @@
 
 ;; Parentheses =================================================================
 
-(defcustom hl-outward-paren-fg-colors '("black" "black")
+(defcustom hl-outward-paren-fg-colors nil
   "List of colors for the highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
   :type '(repeat color)
   :initialize 'custom-initialize-default
@@ -73,9 +73,9 @@
   :group 'hl-anything)
 
 ;; TODO: make choice 1 or nil
-(defcustom hl-inward-paren-fg-colors "black"
+(defcustom hl-inward-paren-fg-colors nil
   "List of colors for the highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
-  :type 'color
+  :type '(repeat color)
   :initialize 'custom-initialize-default
   :set (lambda (sym val)
          (dolist (buffer (buffer-list))
@@ -91,9 +91,9 @@
   :group 'hl-anything)
 
 ;; TODO: make choice 1 or nil
-(defcustom hl-inward-paren-bg-colors "cyan"
+(defcustom hl-inward-paren-bg-colors '("hot pink")
   "List of colors for the background highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
-  :type 'color
+  :type '(repeat color)
   :initialize 'custom-initialize-default
   :set (lambda (sym val)
          (dolist (buffer (buffer-list))
@@ -126,6 +126,9 @@
 
 (defun hl-paren-create-overlays ()
   ;; outward overlays.
+  ;; (dolist (custom '((hl-outward-paren-fg-colors . hl-outward-paren-bg-colors)
+  ;;                   (hl-inward-paren-bg-colors . hl-inward-paren-bg-colors)))
+  ;;   )
   (let ((fg hl-outward-paren-fg-colors)
         (bg hl-outward-paren-bg-colors)
         attributes)
@@ -152,9 +155,17 @@
   (let ((fg hl-inward-paren-fg-colors)
         (bg hl-inward-paren-bg-colors)
         attributes)
-    (setq attributes (face-attr-construct 'hl-paren-face))
-    (setq attributes (plist-put attributes :foreground fg))
-    (setq attributes (plist-put attributes :background bg))
+    (while (or fg bg)
+      (setq attributes (face-attr-construct 'hl-paren-face))
+      (when (car fg)
+        (setq attributes (plist-put attributes :foreground (car fg)))
+        )
+      (pop fg)
+      (when (car bg)
+        (setq attributes (plist-put attributes :background (car bg)))
+        )
+      (pop bg)
+      )
 
     ;; Make pair overlays for every attribute.
     (dotimes (i 2)
@@ -173,14 +184,16 @@
           (pos (point))
           pos1 pos2)
       (save-excursion
-        (while (and (setq pos1 (cadr (syntax-ppss pos1)))
-                    (cdr overlays))
-          (move-overlay (pop overlays) pos1 (1+ pos1))
-          (when (setq pos2 (scan-sexps pos1 1))
-            (move-overlay (pop overlays) (1- pos2) pos2)
-            )
+        (condition-case err
+            (while (and (setq pos1 (cadr (syntax-ppss pos1)))
+                        (cdr overlays))
+              (move-overlay (pop overlays) pos1 (1+ pos1))
+              (when (setq pos2 (scan-sexps pos1 1))
+                (move-overlay (pop overlays) (1- pos2) pos2)
+                )
+              )
+          (error nil)
           )
-        (goto-char pos)
         )
       ;; Hide unused overlays.
       (dolist (ov overlays)
@@ -193,15 +206,24 @@
           (pos1 (point))
           pos2)
       (save-excursion
-        (when (and (looking-back ")"))
-          (move-overlay (pop overlays) pos1 (1- pos1))
-          (setq pos2 (scan-sexps pos1 -1))
-          (move-overlay (pop overlays) pos2 (1+ pos2))
-          )
-        (when (and (looking-at "("))
-          (move-overlay (pop overlays) pos1 (1+ pos1))
-          (setq pos2 (scan-sexps pos1 1))
-          (move-overlay (pop overlays) pos2 (1- pos2))
+        (condition-case err
+            (cond
+             ((and (looking-back ")")
+                   ;; TODO: skip comment.
+                   )
+              (move-overlay (pop overlays) pos1 (1- pos1))
+              (setq pos2 (scan-sexps pos1 -1))
+              (move-overlay (pop overlays) pos2 (1+ pos2))
+              )
+             ((and (looking-at "(")
+                   ;; TODO: skip comment.
+                   )
+              (move-overlay (pop overlays) pos1 (1+ pos1))
+              (setq pos2 (scan-sexps pos1 1))
+              (move-overlay (pop overlays) pos2 (1- pos2))
+              )
+             )
+          (error nil)
           )
         )
       ;; Hide unused overlays.
@@ -210,8 +232,6 @@
         )
       )
     )
-    ;; test: (get-char-property (point))
-    (list 0 '(1 2) 3 '(4 (5 6)))
   )
 
 ;;;###autoload
