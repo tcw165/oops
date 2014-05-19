@@ -36,7 +36,7 @@ This is my .emacs setting.
 ```
 
 ## TODO List
-* ~~Merge `hl-param` and `hl-symb` into it.~~ The `hl-param` has already been changed to `hl-anything`.
+* ~~Merge `hl-param` and `hl-symb` into it.~~
 * Design a multiple help window framework in `oops-win-mode.el`.
 * Create a multiple help buffer framework in `oops-help-buffer.el`.
 * Use `helm` to implement multiple help mechanism.
