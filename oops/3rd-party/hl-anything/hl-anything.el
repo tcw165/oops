@@ -126,9 +126,6 @@
 
 (defun hl-paren-create-overlays ()
   ;; outward overlays.
-  ;; (dolist (custom '((hl-outward-paren-fg-colors . hl-outward-paren-bg-colors)
-  ;;                   (hl-inward-paren-bg-colors . hl-inward-paren-bg-colors)))
-  ;;   )
   (let ((fg hl-outward-paren-fg-colors)
         (bg hl-outward-paren-bg-colors)
         attributes)
