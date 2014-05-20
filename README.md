@@ -17,6 +17,9 @@ This is my .emacs setting.
  ;; If there is more than one, they won't work right.
  '(column-number-mode t)
  '(cua-mode t nil (cua-base))
+ '(highlight-symbol-colors (quote ("yellow" "cyan" "SpringGreen1" "moccasin" "violet")))
+ '(highlight-symbol-idle-delay 0.125)
+ '(highlight-symbol-on-navigation-p t)
  '(show-paren-mode nil))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
