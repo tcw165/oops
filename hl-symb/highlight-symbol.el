@@ -173,11 +173,14 @@ Highlighting takes place after `highlight-symbol-idle-delay'."
       ;; on
       (progn
         (highlight-symbol-update-timer highlight-symbol-idle-delay)
-        (add-hook 'post-command-hook 'highlight-symbol-mode-post-command nil t))
+        (add-hook 'post-command-hook 'highlight-symbol-mode-post-command nil t)
+        )
     ;; off
     (remove-hook 'post-command-hook 'highlight-symbol-mode-post-command t)
     (highlight-symbol-mode-remove-temp)
-    (kill-local-variable 'highlight-symbol)))
+    (kill-local-variable 'highlight-symbol)
+    )
+  )
 
 ;;;###autoload
 (defun highlight-symbol-at-point ()
@@ -312,9 +315,12 @@ current buffer.
                             (eval query-replace-to-history-variable)))
                  (list
                   (read-from-minibuffer "Replacement: " nil nil nil
-                                        query-replace-to-history-variable))))
+                                        query-replace-to-history-variable))
+                 )
+               )
   (goto-char (beginning-of-thing 'symbol))
-  (query-replace-regexp (highlight-symbol-get-symbol) replacement))
+  (query-replace-regexp (highlight-symbol-get-symbol) replacement)
+  )
 
 ;;;###autoload
 (defun highlight-symbol-occur (&optional nlines)
@@ -324,14 +330,19 @@ before if NLINES is negative."
   (interactive "P")
   (if (thing-at-point 'symbol)
       (occur (highlight-symbol-get-symbol) nlines)
-    (error "No symbol at point")))
+    (error "No symbol at point")
+    )
+  )
 
 (defun highlight-symbol-get-symbol ()
   "Return a regular expression identifying the symbol at point."
   (let ((symbol (thing-at-point 'symbol)))
     (when symbol (concat (car highlight-symbol-border-pattern)
                          (regexp-quote symbol)
-                         (cdr highlight-symbol-border-pattern)))))
+                         (cdr highlight-symbol-border-pattern))
+          )
+    )
+  )
 
 (defun highlight-symbol-temp-highlight ()
   "Highlight the current symbol until a command is executed."
@@ -343,13 +354,20 @@ before if NLINES is negative."
         (when symbol
           (setq highlight-symbol symbol)
           (highlight-symbol-add-symbol-with-face symbol 'highlight-symbol-face)
-          (font-lock-fontify-buffer))))))
+          (font-lock-fontify-buffer)
+          )
+        )
+      )
+    )
+  )
 
 (defun highlight-symbol-mode-remove-temp ()
   "Remove the temporary symbol highlighting."
   (when highlight-symbol
     (highlight-symbol-remove-symbol highlight-symbol)
-    (setq highlight-symbol nil)))
+    (setq highlight-symbol nil)
+    )
+  )
 
 (defun highlight-symbol-mode-post-command ()
   "After a command, change the temporary highlighting.
@@ -357,10 +375,14 @@ Remove the temporary symbol highlighting and, unless a timeout is specified,
 create the new one."
   (if (eq this-command 'highlight-symbol-jump)
       (when highlight-symbol-on-navigation-p
-        (highlight-symbol-temp-highlight))
+        (highlight-symbol-temp-highlight)
+        )
     (if (eql highlight-symbol-idle-delay 0)
         (highlight-symbol-temp-highlight)
-      (highlight-symbol-mode-remove-temp))))
+      (highlight-symbol-mode-remove-temp)
+      )
+    )
+  )
 
 (defun highlight-symbol-jump (dir)
   "Jump to the next or previous occurence of the symbol at point.
@@ -371,17 +393,24 @@ DIR has to be 1 or -1."
                (bounds (bounds-of-thing-at-point 'symbol))
                (offset (- (point) (if (< 0 dir) (cdr bounds) (car bounds)))))
           (unless (eq last-command 'highlight-symbol-jump)
-            (push-mark))
+            (push-mark)
+            )
           ;; move a little, so we don't find the same instance again
           (goto-char (- (point) offset))
           (let ((target (re-search-forward symbol nil t dir)))
             (unless target
               (goto-char (if (< 0 dir) (point-min) (point-max)))
               (message "Continued from beginning of buffer")
-              (setq target (re-search-forward symbol nil nil dir)))
-            (goto-char (+ target offset)))
-          (setq this-command 'highlight-symbol-jump))
-      (error "No symbol at point"))))
+              (setq target (re-search-forward symbol nil nil dir))
+              )
+            (goto-char (+ target offset))
+            )
+          (setq this-command 'highlight-symbol-jump)
+          )
+      (error "No symbol at point")
+      )
+    )
+  )
 
 (provide 'highlight-symbol)
 

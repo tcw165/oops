@@ -26,10 +26,15 @@
 ;;
 ;;; Change Log:
 ;;
+;; 2014-05-19 (0.0.2)
+;;    Support one inward parentheses highlight.
+;;
 ;; 2014-05-16 (0.0.1)
 ;;    Initial release, fork from http://nschum.de/src/emacs/highlight-parentheses.
 
 (eval-when-compile (require 'cl))
+
+;; Common ======================================================================
 
 (defgroup hl-anything nil
   "Highlight anything."
@@ -38,38 +43,30 @@
 
 ;; Parentheses =================================================================
 
+(defun hl-paren-custom-set (symbol value)
+  (dolist (buffer (buffer-list))
+    (with-current-buffer buffer
+      (set symbol value)
+      (when hl-paren-mode
+        (hl-paren-mode -1)
+        (hl-paren-mode 1)
+        )
+      )
+    )
+  )
+
 (defcustom hl-outward-paren-fg-colors nil
   "List of colors for the highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
   :type '(repeat color)
   :initialize 'custom-initialize-default
-  :set (lambda (sym val)
-         (dolist (buffer (buffer-list))
-           (with-current-buffer buffer
-             (if (not hl-paren-mode)
-                 (set sym val)
-               (hl-paren-mode -1)
-               (set sym val)
-               (hl-paren-mode 1))
-             )
-           )
-         )
+  :set 'hl-paren-custom-set
   :group 'hl-anything)
 
 (defcustom hl-outward-paren-bg-colors '("cyan" "yellow")
   "List of colors for the background highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
   :type '(repeat color)
   :initialize 'custom-initialize-default
-  :set (lambda (sym val)
-         (dolist (buffer (buffer-list))
-           (with-current-buffer buffer
-             (if (not hl-paren-mode)
-                 (set sym val)
-               (hl-paren-mode -1)
-               (set sym val)
-               (hl-paren-mode 1))
-             )
-           )
-         )
+  :set 'hl-paren-custom-set
   :group 'hl-anything)
 
 ;; TODO: make choice 1 or nil
@@ -77,17 +74,7 @@
   "List of colors for the highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
   :type '(repeat color)
   :initialize 'custom-initialize-default
-  :set (lambda (sym val)
-         (dolist (buffer (buffer-list))
-           (with-current-buffer buffer
-             (if (not hl-paren-mode)
-                 (set sym val)
-               (hl-paren-mode -1)
-               (set sym val)
-               (hl-paren-mode 1))
-             )
-           )
-         )
+  :set 'hl-paren-custom-set
   :group 'hl-anything)
 
 ;; TODO: make choice 1 or nil
@@ -95,17 +82,7 @@
   "List of colors for the background highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
   :type '(repeat color)
   :initialize 'custom-initialize-default
-  :set (lambda (sym val)
-         (dolist (buffer (buffer-list))
-           (with-current-buffer buffer
-             (if (not hl-paren-mode)
-                 (set sym val)
-               (hl-paren-mode -1)
-               (set sym val)
-               (hl-paren-mode 1))
-             )
-           )
-         )
+  :set 'hl-paren-custom-set
   :group 'hl-anything)
 
 (defface hl-paren-face nil
@@ -205,14 +182,16 @@
       (save-excursion
         (condition-case err
             (cond
-             ((and (looking-back ")")
+             ((and (or (looking-back ")")
+                       (looking-back "]"))
                    ;; TODO: skip comment.
                    )
               (move-overlay (pop overlays) pos1 (1- pos1))
               (setq pos2 (scan-sexps pos1 -1))
               (move-overlay (pop overlays) pos2 (1+ pos2))
               )
-             ((and (looking-at "(")
+             ((and (or (looking-at "(")
+                       (looking-at "["))
                    ;; TODO: skip comment.
                    )
               (move-overlay (pop overlays) pos1 (1+ pos1))
@@ -247,5 +226,7 @@
     (add-hook 'post-command-hook 'hl-paren-update nil t)
     )
   )
+
+;; Symbol or Selection =========================================================
 
 (provide 'hl-anything)

@@ -33,7 +33,6 @@
 
 ;; highlight function, require 'highlight-symbol
 (highlight-symbol-mode t)
-(setq highlight-symbol-idle-delay 0)
 
 ;; company mode
 (add-hook 'after-init-hook 'global-company-mode)
