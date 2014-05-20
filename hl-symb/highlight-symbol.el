@@ -114,14 +114,18 @@
     (cancel-timer highlight-symbol-timer))
   (setq highlight-symbol-timer
         (and value (/= value 0)
-             (run-with-idle-timer value t 'highlight-symbol-temp-highlight))))
+             (run-with-idle-timer value t 'highlight-symbol-temp-highlight))
+        )
+  )
 
 (defvar highlight-symbol-mode nil)
 
 (defun highlight-symbol-set (symbol value)
   (when symbol (set symbol value))
   (when highlight-symbol-mode
-    (highlight-symbol-update-timer value)))
+    (highlight-symbol-update-timer value)
+    )
+  )
 
 (defcustom highlight-symbol-idle-delay 1.5
   "Number of seconds of idle time before highlighting the current symbol.
@@ -345,10 +349,11 @@ before if NLINES is negative."
 (defun highlight-symbol-get-symbol ()
   "Return a regular expression identifying the symbol at point."
   (let ((symbol (thing-at-point 'symbol)))
-    (when symbol (concat (car highlight-symbol-border-pattern)
-                         (regexp-quote symbol)
-                         (cdr highlight-symbol-border-pattern))
-          )
+    (when symbol
+      (concat (car highlight-symbol-border-pattern)
+              (regexp-quote symbol)
+              (cdr highlight-symbol-border-pattern))
+      )
     )
   )
 

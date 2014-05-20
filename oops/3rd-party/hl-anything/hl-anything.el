@@ -32,6 +32,7 @@
 ;; 2014-05-16 (0.0.1)
 ;;    Initial release, fork from http://nschum.de/src/emacs/highlight-parentheses.
 
+(require 'thingatpt)
 (eval-when-compile (require 'cl))
 
 ;; Common ======================================================================
@@ -41,9 +42,19 @@
   :group 'faces
   :group 'matching)
 
+(defun hl--thingatpt ()
+  "Return string on which the point is or just string of selection."
+  (if mark-active
+      ;; return the selection.
+      (buffer-substring-no-properties (region-beginning) (region-end))
+    ;; else.
+    (thing-at-point 'symbol)
+    )
+  )
+
 ;; Parentheses =================================================================
 
-(defun hl-paren-custom-set (symbol value)
+(defun hl--paren-custom-set (symbol value)
   (dolist (buffer (buffer-list))
     (with-current-buffer buffer
       (set symbol value)
@@ -59,14 +70,14 @@
   "List of colors for the highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
   :type '(repeat color)
   :initialize 'custom-initialize-default
-  :set 'hl-paren-custom-set
+  :set 'hl--paren-custom-set
   :group 'hl-anything)
 
 (defcustom hl-outward-paren-bg-colors '("cyan" "yellow")
   "List of colors for the background highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
   :type '(repeat color)
   :initialize 'custom-initialize-default
-  :set 'hl-paren-custom-set
+  :set 'hl--paren-custom-set
   :group 'hl-anything)
 
 ;; TODO: make choice 1 or nil
@@ -74,7 +85,7 @@
   "List of colors for the highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
   :type '(repeat color)
   :initialize 'custom-initialize-default
-  :set 'hl-paren-custom-set
+  :set 'hl--paren-custom-set
   :group 'hl-anything)
 
 ;; TODO: make choice 1 or nil
@@ -82,26 +93,26 @@
   "List of colors for the background highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
   :type '(repeat color)
   :initialize 'custom-initialize-default
-  :set 'hl-paren-custom-set
+  :set 'hl--paren-custom-set
   :group 'hl-anything)
 
 (defface hl-paren-face nil
   "Face used for highlighting parentheses."
   :group 'hl-anything)
 
-(defvar hl-outward-paren-overlays nil
+(defvar hl--outward-paren-overlays nil
   "This buffers currently active overlays.")
-(make-variable-buffer-local 'hl-outward-paren-overlays)
+(make-variable-buffer-local 'hl--outward-paren-overlays)
 
-(defvar hl-inward-paren-overlays nil
+(defvar hl--inward-paren-overlays nil
   "This buffers currently active overlays.")
-(make-variable-buffer-local 'hl-inward-paren-overlays)
+(make-variable-buffer-local 'hl--inward-paren-overlays)
 
-(defvar hl-paren-last-point 0
+(defvar hl--paren-last-point 0
   "The last point for which parentheses were highlighted. This is used to prevent analyzing the same context over and over.")
-(make-variable-buffer-local 'hl-paren-last-point)
+(make-variable-buffer-local 'hl--paren-last-point)
 
-(defun hl-paren-create-overlays ()
+(defun hl--paren-create-overlays ()
   ;; outward overlays.
   (let ((fg hl-outward-paren-fg-colors)
         (bg hl-outward-paren-bg-colors)
@@ -119,11 +130,11 @@
 
       ;; Make pair overlays for every attribute.
       (dotimes (i 2)
-        (push (make-overlay 0 0) hl-outward-paren-overlays)
-        (overlay-put (car hl-outward-paren-overlays) 'face attributes)
+        (push (make-overlay 0 0) hl--outward-paren-overlays)
+        (overlay-put (car hl--outward-paren-overlays) 'face attributes)
         )
       )
-    (setq hl-outward-paren-overlays (nreverse hl-outward-paren-overlays))
+    (setq hl--outward-paren-overlays (nreverse hl--outward-paren-overlays))
     )
   ;; inward overlays.
   (let ((fg hl-inward-paren-fg-colors)
@@ -143,18 +154,18 @@
 
     ;; Make pair overlays for every attribute.
     (dotimes (i 2)
-      (push (make-overlay 0 0) hl-inward-paren-overlays)
-      (overlay-put (car hl-inward-paren-overlays) 'face attributes)
+      (push (make-overlay 0 0) hl--inward-paren-overlays)
+      (overlay-put (car hl--inward-paren-overlays) 'face attributes)
       )
     )
   )
 
-(defun hl-paren-update ()
+(defun hl--paren-update ()
   "Highlight the parentheses around point."
-  (unless (= (point) hl-paren-last-point)
+  (unless (= (point) hl--paren-last-point)
     ;; Outward overlays.
-    (setq hl-paren-last-point (point))
-    (let ((overlays hl-outward-paren-overlays)
+    (setq hl--paren-last-point (point))
+    (let ((overlays hl--outward-paren-overlays)
           (pos (point))
           pos1 pos2)
       (save-excursion
@@ -176,7 +187,7 @@
       )
 
     ;; Inward overlays.
-    (let ((overlays hl-inward-paren-overlays)
+    (let ((overlays hl--inward-paren-overlays)
           (pos1 (point))
           pos2)
       (save-excursion
@@ -215,18 +226,34 @@
   "Minor mode to highlight the surrounding parentheses."
   :lighter " hl-p"
 
-  (mapc 'delete-overlay hl-outward-paren-overlays)
-  (mapc 'delete-overlay hl-inward-paren-overlays)
-  (kill-local-variable 'hl-outward-paren-overlays)
-  (kill-local-variable 'hl-inward-paren-overlays)
-  (kill-local-variable 'hl-paren-last-point)
-  (remove-hook 'post-command-hook 'hl-paren-update t)
+  (mapc 'delete-overlay hl--outward-paren-overlays)
+  (mapc 'delete-overlay hl--inward-paren-overlays)
+  (kill-local-variable 'hl--outward-paren-overlays)
+  (kill-local-variable 'hl--inward-paren-overlays)
+  (kill-local-variable 'hl--paren-last-point)
+  (remove-hook 'post-command-hook 'hl--paren-update t)
   (when hl-paren-mode
-    (hl-paren-create-overlays)
-    (add-hook 'post-command-hook 'hl-paren-update nil t)
+    (hl--paren-create-overlays)
+    (add-hook 'post-command-hook 'hl--paren-update nil t)
     )
   )
 
 ;; Symbol or Selection =========================================================
+
+;;;###autoload
+(defun hl-symbol-atpt ()
+  "Toggle highlighting of the symbol at point.
+This highlights or unhighlights the symbol at point using the first
+element in of `highlight-symbol-faces'."
+  (interactive)
+  (let ((thing (hl--thingatpt)))
+    (when thing
+      ;; (if (highlight-symbol-symbol-highlighted-p symbol)
+      ;;     (highlight-symbol-remove-symbol symbol)
+      ;;   (highlight-symbol-add-symbol symbol))
+      (message "%s" thing)
+      )
+    )
+  )
 
 (provide 'hl-anything)
