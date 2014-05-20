@@ -192,11 +192,14 @@ element in of `highlight-symbol-faces'."
     (unless symbol (error "No symbol at point"))
     (if (highlight-symbol-symbol-highlighted-p symbol)
         (highlight-symbol-remove-symbol symbol)
-      (highlight-symbol-add-symbol symbol))))
+      (highlight-symbol-add-symbol symbol))
+    )
+  )
 
 (defun highlight-symbol-symbol-highlighted-p (symbol)
   "Test if the a symbol regexp is currently highlighted."
-  (member symbol highlight-symbol-list))
+  (member symbol highlight-symbol-list)
+  )
 
 (defun highlight-symbol-add-symbol (symbol)
   (unless (highlight-symbol-symbol-highlighted-p symbol)
@@ -207,13 +210,18 @@ element in of `highlight-symbol-faces'."
       (if color ;; wrap
           (incf highlight-symbol-color-index)
         (setq highlight-symbol-color-index 1
-              color (car highlight-symbol-colors)))
+              color (car highlight-symbol-colors))
+        )
       (unless (facep color)
         (setq color `((background-color . ,color)
-                      (foreground-color . ,highlight-symbol-foreground-color))))
+                      (foreground-color . ,highlight-symbol-foreground-color)))
+        )
       ;; highlight
       (highlight-symbol-add-symbol-with-face symbol color)
-      (push symbol highlight-symbol-list))))
+      (push symbol highlight-symbol-list)
+      )
+    )
+  )
 
 (defun highlight-symbol-add-symbol-with-face (symbol face)
   (font-lock-add-keywords nil `((,symbol 0 ',face prepend)) 'append)
