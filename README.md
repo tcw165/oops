@@ -39,7 +39,8 @@ This is my .emacs setting.
 ```
 
 ## TODO List
-* ~~Merge `hl-param` and `hl-symb` into it.~~
+* ~~Merge `hl-param` into my repo, `hl-anything`.~~
+* Merge `hl-symb` into `hl-anything` and release beta version of `hl-anything`.
 * Refer to `helm-projectile` to implement project management and workspace concept.
 * Design a multiple help window framework in `oops-win-mode.el`.
 * Create a multiple help buffer framework in `oops-help-buffer.el`.
