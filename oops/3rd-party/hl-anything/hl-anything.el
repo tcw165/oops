@@ -240,18 +240,34 @@
 
 ;; Symbol or Selection =========================================================
 
+;; (global-hl-line-mode 1)
+
+(defvar hl--things-list nil
+  "A list storing things \(text string\) to be highlighted.")
+
+(defun hl--thing-p (thing)
+  "Test if the thing is currently highlighted."
+  (member thing hl--things-list)
+  )
+
+(defun hl--add-thing (thing)
+  (push thing hl--things-list)
+  )
+
+(defun hl--remove-thing (thing)
+  nil
+  )
+
 ;;;###autoload
-(defun hl-symbol-atpt ()
-  "Toggle highlighting of the symbol at point.
-This highlights or unhighlights the symbol at point using the first
-element in of `highlight-symbol-faces'."
+(defun hl-thing-at-point ()
+  "Toggle highlighting of the thing at point."
   (interactive)
   (let ((thing (hl--thingatpt)))
     (when thing
-      ;; (if (highlight-symbol-symbol-highlighted-p symbol)
-      ;;     (highlight-symbol-remove-symbol symbol)
-      ;;   (highlight-symbol-add-symbol symbol))
-      (message "%s" thing)
+      (if (hl--thing-p thing)
+          (hl--remove-thing thing)
+        (hl--add-thing thing)
+        )
       )
     )
   )

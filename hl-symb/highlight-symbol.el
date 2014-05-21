@@ -208,7 +208,8 @@ element in of `highlight-symbol-faces'."
 (defun highlight-symbol-add-symbol (symbol)
   (unless (highlight-symbol-symbol-highlighted-p symbol)
     (when (equal symbol highlight-symbol)
-      (highlight-symbol-mode-remove-temp))
+      (highlight-symbol-mode-remove-temp)
+      )
     (let ((color (nth highlight-symbol-color-index
                       highlight-symbol-colors)))
       (if color ;; wrap
