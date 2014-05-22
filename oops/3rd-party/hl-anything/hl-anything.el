@@ -240,7 +240,9 @@
 
 ;; Symbol or Selection =========================================================
 ;; TODO:
-;; * Search for the thing through out current buffer.
+;; * Use font-lock-mode to make it.
+;; * Handle the keywords under overlay, make temporary overlays to make them highlighted.
+;; (font-lock-add-keywords 'emacs-lisp-mode "test")
 
 (defun test ()
   (interactive)
@@ -260,16 +262,20 @@
   "This buffers currently active overlays.")
 (make-variable-buffer-local 'hl--things-overlays)
 
+
+(defun hl--thing-create-overlays ()
+  )
+
 (defun hl--thing-p (thing)
   "Test if the thing is currently highlighted."
   (member thing hl--things-list)
   )
 
-(defun hl--add-thing (thing)
+(defun hl--thing-add (thing)
   (push thing hl--things-list)
   )
 
-(defun hl--remove-thing (thing)
+(defun hl--thing-remove (thing)
   nil
   )
 
@@ -280,8 +286,8 @@
   (let ((thing (hl--thingatpt)))
     (when thing
       (if (hl--thing-p thing)
-          (hl--remove-thing thing)
-        (hl--add-thing thing)
+          (hl--thing-remove thing)
+        (hl--thing-add thing)
         )
       )
     )

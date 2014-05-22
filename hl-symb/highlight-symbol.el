@@ -350,12 +350,18 @@ before if NLINES is negative."
 
 (defun highlight-symbol-get-symbol ()
   "Return a regular expression identifying the symbol at point."
-  (let ((symbol (thing-at-point 'symbol)))
-    (when symbol
-      (concat (car highlight-symbol-border-pattern)
-              (regexp-quote symbol)
-              (cdr highlight-symbol-border-pattern))
-      )
+  ;; (let ((symbol (thing-at-point 'symbol)))
+  ;;   (when symbol
+  ;;     (concat (car highlight-symbol-border-pattern)
+  ;;             (regexp-quote symbol)
+  ;;             (cdr highlight-symbol-border-pattern))
+  ;;     )
+  ;;   )
+  (if mark-active
+      ;; return the selection.
+      (buffer-substring-no-properties (region-beginning) (region-end))
+    ;; else.
+    (thing-at-point 'symbol)
     )
   )
 
