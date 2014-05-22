@@ -239,11 +239,26 @@
   )
 
 ;; Symbol or Selection =========================================================
+;; TODO:
+;; * Search for the thing through out current buffer.
 
-;; (global-hl-line-mode 1)
+(defun test ()
+  (interactive)
+  (unless (search-forward "hl-anything" nil t 1)
+    (message "EOF")
+    )
+  )
+
+(defface hl-thing-face nil
+  "Face used for highlighting thing (a symbol or a text selection)."
+  :group 'hl-anything)
 
 (defvar hl--things-list nil
   "A list storing things \(text string\) to be highlighted.")
+
+(defvar hl--things-overlays nil
+  "This buffers currently active overlays.")
+(make-variable-buffer-local 'hl--things-overlays)
 
 (defun hl--thing-p (thing)
   "Test if the thing is currently highlighted."

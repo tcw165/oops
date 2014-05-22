@@ -111,7 +111,8 @@
 
 (defun highlight-symbol-update-timer (value)
   (when highlight-symbol-timer
-    (cancel-timer highlight-symbol-timer))
+    (cancel-timer highlight-symbol-timer)
+    )
   (setq highlight-symbol-timer
         (and value (/= value 0)
              (run-with-idle-timer value t 'highlight-symbol-temp-highlight))
