@@ -17,10 +17,12 @@ This is my .emacs setting.
  ;; If there is more than one, they won't work right.
  '(column-number-mode t)
  '(cua-mode t nil (cua-base))
+ '(global-hl-line-mode t)
+ '(global-linum-mode t)
  '(highlight-symbol-colors (quote ("yellow" "cyan" "SpringGreen1" "moccasin" "violet")))
- '(highlight-symbol-idle-delay 0.125)
- '(highlight-symbol-on-navigation-p t)
- '(show-paren-mode nil))
+ '(imenu-sort-function (quote imenu--sort-by-name))
+ '(show-paren-mode nil)
+ '(which-function-mode t))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.

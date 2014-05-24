@@ -4,20 +4,8 @@
 ;; ido-mode
 (ido-mode 1)
 
-;; icomplete-mode
-;; (icomplete-mode t)
-
-;; enable CUA mode
-(cua-mode t)
-
 ;; insert brackets by pairs
 (electric-pair-mode 1)
-
-;; highlight current line
-(global-hl-line-mode 1)
-
-;; cursor display as a bar
-(setq-default cursor-type 'bar)
 
 ;; tab width
 (setq-default tab-width 2)
