@@ -89,7 +89,7 @@
 
 ;; F1
 ;; F2
-(global-set-key (kbd "<f2>") 'highlight-symbol-at-point)
+(global-set-key (kbd "<f2>") 'hl-thing-at-point)
 ;; F3
 (global-set-key (kbd "<f3>") 'highlight-symbol-next)
 ;; F4
@@ -97,7 +97,7 @@
 
 ;; Shift + F1
 ;; Shift + F2
-(global-set-key (kbd "S-<f2>") 'highlight-symbol-remove-all)
+(global-set-key (kbd "S-<f2>") 'hl-thing-remove-all)
 ;; Shift + F3
 (global-set-key (kbd "S-<f3>") 'highlight-symbol-prev)
 ;; Shift + F4

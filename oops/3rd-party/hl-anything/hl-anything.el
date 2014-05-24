@@ -42,16 +42,6 @@
   :group 'faces
   :group 'matching)
 
-(defun hl--thingatpt ()
-  "Return string on which the point is or just string of selection."
-  (if mark-active
-      ;; return the selection.
-      (buffer-substring-no-properties (region-beginning) (region-end))
-    ;; else.
-    (thing-at-point 'symbol)
-    )
-  )
-
 ;; Parentheses =================================================================
 
 (defun hl--paren-custom-set (symbol value)
@@ -240,20 +230,34 @@
 
 ;; Symbol or Selection =========================================================
 ;; TODO:
-;; * Use font-lock-mode to make it.
 ;; * Handle the keywords under overlay, make temporary overlays to make them highlighted.
 ;; (font-lock-add-keywords 'emacs-lisp-mode "test")
 
-(defun test ()
-  (interactive)
-  (unless (search-forward "hl-anything" nil t 1)
-    (message "EOF")
-    )
+(defun hl--thing-custom-set (symbol value)
+  (set symbol value)
   )
 
 (defface hl-thing-face nil
   "Face used for highlighting thing (a symbol or a text selection)."
   :group 'hl-anything)
+
+(defcustom hl-thing-fg-colors
+  '("black")
+  "The foreground colors for `hl-thing-at-point'."
+  :type '(repeat color)
+  :group 'hl-anything)
+
+(defcustom hl-thing-bg-colors
+  '("yellow"
+    "cyan"
+    "SpringGreen1"
+    "moccasin"
+    "violet")
+  "The background colors for `hl-thing-at-point'."
+  :type '(repeat color)
+  :group 'hl-anything)
+
+(defvar hl--things-color-index 0)
 
 (defvar hl--things-list nil
   "A list storing things \(text string\) to be highlighted.")
@@ -261,7 +265,6 @@
 (defvar hl--things-overlays nil
   "This buffers currently active overlays.")
 (make-variable-buffer-local 'hl--things-overlays)
-
 
 (defun hl--thing-create-overlays ()
   )
@@ -271,12 +274,52 @@
   (member thing hl--things-list)
   )
 
+(defun hl--thingatpt ()
+  "Return string on which the point is or just string of selection."
+  (if mark-active
+      ;; return the selection.
+      (regexp-quote (buffer-substring-no-properties (region-beginning) (region-end)))
+    ;; else.
+    (format "\\<%s\\>" (regexp-quote (thing-at-point 'symbol)))
+    )
+  )
+
 (defun hl--thing-add (thing)
-  (push thing hl--things-list)
+  ;; TODO: get understand what it is exactly doing.
+  (let ((fg-color (nth hl--things-color-index hl-thing-fg-colors))
+        (bg-color (nth hl--things-color-index hl-thing-bg-colors))
+        color)
+    (if (and (null fg-color)
+             (null bg-color))
+        (setq hl--things-color-index 1)
+      (setq hl--things-color-index (1+ hl--things-color-index))
+      )
+    (and (null fg-color)
+         ;; (setq fg-color (car hl-thing-fg-colors))
+         ;; TODO: test
+         (setq fg-color "red")
+         )
+    (and (null bg-color)
+         (setq bg-color (car hl-thing-bg-colors))
+         )
+    (setq color `((foreground-color . ,fg-color)
+                  (background-color . ,bg-color)))
+    ;; highlight
+    (font-lock-add-keywords nil `((,thing 0 ',color prepend)) 'append)
+    (font-lock-fontify-buffer)
+    (push thing hl--things-list)
+    )
   )
 
 (defun hl--thing-remove (thing)
-  nil
+  (setq hl--things-list (delete thing hl--things-list))
+  (let ((keyword (assoc thing (if (eq t (car font-lock-keywords))
+                                    (cadr font-lock-keywords)
+                                  font-lock-keywords
+                                  ))))
+    (font-lock-remove-keywords nil (list keyword))
+    (font-lock-fontify-buffer)
+    )
   )
 
 ;;;###autoload
@@ -291,6 +334,25 @@
         )
       )
     )
+  )
+
+;;;###autoload
+(defun hl-thing-remove-all ()
+  "Remove all the highlights in buffer."
+  (interactive)
+  (mapc 'hl--thing-remove hl--things-list)
+  )
+
+;;;###autoload
+(defun hl-thing-find-forward ()
+  "Find thing forwardly and jump to it."
+  (interactive)
+  )
+
+;;;###autoload
+(defun hl-thing-find-backward ()
+  "Find thing backwardly and jump to it."
+  (interactive)
   )
 
 (provide 'hl-anything)

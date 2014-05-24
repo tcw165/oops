@@ -22,6 +22,7 @@ This is my .emacs setting.
  '(highlight-symbol-colors (quote ("yellow" "cyan" "SpringGreen1" "moccasin" "violet")))
  '(imenu-sort-function (quote imenu--sort-by-name))
  '(show-paren-mode nil)
+ '(vc-handled-backends nil)
  '(which-function-mode t))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
