@@ -24,13 +24,21 @@
 ;; Add the following to your .emacs file:
 ;; (require 'hl-anything)
 ;;
+;; Enable parenethese highlighting.
+;; (hl-paren-mode 1)
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
 ;;; Change Log:
 ;;
-;; 2014-05-25 (0.0.3)
+;; 2014-05-25 (0.0.4)
 ;;    Support searching thing. The thing might be a symbol text or a selection text.
 ;;
-;; 2014-05-19 (0.0.2)
+;; 2014-05-20 (0.0.3)
 ;;    Support one inward parentheses highlight.
+;;
+;; 2014-05-19 (0.0.2)
+;;    Support multiple outward parentheses highlight.
 ;;
 ;; 2014-05-16 (0.0.1)
 ;;    Initial release, fork from http://nschum.de/src/emacs/highlight-parentheses.
@@ -250,7 +258,6 @@
   :type '(repeat color)
   :group 'hl-anything)
 
-(defvar hl--things-color-index 0)
 (defcustom hl-thing-bg-colors '("yellow"
                                 "cyan"
                                 "SpringGreen1"
@@ -260,8 +267,17 @@
   :type '(repeat color)
   :group 'hl-anything)
 
-(defvar hl-thing-at-point-before-hook nil)
-(defvar hl-thing-at-point-after-hook nil)
+(defvar hl--things-color-index 0)
+
+(defvar hl-thing-before-find-hook nil
+  "Hook for doing something before `hl--thing-find' do the searching.
+This hook has one argument, (REGEXP_STRING BEG END).
+Maybe you'll need it for history and navigation feature.")
+
+(defvar hl-thing-after-find-hook nil
+  "Hook for doing something after `hl--thing-find' do the searching.
+This hook has one argument, (REGEXP_STRING BEG END).
+Maybe you'll need it for history and navigation feature.")
 
 (defvar hl--things-list nil
   "A list storing things \(text string\) to be highlighted.")
@@ -351,7 +367,8 @@
          end)
     (when (and thing
                (not (= step 0)))
-      ;; TODO: Hook before searching.
+      ;; Hook before searching.
+      (run-hook-with-args hl-thing-before-find-hook thing)
       ;; Disable selection.
       (setq mark-active nil)
       ;; Regexp search.
@@ -381,7 +398,8 @@
       (message "[hl-anything] find \"%s\" %s."
                str
                (if (> step 0) "forwardly" "backwardly"))
-      ;; TODO: Hook after searching.
+      ;; Hook after searching.
+      (run-hook-with-args hl-thing-after-find-hook (list str beg end))
       )
     )
   )
