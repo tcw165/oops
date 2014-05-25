@@ -91,7 +91,7 @@
 ;; F2
 (global-set-key (kbd "<f2>") 'hl-thing-at-point)
 ;; F3
-(global-set-key (kbd "<f3>") 'highlight-symbol-next)
+(global-set-key (kbd "<f3>") 'hl-thing-find-forward)
 ;; F4
 (global-set-key (kbd "<f4>") 'oops-jump-to-definition-atpt)
 
@@ -99,7 +99,7 @@
 ;; Shift + F2
 (global-set-key (kbd "S-<f2>") 'hl-thing-remove-all)
 ;; Shift + F3
-(global-set-key (kbd "S-<f3>") 'highlight-symbol-prev)
+(global-set-key (kbd "S-<f3>") 'hl-thing-find-backward)
 ;; Shift + F4
 
 ;; HOME

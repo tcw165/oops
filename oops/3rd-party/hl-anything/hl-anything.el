@@ -26,6 +26,9 @@
 ;;
 ;;; Change Log:
 ;;
+;; 2014-05-25 (0.0.3)
+;;    Support searching thing. The thing might be a symbol text or a selection text.
+;;
 ;; 2014-05-19 (0.0.2)
 ;;    Support one inward parentheses highlight.
 ;;
@@ -231,7 +234,8 @@
 ;; Symbol or Selection =========================================================
 ;; TODO:
 ;; * Handle the keywords under overlay, make temporary overlays to make them highlighted.
-;; (font-lock-add-keywords 'emacs-lisp-mode "test")
+;; * Globally highlight.
+;; * Hooks.
 
 (defun hl--thing-custom-set (symbol value)
   (set symbol value)
@@ -241,23 +245,23 @@
   "Face used for highlighting thing (a symbol or a text selection)."
   :group 'hl-anything)
 
-(defcustom hl-thing-fg-colors
-  '("black")
+(defcustom hl-thing-fg-colors nil
   "The foreground colors for `hl-thing-at-point'."
   :type '(repeat color)
   :group 'hl-anything)
 
-(defcustom hl-thing-bg-colors
-  '("yellow"
-    "cyan"
-    "SpringGreen1"
-    "moccasin"
-    "violet")
+(defvar hl--things-color-index 0)
+(defcustom hl-thing-bg-colors '("yellow"
+                                "cyan"
+                                "SpringGreen1"
+                                "moccasin"
+                                "violet")
   "The background colors for `hl-thing-at-point'."
   :type '(repeat color)
   :group 'hl-anything)
 
-(defvar hl--things-color-index 0)
+(defvar hl-thing-at-point-before-hook nil)
+(defvar hl-thing-at-point-after-hook nil)
 
 (defvar hl--things-list nil
   "A list storing things \(text string\) to be highlighted.")
@@ -275,12 +279,26 @@
   )
 
 (defun hl--thingatpt ()
-  "Return string on which the point is or just string of selection."
+  "Return a list, (STRING BEG END), on which the point is or just string of selection."
   (if mark-active
       ;; return the selection.
-      (regexp-quote (buffer-substring-no-properties (region-beginning) (region-end)))
+      (let ((str (buffer-substring-no-properties (region-beginning) (region-end))))
+        (list (regexp-quote str)
+              (region-beginning)
+              (region-end))
+        )
     ;; else.
-    (format "\\<%s\\>" (regexp-quote (thing-at-point 'symbol)))
+    ;; TODO: Use the highlight if point is on it.
+    (let ((bound (bounds-of-thing-at-point 'symbol))
+          thing)
+      (when bound
+        (setq thing (buffer-substring-no-properties (car bound) (cdr bound)))
+        ;; (format "\\<%s\\>" (regexp-quote thing))
+        (list (regexp-quote thing)
+              (car bound)
+              (cdr bound))
+        )
+      )
     )
   )
 
@@ -302,6 +320,7 @@
     (and (null bg-color)
          (setq bg-color (car hl-thing-bg-colors))
          )
+    ;; TODO: if no fg-color, use default.
     (setq color `((foreground-color . ,fg-color)
                   (background-color . ,bg-color)))
     ;; highlight
@@ -309,6 +328,7 @@
     (font-lock-fontify-buffer)
     (push thing hl--things-list)
     )
+  (message "[hl-anything] highlight thing, \"%s\"." thing)
   )
 
 (defun hl--thing-remove (thing)
@@ -320,17 +340,62 @@
     (font-lock-remove-keywords nil (list keyword))
     (font-lock-fontify-buffer)
     )
+  (message "[hl-anything] unhighlight thing, \"%s\"." thing)
+  )
+
+(defun hl--thing-find (step)
+  (let* ((case-fold-search t)
+         (thing (hl--thingatpt))
+         (str (nth 0 thing))
+         beg
+         end)
+    (when (and thing
+               (not (= step 0)))
+      ;; TODO: Hook before searching.
+      ;; Disable selection.
+      (setq mark-active nil)
+      ;; Regexp search.
+      (goto-char (or (and (> step 0)
+                          ;; Move to end.
+                          (nth 2 thing))
+                     (and (< step 0)
+                          ;; Move to beginning.
+                          (nth 1 thing))))
+      (re-search-forward str nil t step)
+      ;; Make a selection.
+      (save-excursion
+        (when (> step 0)
+          (setq end (point))
+          (re-search-backward str nil t 1)
+          (setq beg (point))
+          )
+        (when (< step 0)
+          (setq beg (point))
+          (re-search-forward str nil t 1)
+          (setq end (point))
+          )
+        )
+      (set-marker (mark-marker) beg)
+      (goto-char end)
+      (setq mark-active t)
+      (message "[hl-anything] find \"%s\" %s."
+               str
+               (if (> step 0) "forwardly" "backwardly"))
+      ;; TODO: Hook after searching.
+      )
+    )
   )
 
 ;;;###autoload
 (defun hl-thing-at-point ()
   "Toggle highlighting of the thing at point."
   (interactive)
-  (let ((thing (hl--thingatpt)))
+  (let* ((thing (hl--thingatpt))
+         (str (car thing)))
     (when thing
-      (if (hl--thing-p thing)
-          (hl--thing-remove thing)
-        (hl--thing-add thing)
+      (if (hl--thing-p str)
+          (hl--thing-remove str)
+        (hl--thing-add str)
         )
       )
     )
@@ -341,18 +406,21 @@
   "Remove all the highlights in buffer."
   (interactive)
   (mapc 'hl--thing-remove hl--things-list)
+  (message "[hl-anything] Discard all the highlights.")
   )
 
 ;;;###autoload
 (defun hl-thing-find-forward ()
   "Find thing forwardly and jump to it."
   (interactive)
+  (hl--thing-find 1)
   )
 
 ;;;###autoload
 (defun hl-thing-find-backward ()
   "Find thing backwardly and jump to it."
   (interactive)
+  (hl--thing-find -1)
   )
 
 (provide 'hl-anything)
