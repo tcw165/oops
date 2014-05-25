@@ -188,7 +188,7 @@
    )
   )
 
-;; ###autoload
+;;;###autoload
 (defun oops-prev-history ()
   "Navigate to previous record in the history."
   (interactive)
@@ -219,7 +219,7 @@
    )
   )
 
-;; ###autoload
+;;;###autoload
 (defun oops-jump-to-definition-atpt ()
   "Find the symbol's definition. If there's only one result, open the file in the current window. If there're multiple results, show a list under the current window.
 
@@ -239,7 +239,7 @@ For Python, it doesn't support yet."
    )
   )
 
-;; ###autoload
+;;;###autoload
 (defun oops-goto-global-symbol ()
   ""
   (interactive)
@@ -254,7 +254,7 @@ For Python, it doesn't support yet."
    )
   )
 
-;; ###autoload
+;;;###autoload
 (defun oops-goto-local-symbol ()
   (interactive)
   (cond
@@ -269,7 +269,7 @@ For Python, it doesn't support yet."
    )
   )
 
-;; ###autoload
+;;;###autoload
 (defun oops-common-escape ()
   "Exit the current \"mode\" (in a generalized sense of the word).
 This command can exit an interactive command such as `query-replace',
