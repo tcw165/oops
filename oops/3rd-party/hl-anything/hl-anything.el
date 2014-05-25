@@ -81,7 +81,6 @@
   :set 'hl--paren-custom-set
   :group 'hl-anything)
 
-;; TODO: make choice 1 or nil
 (defcustom hl-inward-paren-fg-colors nil
   "List of colors for the highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
   :type '(repeat color)
@@ -89,7 +88,6 @@
   :set 'hl--paren-custom-set
   :group 'hl-anything)
 
-;; TODO: make choice 1 or nil
 (defcustom hl-inward-paren-bg-colors '("hot pink")
   "List of colors for the background highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
   :type '(repeat color)
@@ -240,10 +238,6 @@
   )
 
 ;; Symbol or Selection =========================================================
-;; TODO:
-;; * Handle the keywords under overlay, make temporary overlays to make them highlighted.
-;; * Globally highlight.
-;; * Hooks.
 
 (defun hl--thing-custom-set (symbol value)
   (set symbol value)
@@ -295,7 +289,7 @@ Maybe you'll need it for history and navigation feature.")
   )
 
 (defun hl--thingatpt ()
-  "Return a list, (STRING BEG END), on which the point is or just string of selection."
+  "Return a list, (REGEXP_STRING BEG END), on which the point is or just string of selection."
   (if mark-active
       ;; return the selection.
       (let ((str (buffer-substring-no-properties (region-beginning) (region-end))))
@@ -330,7 +324,7 @@ Maybe you'll need it for history and navigation feature.")
       )
     (and (null fg-color)
          ;; (setq fg-color (car hl-thing-fg-colors))
-         ;; TODO: test
+         ;; TODO: if no fg-color, use default.
          (setq fg-color "red")
          )
     (and (null bg-color)
