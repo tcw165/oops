@@ -28,7 +28,8 @@
 ;; 2014-??-?? (0.0.1)
 ;;    Initial release.
 
-(require 'history-lisp)
+;; (add-to-list 'load-path "./backends")
+;; (require 'history-lisp)
 (eval-when-compile (require 'cl))
 
 (defgroup history nil
@@ -39,61 +40,115 @@
   :type 'integer
   :group 'history)
 
-(defcustom his-history-backends '(('emacs-lisp-mode . nil)
-                                  (nil . nil))
-  "The history backends."
-  ;; :type '
-  :group 'history)
+;; (defcustom his-history-backends '(('emacs-lisp-mode . nil)
+;;                                   (nil . nil))
+;;   "The history backends."
+;;   ;; :type '
+;;   :group 'history)
 
 (defvar his--history-list nil
-  "")
+  "The history is a list containing records with following format:
+\(:symbol    SYMBOL_NAME  BOUND_MARKER_BEG  BOUND_MARKER_END\)
+\(:position  MARKER\)
+")
 
-(defvar his--history-index 0
-  "")
+(defvar his--history-index 0)
 
-(defun his--clean-history ()
-  (cond
-   ;; lisp
-   ((memq major-mode (list 'emacs-lisp-mode
-                           'lisp-interaction-mode))
-    (oops-lisp-clean-history)
+(defun his--thingatpt ()
+  "Return a list, (REGEXP_STRING BEG END), on which the point is or just string of selection."
+  (if mark-active
+      ;; return the selection.
+      (let ((str (buffer-substring-no-properties (region-beginning) (region-end))))
+        (list str (region-beginning) (region-end))
+        )
+    ;; else.
+    (let* ((bound (bounds-of-thing-at-point 'symbol))
+           (str (and bound
+                     (buffer-substring-no-properties (car bound) (cdr bound)))))
+      (and str
+           (list str (car bound) (cdr bound)))
+      )
     )
-   ;; c
-   ;; c++
-   ;; python
-   )
+  )
+
+(defun his--history-p (record)
+  (and (memq (car record) (:symbol :position))
+       t)
+  )
+
+(defun his--recursively-discard-history-index ()
+  ;; TODO
+  )
+
+(defun his--use-history-index ()
+  (his--recursively-discard-history-index)
+  ;; TODO
+  )
+
+;;;###autoload
+(defun his-make-symbol-history (symb-name bound-marker-beg bound-marker-end)
+  (when (and (stringp symb-name)
+             (markerp bound-marker-beg)
+             (markerp bound-marker-end))
+    (list :symbol symb-name bound-marker-beg bound-marker-end)
+    )
+  )
+
+;;;###autoload
+(defun his-make-position-history (pos-marker)
+  (when (markerp pos-marker)
+    (list :position pos-marker)
+    )
+  )
+
+;;;###autoload
+;; TODO: Smartly detect history type, use `his--thingatpt'.
+;; (defun his-add-history ()
+(defun his-add-history (from to)
+  ""
+  ;; TODO: Check current symbol-name has already in the history.
+  (when (and (his--history-p from)
+             (his--history-p to))
+    ;; Discard old history.
+    (when (and his--history-list
+               (> his--history-index 0))
+      (let ((current (nth his--history-index his--history-list)))
+        (setq his--history-list (cdr current))
+        )
+      )
+    ;; Add new history.
+    (push from his--history-list)
+    (push to his--history-list)
+    (setq his--history-index 0)
+    ;; Make sure the amount of history is less than maximum limit.
+    (when (> (length his--history-list) his-history-max)
+      (setcdr (nthcdr (1- his-history-max) his--history-list) nil)
+      )
+    )
   )
 
 ;;;###autoload
 (defun his-prev-history ()
   "Navigate to previous record in the history."
   (interactive)
-  (cond
-   ;; lisp
-   ((memq major-mode (list 'emacs-lisp-mode
-                           'lisp-interaction-mode))
-    (oops-lisp-prev-history)
+  (when (> (length his--history-list) 0)
+    (incf his--history-index)
+    (and (> his--history-index (1- (length his--history-list)))
+         (setq his--history-index (1- (length his--history-list))))
+    (his--use-history-index)
     )
-   ;; c
-   ;; c++
-   ;; python
-   )
   )
 
 ;;;###autoload
 (defun his-next-history ()
   "Navigate to next record in the history."
   (interactive)
-  (cond
-   ;; lisp
-   ((memq major-mode (list 'emacs-lisp-mode
-                           'lisp-interaction-mode))
-    (oops-lisp-next-history)
+  (when (> (length his--history-list) 0)
+    (decf his--history-index)
+    (and (< his--history-index 0)
+         (setq his--history-index 0))
+    (his--use-history-index)
     )
-   ;; c
-   ;; c++
-   ;; python
-   )
   )
 
 (provide 'history)
