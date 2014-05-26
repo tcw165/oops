@@ -49,8 +49,7 @@
 (defvar his--history-list nil
   "The history is a list containing records with following format:
 \(:symbol    SYMBOL_NAME  BOUND_MARKER_BEG  BOUND_MARKER_END\)
-\(:position  MARKER\)
-")
+\(:position  MARKER\)")
 
 (defvar his--history-index 0)
 
@@ -103,7 +102,6 @@
 
 ;;;###autoload
 ;; TODO: Smartly detect history type, use `his--thingatpt'.
-;; (defun his-add-history ()
 (defun his-add-history (from to)
   ""
   ;; TODO: Check current symbol-name has already in the history.
@@ -126,6 +124,16 @@
       )
     )
   )
+;; (defun his-add-history ()
+;;   (let ((thing (his--thingatpt)))
+;;     (if thing
+;;         ;; Use history of symbol type.
+;;         (let ()
+;;           )
+;;       ;; else, use history of marker type.
+;;       )
+;;     )
+;;   )
 
 ;;;###autoload
 (defun his-prev-history ()
