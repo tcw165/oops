@@ -54,7 +54,7 @@
 (defvar his--history-index 0)
 
 (defun his--thingatpt ()
-  "Return a list, (REGEXP_STRING BEG END), on which the point is or just string of selection."
+  "Return a list, (SYMBOL_NAME BEG END), on which the point is or just string of selection."
   (if mark-active
       ;; return the selection.
       (let ((str (buffer-substring-no-properties (region-beginning) (region-end))))
@@ -101,39 +101,44 @@
   )
 
 ;;;###autoload
-;; TODO: Smartly detect history type, use `his--thingatpt'.
-(defun his-add-history (from to)
-  ""
-  ;; TODO: Check current symbol-name has already in the history.
-  (when (and (his--history-p from)
-             (his--history-p to))
-    ;; Discard old history.
-    (when (and his--history-list
-               (> his--history-index 0))
-      (let ((current (nth his--history-index his--history-list)))
-        (setq his--history-list (cdr current))
-        )
+(defun his-add-history ()
+  (let ((thing (his--thingatpt))
+        history)
+    ;; Create history.
+    (if thing
+        ;; TODO: Examine current point is in the boundary of 1st or 2nd histories.
+        ;; Use history of symbol type.
+        (let ((str (nth 0 thing))
+              (beg (nth 1 thing))
+              (end (nth 2 thing))
+              marker1
+              marker2)
+          (setq marker1 (copy-marker beg t)
+                marker2 (copy-marker end t)
+                history (list :symbol str marker1 marker2))
+          )
+      ;; else, use history of marker type.
+      ;; TODO: Examine current point is at the same line with 1st history.
+      (setq history (list :position (copy-marker (point) t)))
       )
-    ;; Add new history.
-    (push from his--history-list)
-    (push to his--history-list)
-    (setq his--history-index 0)
-    ;; Make sure the amount of history is less than maximum limit.
-    (when (> (length his--history-list) his-history-max)
-      (setcdr (nthcdr (1- his-history-max) his--history-list) nil)
+    (when history
+      ;; Discard old history.
+      (when (and his--history-list
+                 (> his--history-index 0))
+        (let ((current (nthcdr his--history-index his--history-list)))
+          (setq his--history-list (cdr current))
+          )
+        )
+      ;; Add new record.
+      (push history his--history-list)
+      (setq his--history-index 0)
+      ;; Make sure the amount of history is less than maximum limit.
+      (when (> (length his--history-list) his-history-max)
+        (setcdr (nthcdr (1- his-history-max) his--history-list) nil)
+        )
       )
     )
   )
-;; (defun his-add-history ()
-;;   (let ((thing (his--thingatpt)))
-;;     (if thing
-;;         ;; Use history of symbol type.
-;;         (let ()
-;;           )
-;;       ;; else, use history of marker type.
-;;       )
-;;     )
-;;   )
 
 ;;;###autoload
 (defun his-prev-history ()
