@@ -435,4 +435,12 @@ Maybe you'll need it for history and navigation feature.")
   (hl--thing-find -1)
   )
 
+;; TODO: Save highlights of last session.
+;;;###autoload
+(define-minor-mode hl-thing-mode ()
+  "This mode supports following features:
+1. Remember highlights of last session."
+  lighter: " hl-t"
+  )
+
 (provide 'hl-anything)
