@@ -440,7 +440,11 @@ Maybe you'll need it for history and navigation feature.")
 (define-minor-mode hl-thing-mode ()
   "This mode supports following features:
 1. Remember highlights of last session."
-  lighter: " hl-t"
+  :lighter " hl-t"
+
+  (when hl-thing-mode
+    ()
+    )
   )
 
 (provide 'hl-anything)

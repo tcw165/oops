@@ -70,9 +70,20 @@
     )
   )
 
-(defun his--history-p (record)
-  (and (memq (car record) (:symbol :position))
-       t)
+(defun his--same-line-p (pos1 pos2)
+  (let ((line-pos1 (save-excursion
+                     (goto-char pos1)
+                     (beginning-of-line)
+                     (point)
+                     ))
+        (line-pos2 (save-excursion
+                     (goto-char pos2)
+                     (beginning-of-line)
+                     (point)
+                     ))
+        )
+    (= line-pos1 line-pos2)
+    )
   )
 
 (defun his--recursively-discard-history-index ()
@@ -85,43 +96,66 @@
   )
 
 ;;;###autoload
-(defun his-make-symbol-history (symb-name bound-marker-beg bound-marker-end)
-  (when (and (stringp symb-name)
-             (markerp bound-marker-beg)
-             (markerp bound-marker-end))
-    (list :symbol symb-name bound-marker-beg bound-marker-end)
-    )
-  )
-
-;;;###autoload
-(defun his-make-position-history (pos-marker)
-  (when (markerp pos-marker)
-    (list :position pos-marker)
-    )
-  )
-
-;;;###autoload
 (defun his-add-history ()
+  (interactive)
   (let ((thing (his--thingatpt))
+        (is-add-history t)
         history)
     ;; Create history.
     (if thing
-        ;; TODO: Examine current point is in the boundary of 1st or 2nd histories.
-        ;; Use history of symbol type.
+        ;; :symbol type.
         (let ((str (nth 0 thing))
               (beg (nth 1 thing))
               (end (nth 2 thing))
               marker1
               marker2)
-          (setq marker1 (copy-marker beg t)
-                marker2 (copy-marker end t)
-                history (list :symbol str marker1 marker2))
+          ;; If 1st or 2nd history exist, test if it is a :symbol history and
+          ;; current point is within it.
+          ;; If t, there's no need to add the history.
+          (dotimes (i 2)
+            (let ((history-n (nth i his--history-list)))
+              (and history-n
+                   is-add-history
+                   (eq :symbol (nth 0 history-n))
+                   (let ((buffer-n (marker-buffer (nth 2 history-n)))
+                         (beg-n (marker-position (nth 2 history-n)))
+                         (end-n (marker-position (nth 3 history-n))))
+                     (and (eq (current-buffer) buffer-n)
+                          (>= (point) beg-n)
+                          (<= (point) end-n)
+                          (setq is-add-history nil))
+                     )
+                   )
+              )
+            )
+          (and is-add-history
+               (setq marker1 (copy-marker beg t)
+                     marker2 (copy-marker end t)
+                     history (list :symbol str marker1 marker2)))
           )
-      ;; else, use history of marker type.
-      ;; TODO: Examine current point is at the same line with 1st history.
-      (setq history (list :position (copy-marker (point) t)))
+      ;; else, :position type.
+      (dotimes (i 1)
+        (let ((history-n (nth i his--history-list)))
+          (and history-n
+               is-add-history
+               (eq :position (nth 0 history-n))
+               (let ((buffer-n (marker-buffer (nth 1 history-n)))
+                     (position-n (marker-position (nth 1 history-n))))
+                 (and (eq (current-buffer) buffer-n)
+                      (his--same-line-p (point) position-n)
+                      (setq is-add-history nil)
+                      )
+                 )
+               )
+          )
+        )
+      (and is-add-history
+           (setq history (list :position (copy-marker (point) t)))
+           )
       )
-    (when history
+    (message "is-add-history = %s" is-add-history)
+    (when (and is-add-history
+               history)
       ;; Discard old history.
       (when (and his--history-list
                  (> his--history-index 0))
