@@ -25,11 +25,9 @@
 ;;
 ;;; Change Log:
 ;;
-;; 2014-??-?? (0.0.1)
+;; 2014-06-01 (0.0.1)
 ;;    Initial release.
 
-;; (add-to-list 'load-path "./backends")
-;; (require 'history-lisp)
 (eval-when-compile (require 'cl))
 
 (defgroup history nil
@@ -40,18 +38,20 @@
   :type 'integer
   :group 'history)
 
-;; (defcustom his-history-backends '(('emacs-lisp-mode . nil)
-;;                                   (nil . nil))
-;;   "The history backends."
-;;   ;; :type '
-;;   :group 'history)
+(defcustom his-idle-seconds 10
+  "Implicitly add history after emacs enter idle state for `his-idle-seconds' seconds."
+  :type 'integer
+  :group 'history)
 
 (defvar his--history-list nil
   "The history is a list containing records with following format:
-\(:symbol    SYMBOL_NAME  BOUND_MARKER_BEG  BOUND_MARKER_END\)
-\(:position  MARKER\)")
+   (:region    STRING  BOUND_MARKER_BEG  BOUND_MARKER_END)
+   (:position  MARKER)"
+  )
 
 (defvar his--history-index 0)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun his--thingatpt ()
   "Return a list, (SYMBOL_NAME BEG END), on which the point is or just string of selection."
@@ -80,19 +80,48 @@
                      (goto-char pos2)
                      (beginning-of-line)
                      (point)
-                     ))
-        )
+                     )))
     (= line-pos1 line-pos2)
     )
   )
 
-(defun his--recursively-discard-history-index ()
-  ;; TODO
+(defun his--discard-invalid-history-recursively ()
+  ;; TODO: Check buffer is valid or not.
+  ;; TODO: Check region string is valid or not.
   )
 
-(defun his--use-history-index ()
-  (his--recursively-discard-history-index)
-  ;; TODO
+(defun his--use-history-at-index ()
+  (his--discard-invalid-history-recursively)
+  (let ((history (nth his--history-index his--history-list))
+        (type (car record))
+        buffer
+        pos1
+        pos2)
+    (cond
+     ;;; :region type ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+     ((eq type :region)
+      (setq buffer (marker-buffer (nth 2 history))
+            pos1 (marker-position (nth 2 history))
+            pos2 (marker-position (nth 3 history)))
+      ;; Switch to buffer.
+      (switch-to-buffer buffer)
+      ;; Update region.
+      (set-marker (mark-marker) pos1)
+      (goto-char pos2)
+      (setq mark-active t)
+      )
+     ;;; :position type ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+     ((eq type :position)
+      (setq buffer (marker-buffer (nth 1 history))
+            pos1 (marker-position (nth 1 history)))
+      ;; Switch to buffer.
+      (switch-to-buffer buffer)
+      ;; Update point.
+      (goto-char pos1)
+      (setq mark-active nil)
+      )
+     )
+    )
   )
 
 ;;;###autoload
@@ -103,20 +132,20 @@
         history)
     ;; Create history.
     (if thing
-        ;; :symbol type.
+        ;; :region type.
         (let ((str (nth 0 thing))
               (beg (nth 1 thing))
               (end (nth 2 thing))
               marker1
               marker2)
-          ;; If 1st or 2nd history exist, test if it is a :symbol history and
+          ;; If 1st or 2nd history exist, test if it is a ":region" history and
           ;; current point is within it.
           ;; If t, there's no need to add the history.
           (dotimes (i 2)
             (let ((history-n (nth i his--history-list)))
               (and history-n
                    is-add-history
-                   (eq :symbol (nth 0 history-n))
+                   (eq :region (nth 0 history-n))
                    (let ((buffer-n (marker-buffer (nth 2 history-n)))
                          (beg-n (marker-position (nth 2 history-n)))
                          (end-n (marker-position (nth 3 history-n))))
@@ -124,16 +153,18 @@
                           (>= (point) beg-n)
                           (<= (point) end-n)
                           (setq is-add-history nil))
-                     )
-                   )
+                     ))
               )
             )
           (and is-add-history
                (setq marker1 (copy-marker beg t)
                      marker2 (copy-marker end t)
-                     history (list :symbol str marker1 marker2)))
+                     history (list :region str marker1 marker2)))
           )
       ;; else, :position type.
+      ;; If 1st history exist, test if it is a ":position" history and is at the
+      ;; same line with it.
+      ;; If t, there's no need to add the history.
       (dotimes (i 1)
         (let ((history-n (nth i his--history-list)))
           (and history-n
@@ -143,33 +174,26 @@
                      (position-n (marker-position (nth 1 history-n))))
                  (and (eq (current-buffer) buffer-n)
                       (his--same-line-p (point) position-n)
-                      (setq is-add-history nil)
-                      )
-                 )
-               )
+                      (setq is-add-history nil))
+                 ))
           )
         )
       (and is-add-history
-           (setq history (list :position (copy-marker (point) t)))
-           )
+           (setq history (list :position (copy-marker (point) t))))
       )
-    (message "is-add-history = %s" is-add-history)
-    (when (and is-add-history
-               history)
+    (when history
       ;; Discard old history.
-      (when (and his--history-list
-                 (> his--history-index 0))
-        (let ((current (nthcdr his--history-index his--history-list)))
-          (setq his--history-list (cdr current))
-          )
-        )
+      (and his--history-list
+           (> his--history-index 0)
+           (let ((current (nthcdr his--history-index his--history-list)))
+             (setq his--history-list (cdr current))
+             ))
       ;; Add new record.
       (push history his--history-list)
       (setq his--history-index 0)
       ;; Make sure the amount of history is less than maximum limit.
-      (when (> (length his--history-list) his-history-max)
-        (setcdr (nthcdr (1- his-history-max) his--history-list) nil)
-        )
+      (and (> (length his--history-list) his-history-max)
+           (setcdr (nthcdr (1- his-history-max) his--history-list) nil))
       )
     )
   )
@@ -182,7 +206,7 @@
     (incf his--history-index)
     (and (> his--history-index (1- (length his--history-list)))
          (setq his--history-index (1- (length his--history-list))))
-    (his--use-history-index)
+    (his--use-history-at-index)
     )
   )
 
@@ -194,8 +218,15 @@
     (decf his--history-index)
     (and (< his--history-index 0)
          (setq his--history-index 0))
-    (his--use-history-index)
+    (his--use-history-at-index)
     )
+  )
+
+;;;###autoload
+(define-minor-mode auto-history-mode
+  ""
+  :lighter " his"
+  ;; TODO: Add history automatically when emacs enter idle state for n seconds.
   )
 
 (provide 'history)
