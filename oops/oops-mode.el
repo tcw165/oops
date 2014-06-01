@@ -38,6 +38,7 @@ The `base' should be a directory string and the `exclude' should be a list that 
 ;; 3rd party library ===========================================================
 (require 'highlight-symbol)
 (require 'hl-anything)
+(require 'history)
 
 ;; Oops library ================================================================
 
@@ -60,7 +61,8 @@ The `base' should be a directory string and the `exclude' should be a list that 
     (emacs-lisp-mode-hook . imenu-add-menubar-index)
     (lisp-interaction-mode-hook . hl-paren-mode)
     ;; 3rd-party
-    (emacs-lisp-mode-hook . hl-paren-mode))
+    (emacs-lisp-mode-hook . hl-paren-mode)
+    (emacs-lisp-mode-hook . auto-history-mode))
   "An association list that indicates the bindings of major mode and minor mode. Its format should be (MAJOR-MODE-HOOK . MINOR-MODE-HOOK)")
 
 (defvar oops--idtimer nil

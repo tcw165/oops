@@ -66,9 +66,9 @@
 ;; Ctrl + down
 (global-set-key (kbd "C-<down>") 'oops-move-lines-down)
 ;; Alt + [
-(global-set-key (kbd "M-[") 'oops-prev-history)
+(global-set-key (kbd "M-[") 'his-prev-history)
 ;; Alt + ]
-(global-set-key (kbd "M-]") 'oops-next-history)
+(global-set-key (kbd "M-]") 'his-next-history)
 
 ;; Ctrl + o
 (global-set-key (kbd "C-o") 'oops-goto-local-symbol)

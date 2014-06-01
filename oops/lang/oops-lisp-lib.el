@@ -1,5 +1,6 @@
 (require 'find-func)
 (require 'help-fns)
+(require 'history)
 
 ;; Common ======================================================================
 
@@ -82,126 +83,6 @@ The 1st element of all the records is RECORD-TYPE.")
     ;; Keep the lenght less than maximum length.
     (when (> (length oops--lisp-history) oops-history-max)
       (setcdr (nthcdr (1- oops-history-max) oops--lisp-history) nil)
-      )
-    )
-  )
-
-(defun oops--lisp-use-history ()
-  (let* ((record (car oops--lisp-history-indicator))
-         (record-type (car record)))
-    (cond
-     ;; (:symbol-record SYMBOL TYPE BUFFER):
-     ((eq record-type :symbol-record)
-      (let* ((symbol (nth 1 record))
-             (type (nth 2 record))
-             (predicate (cdr (assq type '((defun . oops--lisp-find-function)
-                                          (defvar . oops--lisp-find-variable)
-                                          (defface . oops--lisp-find-face)))))
-             (search-result (funcall predicate symbol))
-             (buffer (nth 0 search-result))
-             (beg (nth 1 search-result))
-             (end (nth 2 search-result))
-             )
-        ;; Switch buffer.
-        (switch-to-buffer buffer)
-        ;; Disable region.
-        (setq mark-active nil)
-        (and beg end
-             (goto-char end)
-             ;; Enable region.
-             (set-marker (mark-marker) beg)
-             (unless (= beg end)
-               (setq mark-active t)
-               )
-             )
-        )
-      )
-     ;; (:marker-record SYMBOL MARKER)
-     ((eq record-type :marker-record)
-      (let ((buffer (marker-buffer (nth 2 record)))
-            (pos (marker-position (nth 2 record))))
-        ;; Switch buffer.
-        (switch-to-buffer buffer)
-        ;; Disable region.
-        (setq mark-active nil)
-        (goto-char pos)
-        )
-      )
-     )
-    ;; ;; Debug message.
-    ;; (message "oops--lisp-history (%s):\n%s\n\noops--lisp-history-indicator (%s):\n%s"
-    ;;            (length oops--lisp-history)
-    ;;            oops--lisp-history
-    ;;            (length oops--lisp-history-indicator)
-    ;;            oops--lisp-history-indicator)
-    )
-  )
-
-(defun oops-lisp-prev-history ()
-  "Navigate to previous history by rotating the `oops--lisp-history'.
-\(1 2 3 4 5\) => \(2 3 4 5 1\) and use \(2\) history."
-  (interactive)
-  (if (and oops--lisp-history
-           (> (length oops--lisp-history) 0))
-      (progn
-        ;; Move the indicator.
-        (unless (null (cdr oops--lisp-history-indicator))
-          (setq oops--lisp-history-indicator (cdr oops--lisp-history-indicator))
-          )
-        (oops--lisp-use-history)
-        (let ((i (length oops--lisp-history))
-              (j (length oops--lisp-history-indicator)))
-          (message "[History] navigate to previous record: %s\/%s" j i)
-          )
-        )
-    (message "[History] no record was set!")
-    )
-  )
-
-(defun oops-lisp-next-history ()
-  "Navigate to next history by rotating the `oops--lisp-history'.
-\(2 3 4 5 1\) => \(1 2 3 4 5\) and use \(1\) history."
-  (interactive)
-
-  (if (and oops--lisp-history
-           (> (length oops--lisp-history) 0))
-      (progn
-        ;; Move the indicator.
-        (unless (eq oops--lisp-history-indicator oops--lisp-history)
-          (let* ((full-length (length oops--lisp-history))
-                 (indicator-length (length oops--lisp-history-indicator))
-                 (indicator-index (- full-length indicator-length))
-                 (before-index (1- indicator-index)))
-            (setq oops--lisp-history-indicator (nthcdr before-index oops--lisp-history))
-            )
-          )
-        (oops--lisp-use-history)
-        (let ((i (length oops--lisp-history))
-              (j (length oops--lisp-history-indicator)))
-          (message "[History] navigate to next record: %s\/%s" j i)
-          )
-        )
-    (message "[History] no record was set!")
-    )
-  )
-
-(defun oops-lisp-clean-history ()
-  "Iterate through the history and discard the invalid records."
-  (let* ((temp-list oops--lisp-history)
-         (record (car temp-list)))
-    (while (and temp-list
-                record)
-      (when (or (and (eq :marker-record (car record))
-                     (not (marker-buffer (nth 2 record))))
-                (and (eq :symbol-record (car record))
-                     (not (buffer-live-p (nth 3 record)))))
-        (setq oops--lisp-history-indicator (if (eq record (car oops--lisp-history-indicator))
-                                               (cdr oops--lisp-history-indicator)
-                                             oops--lisp-history-indicator))
-        (setq oops--lisp-history (delq record oops--lisp-history))
-        )
-      (setq temp-list (cdr temp-list))
-      (setq record (car temp-list))
       )
     )
   )
@@ -780,19 +661,20 @@ TYPE specifies the kind of definition, and it is interpreted via `oops--lisp-sea
           ;; Built-in function.
           (message "[Definition] No support for built-in function: %s." symbol)
         ;; Save current state before switching.
-        (oops--lisp-push-history (oops--lisp-marker-record symbol))
+        (his-add-history)
 
         (switch-to-buffer buffer)
+        (goto-char (1- end)) ;; TODO: because `oops--lisp-find-function symbol' will return position after the symbol.
 
         ;; Save new state after switching.
-        (oops--lisp-push-history (oops--lisp-symbol-record symbol 'defun buffer))
+        (his-add-history)
 
         ;; Enable region.
         (set-marker (mark-marker) beg)
-        (goto-char end)
         (unless (= (marker-position (mark-marker)) (point))
           (setq mark-active t)
           )
+
         (message "[Definition] function: %s" symbol)
         )
       )
@@ -808,16 +690,16 @@ TYPE specifies the kind of definition, and it is interpreted via `oops--lisp-sea
           ;; Built-in variable.
           (message "[Definition] No support for built-in variable: %s." symbol)
         ;; Save current state before switching.
-        (oops--lisp-push-history (oops--lisp-marker-record symbol))
+        (his-add-history)
 
         (switch-to-buffer buffer)
+        (goto-char (1- end)) ;; TODO: because `oops--lisp-find-function symbol' will return position after the symbol.
 
         ;; Save new state after switching.
-        (oops--lisp-push-history (oops--lisp-symbol-record symbol 'defvar buffer))
+        (his-add-history)
 
         ;; Enable region.
         (set-marker (mark-marker) beg)
-        (goto-char end)
         (unless (= (marker-position (mark-marker)) (point))
           (setq mark-active t)
           )
@@ -836,16 +718,16 @@ TYPE specifies the kind of definition, and it is interpreted via `oops--lisp-sea
           ;; Built-in variable.
           (message "[Definition] No support for built-in face: %s." symbol)
         ;; Save current state before switching.
-        (oops--lisp-push-history (oops--lisp-marker-record symbol))
+        (his-add-history)
 
         (switch-to-buffer buffer)
+        (goto-char (1- end))
 
         ;; Save new state after switching.
-        (oops--lisp-push-history (oops--lisp-symbol-record symbol 'defface buffer))
+        (his-add-history)
 
         ;; Enable region.
         (set-marker (mark-marker) beg)
-        (goto-char end)
         (unless (= (marker-position (mark-marker)) (point))
           (setq mark-active t)
           )
