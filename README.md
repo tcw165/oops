@@ -31,9 +31,6 @@ This is my .emacs setting.
  ;; If there is more than one, they won't work right.
  )
 
-;; Indicate which definition of function or class you are inside. (global mode)
-(which-function-mode 1)
-
 (add-to-list 'load-path "~/.emacs.d/oops")
 (require 'oops-mode)
 

@@ -22,6 +22,7 @@
 ;;; Commentary:
 ;;
 ;; TODO: Add comment for all the functions and variables.
+;; TODO: Add GUI buttom for `his-next-history' and `his-prev-history'.
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -47,22 +48,37 @@
     )
   )
 
-(defcustom his-history-max 64
+(defcustom his-history-max 16
   "The maximum history count."
   :type 'integer
   :group 'history)
 
-(defcustom his-idle-seconds 10
+(defcustom his-idle-seconds 2.5
   "Implicitly add history after emacs enter idle state for `his-idle-seconds' seconds."
   :type 'number
   :initialize 'custom-initialize-default
   :set 'his--auto-history-custom-set
   :group 'history)
 
+(defcustom his-idle-history-max 5
+  "The maximum number of contiguous histories implicitly added by idle timer."
+  :type 'integer
+  :group 'history)
+
 (defvar his--history-list nil
   "The history is a list containing records with following format:
    (:region    STRING  BOUND_MARKER_BEG  BOUND_MARKER_END)
-   (:position  MARKER)"
+             - STRING            String between beginning and end.
+             - BOUND_MARKER_BEG  Marker for beginning position.
+             - BOUND_MARKER_END  Marker for end position.
+
+   (:position  MARKER)
+             - MARKER            Marker for a position.
+
+   (:position  MARKER AUTO_POS_TYPE)
+             - MARKER            Marker for a position.
+             - AUTO_POS_TYPE     Boolean, t for the histories which added by idle timer function.
+"
   )
 
 (defvar his--history-index 0)
@@ -100,6 +116,39 @@
                      (point)
                      )))
     (= line-pos1 line-pos2)
+    )
+  )
+
+(defun his--dont-add-position-history-p (index)
+  (let* ((history (nth index his--history-list))
+         (type (nth 0 history)))
+    (when history
+      (cond
+       ;;; :position type and same line test.
+       ((eq :position type)
+        (let* ((marker (nth 1 history))
+               (buffer (marker-buffer marker))
+               (position (marker-position marker)))
+          (and (eq (current-buffer) buffer)
+               (his--same-line-p (point) position)
+               (set-marker marker-n (point))
+               t)
+          )
+        )
+       ;;; :region type and region test.
+       ((eq :region type)
+        (let* ((beg-marker (nth 2 history))
+               (end-marker (nth 3 history))
+               (beg (marker-position beg-marker))
+               (end (marker-position end-marker))
+               (buffer (marker-buffer beg-marker)))
+          (and (eq (current-buffer) buffer)
+               (>= (point) beg)
+               (<= (point) end))
+          )
+        )
+       )
+      )
     )
   )
 
@@ -192,8 +241,32 @@
 
 (defun his--idle-timer-function ()
   (and auto-history-mode
-       (his-add-history t)
-       )
+       (his-add-history t))
+  )
+
+(defun his--discard-idle-history (history)
+  (let ((type (nth 0 history))
+        (added-by-idle-timer-p (nth 2 history)))
+    (and (eq type :position)
+         added-by-idle-timer-p
+         (setq his--history-list (delq history his--history-list)))
+    )
+  )
+
+(defun his--keep-max-idle-history (step)
+  (let* ((index (+ step his--history-index))
+         (history (nth index his--history-list))
+         (type (nth 0 history))
+         (added-by-idle-timer-p (nth 2 history)))
+    (when (and history
+               (eq :position type)
+               added-by-idle-timer-p)
+      (if (< step his-idle-history-max)
+          (his--keep-max-idle-history (1+ step))
+        (setq his--history-list (delq history his--history-list))
+        )
+      )
+    )
   )
 
 ;;;###autoload
@@ -207,13 +280,13 @@
   )
 
 ;;;###autoload
-(defun his-add-history (&optional force-position-type)
+(defun his-add-history (&optional added-by-idle-timer)
   (interactive)
   (let ((thing (his--thingatpt))
         history)
     ;; Create history.
     (if (and thing
-             (not force-position-type))
+             (not added-by-idle-timer))
         ;;; :region type ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
         (let* ((str (nth 0 thing))
                (beg (nth 1 thing))
@@ -221,30 +294,24 @@
                (marker1 (copy-marker beg t))
                (marker2 (copy-marker end t)))
           (setq history (list :region str marker1 marker2))
+          ;; Discard those history added by idle timer.
+          (mapcar 'his--discard-idle-history his--history-list)
           )
       ;;; :position type ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
       ;; If nth history exist, test if it is a ":position" history and is at the
       ;; same line with it.
       ;; If t, there's no need to add the history.
       ;; But update the its position.
-      (let* ((history-n (nth his--history-index his--history-list))
-             (type-n (nth 0 history-n))
-             (is-add-history t)
-             marker-n
-             buffer-n
-             position-n)
-        (when (and history-n
-                   (eq :position type-n))
-          (setq marker-n (nth 1 history-n)
-                buffer-n (marker-buffer marker-n)
-                position-n (marker-position marker-n))
-          (and (eq (current-buffer) buffer-n)
-               (his--same-line-p (point) position-n)
-               (set-marker marker-n (point))
-               (setq is-add-history nil))
+      (unless (his--dont-add-position-history-p his--history-index)
+        (if added-by-idle-timer
+            ;; Special :position type added by idle timer function.
+            (progn
+              (setq history (list :position (copy-marker (point) t) t))
+              (message "[History] auto-save history at %s, in %s." (point) (current-buffer))
+              )
+          ;; Normal :position type.
+          (setq history (list :position (copy-marker (point) t)))
           )
-        (and is-add-history
-             (setq history (list :position (copy-marker (point) t))))
         )
       )
     (when history
@@ -258,6 +325,7 @@
       (push history his--history-list)
       (setq his--history-index 0)
       ;; Make sure the amount of history is less than maximum limit.
+      (his--keep-max-idle-history 0)
       (and (> (length his--history-list) his-history-max)
            (setcdr (nthcdr (1- his-history-max) his--history-list) nil))
       )
@@ -273,7 +341,7 @@
 
 ;;;###autoload
 (defun his-prev-history ()
-  "Navigate to previous record in the history."
+  "Navigate to previous history."
   (interactive)
   (his--move-to-valid-history 1)
   (his--use-history-at-index)
@@ -281,7 +349,7 @@
 
 ;;;###autoload
 (defun his-next-history ()
-  "Navigate to next record in the history."
+  "Navigate to next history."
   (interactive)
   (his--move-to-valid-history -1)
   (his--use-history-at-index)
@@ -289,7 +357,7 @@
 
 ;;;###autoload
 (define-minor-mode auto-history-mode
-  "Add history automatically when emacs enter idle state for n seconds."
+  "Add history automatically when emacs enter idle state for `his-idle-seconds' seconds."
   :lighter " a-his"
   (and (timerp his--idle-timer)
        (setq his--idle-timer (cancel-timer his--idle-timer)))
