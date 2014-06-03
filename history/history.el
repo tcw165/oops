@@ -22,7 +22,7 @@
 ;;; Commentary:
 ;;
 ;; TODO: Add comment for all the functions and variables.
-;; TODO: Add GUI buttom for `his-next-history' and `his-prev-history'.
+;; TODO: Add GUI buttom for `his-add-history', `his-next-history' and `his-prev-history'.
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -150,6 +150,11 @@
        )
       )
     )
+  )
+
+(defun his--add-history ()
+  ;; TODO:
+  nil
   )
 
 (defun his--move-to-valid-history (step)
@@ -280,6 +285,7 @@
   )
 
 ;;;###autoload
+;; TODO: to his-add-auto-history, use his--add-history internally.
 (defun his-add-history (&optional added-by-idle-timer)
   (interactive)
   (let ((thing (his--thingatpt))
@@ -333,6 +339,18 @@
   )
 
 ;;;###autoload
+(defun his-add-region-type-history (beg end)
+  (interactive)
+  ;; TODO:
+  )
+
+;;;###autoload
+(defun his-add-position-type-history (beg end)
+  (interactive)
+  ;; TODO:
+  )
+
+;;;###autoload
 (defun his-discard-all-history ()
   (interactive)
   (setq his--history-index 0
@@ -359,6 +377,7 @@
 (define-minor-mode auto-history-mode
   "Add history automatically when emacs enter idle state for `his-idle-seconds' seconds."
   :lighter " a-his"
+  ;; TODO: keymap.
   (and (timerp his--idle-timer)
        (setq his--idle-timer (cancel-timer his--idle-timer)))
   (when auto-history-mode
