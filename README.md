@@ -39,8 +39,8 @@ This is my .emacs setting.
 ```
 
 ## TODO List
-* ~~Merge `hl-param` into my repo, `hl-anything`.~~
-* Merge `hl-symb` into `hl-anything` and release beta version of `hl-anything`.
+* ~~Folk `hl-param` to my repo, `hl-anything`.~~
+* ~~Merge `hl-symb` into `hl-anything`.~~
 * Refer to `helm-projectile` to implement project management and workspace concept.
 * Design a multiple help window framework in `oops-win-mode.el`.
 * Create a multiple help buffer framework in `oops-help-buffer.el`.
@@ -48,5 +48,5 @@ This is my .emacs setting.
 * Try to use hook mechanism to make strategy pattern (refer `to company`).
 * Is this feature a mode or a framework? Maybe use `(oops-framework 1)` is better.
 * Add copyright.
-* Enhance history mechanism since there's already a MARKER-INSERTION-TYPE.
+* ~~Write history.el to support generic history design.~~
 * Enhance `hl-anything`, make it flexibly support more languages.
