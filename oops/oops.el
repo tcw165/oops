@@ -1,18 +1,113 @@
-;; GNU Library =================================================================
+;; Copyright (C) 2014
+;;
+;; Author: BoyW165
+;; Version: 0.0.1
+;; Compatibility: GNU Emacs 22.x, GNU Emacs 23.x, GNU Emacs 24.x
+;;
+;; This file is NOT part of GNU Emacs.
+;;
+;; This program is free software; you can redistribute it and/or
+;; modify it under the terms of the GNU General Public License
+;; as published by the Free Software Foundation; either version 2
+;; of the License, or (at your option) any later version.
+;;
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+;;
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+;;
+;;; Commentary:
+;;
+;; TODO: Add comment for all the functions and variables.
+;; TODO: Add GUI buttom for `his-add-history', `his-next-history' and `his-prev-history'.
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;; Change Log:
+;;
+;; 2014-06-07 (0.0.1)
+;;    Initial release.
+
+;;; GNU Library ================================================================
 (require 'ido)
 (require 'imenu)
 (require 'thingatpt)
 (require 'company)
 
-;; Oops Library ================================================================
+;;; 3rd party library ==========================================================
+(require 'highlight-symbol)
+(require 'hl-anything)
+(require 'history)
+(require 'projectile)
+
+;;; Oops library ===============================================================
+;; Core libraries:
 (require 'oops-win)
-(require 'oops-lisp-lib)
-(require 'oops-python-lib)
+(require 'oops-help)
+;; Language libraries:
 (require 'oops-c-lib)
 (require 'oops-cpp-lib)
+(require 'oops-lisp-lib)
+(require 'oops-python-lib)
+;; Settings:
+(require 'oops-settings)
 
-;; Text Operation ==============================================================
+;; TODO: customization.
+(defconst oops--hooks
+  '(;; GNU mode
+    (emacs-lisp-mode-hook . imenu-add-menubar-index)
+    (lisp-interaction-mode-hook . hl-paren-mode)
+    ;; 3rd-party
+    (emacs-lisp-mode-hook . hl-paren-mode)
+    (emacs-lisp-mode-hook . auto-history-mode))
+  "An association list that indicates the bindings of major mode and minor mode. Its format should be (MAJOR-MODE-HOOK . MINOR-MODE-HOOK)")
 
+(defvar oops--idtimer nil
+  "An idle timer that ask `oops--idtimer-function' to do something.")
+
+(defun oops--idtimer-function ()
+  "The function for `oops--idtimer' do the following things:
+  * Detect the symbol nearby the `point', and show symbol's definition in another window. Normally, the definition window is under the current window."
+  (when oops-mode
+    (cond
+     ;; lisp
+     ((or (eq major-mode 'emacs-lisp-mode)
+          (eq major-mode 'lisp-interaction-mode))
+      (when oops--is-basic-perspective
+        (oops-lisp-show-help-atpt)
+        )
+      )
+     ;; c
+     ;; c++-mode
+     ;; python-mode
+     ;; eshell
+     )
+    )
+  )
+
+(defun oops--init-idtimer (enable)
+  "Create the `oops--idtimer' if `enable' is 1. Destory it if -1.
+
+!DO NOT use this function in your lisp, or there would be side effects!"
+  (if (> enable 0)
+      ;; Enable idle timer.
+      (when (null oops--idtimer)
+        (setq oops--idtimer (run-with-idle-timer 0.3 t 'oops--idtimer-function))
+        )
+    ;; Disable idle timer.
+    (when oops--idtimer
+      (cancel-timer oops--idtimer)
+      (setq oops--idtimer nil)
+      )
+    )
+  )
+
+;;; Text Operation =============================================================
+
+;;;###autoload
 (defun oops-undo ()
   "Discard the selection and then undo something."
   (interactive)
@@ -20,14 +115,14 @@
   (undo)
   )
 
+;;;###autoload
 (defun oops-kill-current-buffer-or-window ()
   "Kill the buffer you are focusing which is `current-buffer'."
   (interactive)
   (kill-buffer (current-buffer))
-  ;; Remove invalid history.
-  (oops--clean-history)
   )
 
+;;;###autoload
 (defun oops-toggle-comment ()
   "Toggle comment smartly. It support comment on both single line and multiple lines."
   (interactive)
@@ -48,6 +143,7 @@
     )
   )
 
+;;;###autoload
 (defun oops-duplicate-lines ()
   "Duplciate the current line or the lines between point and mark without modifying `kill-ring'."
   (interactive)
@@ -85,6 +181,7 @@
     )
   )
 
+;;;###autoload
 (defun oops-kill-lines ()
   "Kill the current line or the lines between point and mark without modifying `kill-ring'."
   (interactive)
@@ -105,6 +202,7 @@
     )
   )
 
+;;;###autoload
 (defun oops--move-lines (step)
   "Move the current line or the lines covered by region upward or downward without modifying `kill-ring'."
   ;; There're two situation:
@@ -149,18 +247,21 @@
     )
   )
 
+;;;###autoload
 (defun oops-move-lines-up ()
   "Move the current line or the lines covered by region upward without modifying `kill-ring'."
   (interactive)
   (oops--move-lines -1)
   )
 
+;;;###autoload
 (defun oops-move-lines-down ()
   "Move the current line or the lines covered by region downward without modifying `kill-ring'."
   (interactive)
   (oops--move-lines 1)
   )
 
+;;;###autoload
 (defun oops-indent-or-company ()
   (interactive)
   (if (or mark-active
@@ -170,54 +271,7 @@
     (company-complete-common))
   )
 
-;; Navigation ==================================================================
-
-;; TODO: customization support.
-(defvar oops-history-max 32)
-
-(defun oops--clean-history ()
-  (cond
-   ;; lisp
-   ((memq major-mode (list 'emacs-lisp-mode
-                           'lisp-interaction-mode))
-    (oops-lisp-clean-history)
-    )
-   ;; c
-   ;; c++
-   ;; python
-   )
-  )
-
-;;;###autoload
-(defun oops-prev-history ()
-  "Navigate to previous record in the history."
-  (interactive)
-  (cond
-   ;; lisp
-   ((memq major-mode (list 'emacs-lisp-mode
-                           'lisp-interaction-mode))
-    (oops-lisp-prev-history)
-    )
-   ;; c
-   ;; c++
-   ;; python
-   )
-  )
-
-(defun oops-next-history ()
-  "Navigate to next record in the history."
-  (interactive)
-  (cond
-   ;; lisp
-   ((memq major-mode (list 'emacs-lisp-mode
-                           'lisp-interaction-mode))
-    (oops-lisp-next-history)
-    )
-   ;; c
-   ;; c++
-   ;; python
-   )
-  )
+;;; Navigation =================================================================
 
 ;;;###autoload
 (defun oops-jump-to-definition-atpt ()
@@ -304,4 +358,30 @@ or go back to just one window (by deleting all but the selected window)."
    )
   )
 
-(provide 'oops-core)
+;;; Others =====================================================================
+
+;;;###autoload
+(define-minor-mode oops-mode
+  ""
+  :lighter " Oops"
+  :global t
+
+  (if oops-mode
+      ;; Enable.
+      (progn (dolist (l oops--hooks)
+               (add-hook (car l) (cdr l)))
+
+             (oops--init-idtimer 1)
+             (oops-win-mode 1)
+             )
+    ;; Disable.
+    (progn (dolist (l oops--hooks)
+             (remove-hook (car l) (cdr l)))
+
+           (oops--init-idtimer -1)
+           (oops-win-mode -1)
+           )
+    )
+  )
+
+(provide 'oops)

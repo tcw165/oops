@@ -1,29 +1,3 @@
-## Usage
-Add following script in your .emacs file.
-```
-;; Automaticall add all the sub-directories to load-path.
-(defun update-loadpath (base exclude)
-  "Add sub-directories recursively to `load-path'.
-The `base' should be a directory string and the `exclude' should be a list that to be skipped."
-  (dolist (f (directory-files base))
-    (let ((name (concat base "/" f)))
-      (when (and (file-directory-p name)
-                 (not (member f exclude)))
-        (update-loadpath name exclude)
-        )
-      )
-    )
-  (add-to-list 'load-path base)
-  )
-(update-loadpath "~/.emacs.d" '("." ".." ".svn" ".git"))
-
-;; Enable `oops-mode'.
-(require 'oops)
-(oops-mode 1)
-```
-
-This is my .emacs setting.
-```
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
@@ -65,17 +39,3 @@ The `base' should be a directory string and the `exclude' should be a list that 
 ;; Enable `oops-mode'.
 (require 'oops)
 (oops-mode 1)
-```
-
-## TODO List
-* ~~Folk `hl-param` to my repo, `hl-anything`.~~
-* ~~Merge `hl-symb` into `hl-anything`.~~
-* ~~Write `history.el` to support generic history design.~~
-* Refer to `helm-projectile` to implement project management and workspace concept.
-* Design a multiple help window framework in `oops-win-mode.el`.
-* Create a multiple help buffer framework in `oops-help-buffer.el`.
-* Use `helm` to implement multiple help mechanism.
-* Try to use hook mechanism to make strategy pattern (refer `to company`).
-* Is this feature a mode or a framework? Maybe use `(oops-framework 1)` is better.
-* Add copyright.
-* Enhance `hl-anything`, make it flexibly support more languages.
