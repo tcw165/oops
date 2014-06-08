@@ -38,7 +38,6 @@
 (require 'company)
 
 ;;; 3rd party library ==========================================================
-(require 'highlight-symbol)
 (require 'hl-anything)
 (require 'history)
 
