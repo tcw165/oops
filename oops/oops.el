@@ -41,7 +41,6 @@
 (require 'highlight-symbol)
 (require 'hl-anything)
 (require 'history)
-(require 'projectile)
 
 ;;; Oops library ===============================================================
 ;; Core libraries:
@@ -52,8 +51,6 @@
 (require 'oops-cpp-lib)
 (require 'oops-lisp-lib)
 (require 'oops-python-lib)
-;; Settings:
-(require 'oops-settings)
 
 ;; TODO: customization.
 (defconst oops--hooks
