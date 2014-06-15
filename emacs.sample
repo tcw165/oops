@@ -24,6 +24,8 @@
  ;; If there is more than one, they won't work right.
  )
 
+;;; Aboving customizations are for GNU project which are natively built-in in the `load-path'.
+
 ;; Automaticall add all the sub-directories to load-path.
 (defun update-loadpath (base exclude)
   "Add sub-directories recursively to `load-path'.
@@ -40,16 +42,22 @@ The `base' should be a directory string and the `exclude' should be a list that 
   )
 (update-loadpath "~/.emacs.d" '("." ".." ".svn" ".git"))
 
-;; Enable `oops-mode'.
+;;; oops =======================================================================
 (require 'oops)
 (oops-mode 1)
 
-;;; helm  ======================================================================
-(require 'helm)
-;; (helm-mode 1)
+;;; helm =======================================================================
+(require 'helm-mode)
+(helm-mode 1)
 
 ;;; projectile =================================================================
 (require 'helm-projectile)
+;; (projectile-global-mode 1)
+;; (setq projectile-enable-caching t)
+;; (setq projectile-require-project-root nil)
+
+;;; wmvc  ======================================================================
+(require 'widget-mvc)
 
 ;; scroll one line at a time
 (setq mouse-wheel-scroll-amount '(1 ((shift) . 1))) ;; one line at a time
@@ -63,7 +71,7 @@ The `base' should be a directory string and the `exclude' should be a list that 
 ;; TODO: Move key-binding to a more generic file.
 
 (when (eq system-type 'darwin)
-  (global-set-key (kbd "s-w") 'oops-kill-current-buffer)
+  (global-set-key (kbd "s-w") 'oops-kill-current-buffer-or-window)
   (global-set-key (kbd "s-z") 'oops-undo)
   )
 
