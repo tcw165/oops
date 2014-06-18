@@ -58,7 +58,7 @@
     (lisp-interaction-mode-hook . hl-paren-mode)
     ;; 3rd-party
     (emacs-lisp-mode-hook . hl-paren-mode)
-    (emacs-lisp-mode-hook . auto-history-mode))
+    (emacs-lisp-mode-hook . history-mode))
   "An association list that indicates the bindings of major mode and minor mode. Its format should be (MAJOR-MODE-HOOK . MINOR-MODE-HOOK)")
 
 (defvar oops--idtimer nil
