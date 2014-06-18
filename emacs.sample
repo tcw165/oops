@@ -42,6 +42,10 @@ The `base' should be a directory string and the `exclude' should be a list that 
   )
 (update-loadpath "~/.emacs.d" '("." ".." ".svn" ".git"))
 
+;;; history ====================================================================
+(require 'history)
+(history-mode 1)
+
 ;;; oops =======================================================================
 (require 'oops)
 (oops-mode 1)
