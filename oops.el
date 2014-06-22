@@ -361,21 +361,17 @@ or go back to just one window (by deleting all but the selected window)."
   :lighter " Oops"
   :global t
 
-  (if oops-mode
-      ;; Enable.
-      (progn (dolist (l oops--hooks)
-               (add-hook (car l) (cdr l)))
-
-             (oops--init-idtimer 1)
-             (oops-win-mode 1)
-             )
-    ;; Disable.
-    (progn (dolist (l oops--hooks)
-             (remove-hook (car l) (cdr l)))
-
-           (oops--init-idtimer -1)
-           (oops-win-mode -1)
-           )
+  (dolist (l oops--hooks)
+    (remove-hook (car l) (cdr l))
+    )
+  (oops--init-idtimer -1)
+  (oops-win-mode -1)
+  (when oops-mode
+    (dolist (l oops--hooks)
+      (add-hook (car l) (cdr l))
+      )
+    (oops--init-idtimer 1)
+    (oops-win-mode 1)
     )
   )
 
