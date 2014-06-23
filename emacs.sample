@@ -1,3 +1,4 @@
+(package-initialize)
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
@@ -26,7 +27,7 @@
 
 ;;; Aboving customizations are for GNU project which are natively built-in in the `load-path'.
 
-;; Automaticall add all the sub-directories to load-path.
+;; Add all the sub-directories to load-path.
 (defun update-loadpath (base exclude)
   "Add sub-directories recursively to `load-path'.
 The `base' should be a directory string and the `exclude' should be a list that to be skipped."
@@ -42,37 +43,13 @@ The `base' should be a directory string and the `exclude' should be a list that 
   )
 (update-loadpath "~/.emacs.d" '("." ".." ".svn" ".git"))
 
-;;; history ====================================================================
 (require 'history)
-(history-mode 1)
-
-;;; oops =======================================================================
 (require 'oops)
-(oops-mode 1)
-
-;;; helm =======================================================================
 (require 'helm-mode)
-(helm-mode 1)
-
-;;; projectile =================================================================
 (require 'helm-projectile)
-;; (projectile-global-mode 1)
-;; (setq projectile-enable-caching t)
-;; (setq projectile-require-project-root nil)
-
-;;; wmvc  ======================================================================
 (require 'widget-mvc)
 
-;; scroll one line at a time
-(setq mouse-wheel-scroll-amount '(1 ((shift) . 1))) ;; one line at a time
-(setq mouse-wheel-follow-mouse 't) ;; scroll window under mouse
-(setq scroll-step 1) ;; keyboard scroll one line at a time
-
-;; company mode
-(add-hook 'after-init-hook 'global-company-mode)
-
 ;; ======================== KEY BINDING ========================
-;; TODO: Move key-binding to a more generic file.
 
 (when (eq system-type 'darwin)
   (global-set-key (kbd "s-w") 'oops-kill-current-buffer-or-window)
@@ -149,3 +126,18 @@ The `base' should be a directory string and the `exclude' should be a list that 
 ;; END
 (global-set-key (kbd "<end>") 'move-end-of-line)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; scroll one line at a time
+(setq mouse-wheel-scroll-amount '(1 ((shift) . 1))) ;; one line at a time
+(setq mouse-wheel-follow-mouse 't) ;; scroll window under mouse
+(setq scroll-step 1) ;; keyboard scroll one line at a time
+
+;; company mode
+(add-hook 'after-init-hook 'global-company-mode)
+
+(history-mode 1)
+(oops-mode 1)
+;; (projectile-global-mode 1)
+;; (setq projectile-enable-caching t)
+;; (setq projectile-require-project-root nil)
