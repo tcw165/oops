@@ -310,9 +310,9 @@
     ;; Destory hook.
     (dolist (alist oops--win-hooks)
       (remove-hook (car alist) (cdr alist)))
-    ;; Clean all.
-    (oops-toggle-hsplit-perspective -1)
-    (oops-toggle-basic-perspective -1)
+    ;; ;; Clean all.
+    ;; (oops-toggle-hsplit-perspective -1)
+    ;; (oops-toggle-basic-perspective -1)
     )
   )
 
