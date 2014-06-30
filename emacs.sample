@@ -11,12 +11,14 @@
  '(cua-mode t nil (cua-base))
  '(electric-indent-mode t)
  '(electric-pair-mode t)
- '(global-hl-line-mode t)
- '(global-linum-mode t)
+ '(emacs-lisp-mode-hook (quote (hl-paren-mode imenu-add-menubar-index linum-mode hl-line-mode)))
  '(ido-mode (quote both) nil (ido))
  '(imenu-sort-function (quote imenu--sort-by-name))
  '(make-backup-files nil)
+ '(mouse-wheel-follow-mouse t)
+ '(mouse-wheel-scroll-amount (quote (1 ((shift) . 1))))
  '(package-archives (quote (("gnu" . "http://elpa.gnu.org/packages/") ("elpa" . "http://melpa.milkbox.net/packages/") ("marmalade" . "http://marmalade-repo.org/packages/"))))
+ '(scroll-step 1)
  '(show-paren-mode nil)
  '(standard-indent 2)
  '(vc-handled-backends nil)
@@ -28,9 +30,10 @@
  ;; If there is more than one, they won't work right.
  )
 
-;;; Aboving customizations are for GNU project which are natively built-in in the `load-path'.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                   load-path                                ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; Add all the sub-directories to load-path.
 (defun update-loadpath (base exclude)
   "Add sub-directories recursively to `load-path'.
 The `base' should be a directory string and the `exclude' should be a list that to be skipped."
@@ -46,13 +49,9 @@ The `base' should be a directory string and the `exclude' should be a list that 
   )
 (update-loadpath "~/.emacs.d" '("." ".." ".svn" ".git"))
 
-(require 'history)
-(require 'oops)
-(require 'helm-mode)
-(require 'helm-projectile)
-(require 'widget-mvc)
-
-;; ======================== KEY BINDING ========================
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                  Key Binding                               ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (when (eq system-type 'darwin)
   (global-set-key (kbd "s-w") 'oops-kill-current-buffer-or-window)
@@ -130,17 +129,29 @@ The `base' should be a directory string and the `exclude' should be a list that 
 (global-set-key (kbd "<end>") 'move-end-of-line)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                   3rd-party                                ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; scroll one line at a time
-(setq mouse-wheel-scroll-amount '(1 ((shift) . 1))) ;; one line at a time
-(setq mouse-wheel-follow-mouse 't) ;; scroll window under mouse
-(setq scroll-step 1) ;; keyboard scroll one line at a time
+;; (require 'helm-mode)
+;; (require 'helm-projectile)
+;; (require 'widget-mvc)
 
-;; company mode
-(add-hook 'after-init-hook 'global-company-mode)
+(require 'company)
+(add-hook 'emacs-lisp-mode-hook 'company-mode)
 
-(history-mode 1)
+(require 'history)
+;; (history-mode 1)
+
+(require 'oops)
 (oops-mode 1)
+
 ;; (projectile-global-mode 1)
 ;; (setq projectile-enable-caching t)
 ;; (setq projectile-require-project-root nil)
+
+;; (require 'cygwin-mount)
+;; (setenv "PATH" (concat "D:/cygwin/bin;" (getenv "PATH")))
+;; (setq exec-path (cons "D:/cygwin/bin" exec-path))
+;; (cygwin-mount-activate)
+
+;; (require 'setup-cygwin)
