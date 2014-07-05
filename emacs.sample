@@ -53,18 +53,14 @@ The `base' should be a directory string and the `exclude' should be a list that 
 ;;                                  Key Binding                               ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(when (eq system-type 'darwin)
-  (global-set-key (kbd "s-w") 'oops-kill-current-buffer-or-window)
-  (global-set-key (kbd "s-z") 'oops-undo)
-  )
-
 ;; ESC
 (global-set-key (kbd "<escape>") 'oops-common-escape)
 ;; Ctrl + ESC
 (global-set-key (kbd "C-x <escape>") 'delete-other-windows)
 
 ;; Ctrl + w, command + w
-(global-set-key (kbd "C-w") 'oops-kill-current-buffer-or-window)
+(global-set-key (kbd "C-w") 'oops-kill-buffer-or-window-or-frame)
+(global-set-key (kbd "s-w") 'oops-kill-buffer-or-window-or-frame)
 ;; Ctrl + d
 (global-set-key (kbd "C-d") 'oops-duplicate-lines)
 ;; Ctrl + shift + d
@@ -127,6 +123,9 @@ The `base' should be a directory string and the `exclude' should be a list that 
 (global-set-key (kbd "<home>") 'move-beginning-of-line)
 ;; END
 (global-set-key (kbd "<end>") 'move-end-of-line)
+;; DELETE
+(global-set-key (kbd "s-<backspace>") 'delete-forward-char)
+(global-set-key (kbd "C-s-<backspace>") 'kill-word)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                                   3rd-party                                ;;

@@ -111,10 +111,28 @@
   )
 
 ;;;###autoload
-(defun oops-kill-current-buffer-or-window ()
-  "Kill the buffer you are focusing which is `current-buffer'."
-  (interactive)
-  (kill-buffer (current-buffer))
+(defun oops-kill-buffer-or-window-or-frame (&optional kill-win kill-frame)
+  "Kill current window if `kill-win' is t."
+  ;; TODO: implement `kill-frame'
+  (interactive
+   (unless (eq (selected-window) (frame-root-window))
+     (let ((ans (read-from-minibuffer "Kill window (y/n, Enter = n)? ")))
+       (if (string-equal ans "y")
+	   (list t nil)
+	 (list nil nil)
+	 )
+       )
+     )
+   )
+  ;; If there's only 1 window, set `kill-win' to nil.
+  ;; (Impossible to kill window)
+  (if (eq (selected-window) (frame-root-window))
+      (setq kill-win nil)
+    )
+  (if kill-win
+      (delete-window)
+    (kill-buffer (current-buffer))
+    )
   )
 
 ;;;###autoload
