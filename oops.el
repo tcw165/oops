@@ -140,28 +140,29 @@
   )
 
 ;;;###autoload
-(defun oops-kill-buffer-or-window-or-frame (&optional kill-win kill-frame)
-  "Kill current window if `kill-win' is t."
-  ;; TODO: implement `kill-frame'
+(defun oops-kill-buffer-or-window-or-frame (buffer-window-or-frame)
+  "Kill buffer, window or frame with a smart prompt.
+`buffer-window-or-frame' must be a string with following cases: \"buffer\", \"window\" or \"frame\"."
   (interactive
-   (unless (eq (selected-window) (frame-root-window))
-     (let ((ans (read-from-minibuffer "Kill window (y/n, Enter = n)? ")))
-       (if (string-equal ans "y")
-	   (list t nil)
-	 (list nil nil)
-	 )
-       )
+   (if (eq (selected-window) (frame-root-window))
+       (list "buffer")
+     (list (ido-completing-read "[Oops] What to kill? " (list "buffer" "window" "frame")))
      )
    )
-  ;; If there's only 1 window, set `kill-win' to nil.
-  ;; (Impossible to kill window)
-  (if (eq (selected-window) (frame-root-window))
-      (setq kill-win nil)
+  (cond
+   ((string-equal buffer-window-or-frame "buffer")
+    (kill-buffer)
+    (message "[Oops] Buffer is killed.")
     )
-  (if kill-win
-      (delete-window)
-    (kill-buffer (current-buffer))
+   ((string-equal buffer-window-or-frame "window")
+    (delete-window)
+    (message "[Oops] Buffer is killed.")
     )
+   ((string-equal buffer-window-or-frame "frame")
+    (message "[Oops] Yet support to kill frame!")
+    )
+   (t (message "[Oops] Wrong option, Nothing is killed."))
+   )
   )
 
 ;;;###autoload
