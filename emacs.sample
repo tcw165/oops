@@ -89,6 +89,8 @@ The `base' should be a directory string and the `exclude' should be a list that 
 
 ;; Ctrl + o
 (global-set-key (kbd "C-o") 'oops-goto-local-symbol)
+;; Ctrl + r
+(global-set-key (kbd "C-r") 'prj-find-file)
 ;; Ctrl + Shift + o
 (global-set-key (kbd "C-S-o") 'oops-goto-global-symbol)
 
