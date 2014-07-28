@@ -141,6 +141,8 @@ The `base' should be a directory string and the `exclude' should be a list that 
 (require 'history)
 ;; (history-mode 1)
 
+(require 'prj)
+
 (require 'oops)
 (oops-mode 1)
 
