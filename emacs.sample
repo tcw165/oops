@@ -19,6 +19,7 @@
  '(mouse-wheel-scroll-amount (quote (1 ((shift) . 1))))
  '(package-archives (quote (("gnu" . "http://elpa.gnu.org/packages/") ("elpa" . "http://melpa.milkbox.net/packages/") ("marmalade" . "http://marmalade-repo.org/packages/"))))
  '(scroll-step 1)
+ '(shell-file-name "D:/cygwin/bin/sh.exe")
  '(show-paren-mode nil)
  '(standard-indent 2)
  '(vc-handled-backends nil)
@@ -141,20 +142,15 @@ The `base' should be a directory string and the `exclude' should be a list that 
 (add-hook 'emacs-lisp-mode-hook 'company-mode)
 
 (require 'history)
-;; (history-mode 1)
 
 (require 'prj)
 
 (require 'oops)
 (oops-mode 1)
 
+(require 'semantic)
+(require 'projectile)
+
 ;; (projectile-global-mode 1)
 ;; (setq projectile-enable-caching t)
 ;; (setq projectile-require-project-root nil)
-
-;; (require 'cygwin-mount)
-;; (setenv "PATH" (concat "D:/cygwin/bin;" (getenv "PATH")))
-;; (setq exec-path (cons "D:/cygwin/bin" exec-path))
-;; (cygwin-mount-activate)
-
-;; (require 'setup-cygwin)
