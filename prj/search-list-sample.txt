@@ -1,0 +1,16 @@
+./lisp/gnus/gnus-html.el:500:                  (setq image (find-image
+./lisp/gnus/gnus.el:339:                                      (find-image
+./lisp/gnus/gnus.el:1040:           (or (find-image '(nil (:type xpm :file "gnus.xpm"))) t)
+./lisp/gnus/gnus.el:1047:                  (image (gnus-splash-svg-color-symbols (find-image
+./lisp/image.el:607:  `(defvar ,symbol (find-image ',specs) ,doc))
+./lisp/play/gamegrid.el:231:  (find-image `((:type xpm :data ,gamegrid-xpm
+./lisp/play/gamegrid.el:265:       (find-image data)) ;untested!
+./lisp/progmodes/gdb-mi.el:4036:    :image (find-image '((:type xpm :file "gud/thread.xpm")))
+./lisp/progmodes/gdb-mi.el:4044:    :image (find-image '((:type xpm :file "gud/all.xpm")))
+./lisp/progmodes/gdb-mi.el:4254:                         (find-image `((:type xpm :data
+./lisp/progmodes/gdb-mi.el:4262:                       (find-image `((:type xpm :data
+./lisp/thumbs.el:341:       (find-image `((:type ,(thumbs-image-type img) :file ,img))) t)))
+./lisp/time.el:235:  (find-image '((:type xpm :file "letter.xpm" :ascent center)
+./lisp/tool-bar.el:156:    `(find-image (cond ((not (display-color-p))
+./lisp/wid-edit.el:641:            (find-image (nreverse specs))))
+
