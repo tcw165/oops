@@ -37,20 +37,17 @@
 (defgroup prj-group nil
   "Project.")
 
-(defun prj--cus-set-workspace (symbol value)
-  "Make sure workspace folder is present."
+(defun prj-cus-set-workspace (symbol value)
+  "Make sure the directory is present."
   (when (stringp value)
     (unless (file-exists-p value)
-      (make-directory value)
-      )
-    (set symbol value)
-    )
-  )
+      (make-directory value))
+    (set symbol value)))
 
 (defcustom prj-workspace-path "~/.emacs.d/.workspace"
   "The workspace path which is the place storing all the projects' configurations."
   :type '(string)
-  :set 'prj--cus-set-workspace
+  :set 'prj-cus-set-workspace
   :group 'prj-group)
 
 (defcustom prj-document-types '(("Text" . ".txt")
@@ -90,6 +87,9 @@
 (defvar prj-current-project-exclude-matches nil
   "The current project's exclude matches.")
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; They are temporary data for widgets when calling `prj-create-project', `prj-delete-project'.
+
 (defvar prj-tmp-project-name nil)
 
 (defvar prj-tmp-project-doctypes nil)
@@ -98,25 +98,22 @@
 
 (defvar prj-tmp-project-exclude-matches nil)
 
-(defvar prj-current-project-config nil
-  "The current project's configuration.")
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun prj--config-path ()
+(defun prj-current-config-path ()
   (expand-file-name (concat prj-workspace-path "/" prj-current-project-name "/" prj-config-name)))
 
-(defun prj--file-db-path ()
+(defun prj-current-file-db-path ()
   (expand-file-name (concat prj-workspace-path "/" prj-current-project-name "/" prj-file-db-name)))
 
-(defun prj--search-db-path ()
+(defun prj-search-db-path-path ()
   (expand-file-name (concat prj-workspace-path "/" prj-current-project-name "/" prj-search-db-name)))
 
-(defun prj--build-file-db ()
+(defun prj-build-file-db ()
+  ;; TODO: fix it
   (let* ((matches (plist-get prj-current-project-config :match))
 	 (includes (plist-get prj-current-project-config :include))
-	 (db-path (prj--file-db-path))
+	 (db-path (prj-current-file-db-path))
 	 (buffer (find-file-noselect db-path)))
     (message "[Prj] Building file list ...")
     (with-current-buffer buffer
@@ -136,15 +133,13 @@
       (save-buffer)
       (kill-buffer)
       )
-    (message "[Prj] Building file list ...done")
-    )
-  )
+    (message "[Prj] Building file list ...done")))
 
-(defun prj--build-tags ()
+(defun prj-build-tags ()
   ;; TODO: implemnt it.
   )
 
-(defun prj--init-widget-variables ()
+(defun prj-init-widget-variables ()
   (set (make-local-variable 'widget-documentation-face) 'custom-documentation)
   (set (make-local-variable 'widget-button-face) custom-button)
   (set (make-local-variable 'widget-button-pressed-face) custom-button-pressed)
@@ -155,23 +150,36 @@
     (set (make-local-variable 'widget-push-button-suffix) " ")
     (set (make-local-variable 'widget-link-prefix) "")
     (set (make-local-variable 'widget-link-suffix) ""))
-  (setq show-trailing-whitespace nil)
-  )
+  (setq show-trailing-whitespace nil))
 
 ;;;###autoload
-(defun prj-document-type ()
+(defun prj-customize-document-types ()
+  "Customize document types."
   (interactive)
-  )
+  (customize-option 'prj-document-types))
+
+;;;###autoload
+(defun prj-customize-excluded-types ()
+  "Customize excluded types."
+  (interactive)
+  (customize-option 'prj-exclude-types))
+
+;;;###autoload
+(defun prj-customize-workspace-path ()
+  "Customize workspace path."
+  (interactive)
+  (customize-option 'prj-workspace-path))
 
 ;;;###autoload
 (defun prj-create-project ()
+  "Create a new project."
   (interactive)
   (switch-to-buffer "*Create Project*")
   (kill-all-local-variables)
   (let ((inhibit-read-only t))
     (erase-buffer))
   (remove-overlays)
-  (prj--init-widget-variables)
+  (prj-init-widget-variables)
 
   (setq prj-tmp-project-name nil)
   (setq prj-tmp-project-doctypes nil)
@@ -194,10 +202,8 @@
 					 (if (widget-value wid)
 					     (push (widget-get wid :doc-type) prj-tmp-project-doctypes)
 					   (setq prj-tmp-project-doctypes
-						 (delq (widget-get wid :doc-type) prj-tmp-project-doctypes)))
-					 ))
-		:doc-type type)
-    )
+						 (delq (widget-get wid :doc-type) prj-tmp-project-doctypes)))))
+		:doc-type type))
   (widget-insert "\n")
   (widget-create 'editable-field
 		 :value prj-tmp-project-exclude-matches
@@ -213,6 +219,7 @@
 			   (setq prj-tmp-project-filepath (widget-value wid)))
 		 '(editable-field :value ""))
   (widget-insert "\n")
+  ;; ok and cancel buttons.
   (widget-create 'push-button
 		 :notify (lambda (&rest ignore)
 			   (message "[Prj] Creating new project ...")
@@ -265,14 +272,62 @@
 
   (goto-char 43)
   (use-local-map widget-keymap)
-  (widget-setup)
-  )
+  (widget-setup))
 
 ;;;###autoload
 (defun prj-delete-project ()
+  "Delete projects which are no more needed."
   (interactive)
-  ;; TODO: implemnt it.
-  )
+  (switch-to-buffer "*Delete Project*")
+  (kill-all-local-variables)
+  (let ((inhibit-read-only t))
+    (erase-buffer))
+  (remove-overlays)
+  (prj-init-widget-variables)
+
+  (setq prj-tmp-project-filepath nil)
+
+  ;; Widget start ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  (widget-insert "=== Delete Project ===\n")
+  (widget-insert "\n")
+  (widget-insert "Select projects to be deleted:\n")
+  (let (choices)
+    (dolist (f (directory-files prj-workspace-path))
+      (let ((config-file (concat prj-workspace-path "/" f "/" prj-config-name)))
+	(when (file-exists-p config-file)
+	  (push f choices))))
+    (unless choices
+      (kill-buffer)
+      (error "[Prj] No projects can be deleted."))
+    (dolist (c choices)
+      (widget-put (widget-create 'checkbox
+				 :format (concat "%[%v%] " c "\n")
+				 :notify (lambda (wid &rest ignore)
+					   (if (widget-value wid)
+					       (push (widget-get wid :full-path) prj-tmp-project-filepath)
+					     (setq prj-tmp-project-filepath
+						   (delq (widget-get wid :full-path) prj-tmp-project-filepath)))))
+		  :full-path (expand-file-name (concat prj-workspace-path "/" c)))))
+  (widget-insert "\n")
+  ;; ok and cancel buttons.
+  (widget-create 'push-button
+		 :notify (lambda (&rest ignore)
+			   (message "[Prj] Delet project ...")
+			   (dolist (f prj-tmp-project-filepath)
+			     (delete-directory f t t))
+			   (kill-buffer)
+			   (message "[Prj] Delet project ...done"))
+		 "ok")
+  (widget-insert " ")
+  (widget-create 'push-button
+		 :notify (lambda (&rest ignore)
+			   (kill-buffer))
+		 "cancel")
+  ;; Widget end ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+  (goto-char 56)
+  (use-local-map widget-keymap)
+  (widget-setup))
 
 ;;;###autoload
 (defun prj-load-project ()
@@ -284,15 +339,27 @@
       (let ((config-file (concat prj-workspace-path "/" f "/" prj-config-name)))
 	(when (file-exists-p config-file)
 	  (push f choices))))
+    ;; Prompt user to load project.
     (let ((c (ido-completing-read "[Prj] Load project: " choices)))
       (unless (member c choices)
 	(error (format "[Prj] Can't load project invalid project, %s" c)))
       (setq prj-current-project-name c)
       ;; Read configuration.
-      (let ((buffer (find-file-noselect (prj--config-path))))
+      (let ((buffer (find-file-noselect (prj-current-config-path))))
 	(eval-buffer buffer)
 	(kill-buffer buffer))
       (message "[Prj] Load project, %s ...done" prj-current-project-name))))
+
+;;;###autoload
+(defun prj-unload-project ()
+  "Unload current project."
+  (interactive)
+  (when prj-current-project-name
+    (setq prj-current-project-name nil
+	  prj-current-project-doctypes nil
+	  prj-current-project-exclude-matches nil
+	  prj-current-project-filepath nil)
+    (message "[Prj] Unload project ...done")))
 
 ;;;###autoload
 (defun prj-build-database ()
@@ -300,35 +367,31 @@
   (interactive)
   ;; Create file list which is the data base of the project's files.
   (when prj-current-project-config
-    (prj--build-file-db)
-    (prj--build-tags)
-    )
-  )
+    (prj-build-file-db)
+    (prj-build-tags)))
 
 ;;;###autoload
 (defun prj-find-file ()
-  "Open file by the given name `name'."
+  "Open file by the given file name."
   (interactive)
-  ;; Load project if `prj-current-project-config' is nil.
-  (unless prj-current-project-config
+  ;; Load project if `prj-current-project-name' is nil.
+  (unless prj-current-project-name
     (prj-load-project))
   ;; TODO: Support history.
   ;; TODO: Support auto-complete.
   ;; Find.
-  (let* ((buffer (find-file-noselect (prj--file-db-path)))
+  (let* ((db-buffer (find-file-noselect (prj-current-file-db-path)))
 	 db
 	 file)
-    (with-current-buffer buffer
+    (with-current-buffer db-buffer
       (setq db (split-string (buffer-string) "\\(\n\\|\r\\)" t)
 	    file (ido-completing-read "[Prj] Find file: " db))
-      )
-    (find-file file)
-    (kill-buffer buffer)
-    )
-  )
+      (find-file file))
+    (kill-buffer db-buffer)))
 
 ;;;###autoload
 (defun prj-search-string ()
+  ;; TODO: fix it.
   "Search string in the project. Append new search result to the old caches if `new' is nil."
   (interactive)
   ;; Load project if `prj-current-project-config' is nil.
@@ -339,23 +402,18 @@
   (let ((str (read-from-minibuffer "[Prj] Search string: ")))
     (when (not (string-equal str ""))
       (message "[Prj] Searching %s..." str)
-      (let* ((search-db-file (find-file (prj--search-db-path))))
+      (let* ((search-db-file (find-file (prj-search-db-path-path))))
 	;; Add title.
 	(end-of-buffer)
 	(princ (format "=== Search: %s ===\n" str) search-db-file)
 	;; Search.
-	(call-process-shell-command (format "xargs grep -nH \"%s\" < %s" str (prj--file-db-path)) nil search-db-file nil)
+	(call-process-shell-command (format "xargs grep -nH \"%s\" < %s" str (prj-current-file-db-path)) nil search-db-file nil)
 	;; Cache search result.
 	(princ "\n" search-db-file)
-	(save-buffer)
-	)
-      )
-    )
-  )
+	(save-buffer)))))
 
 ;;;###autoload
 (defun prj-toggle-search-buffer ()
-  (interactive)
-  )
+  (interactive))
 
 (provide 'prj)
