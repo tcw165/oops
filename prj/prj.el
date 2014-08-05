@@ -84,6 +84,14 @@
 (defvar prj-current-project-exclude-matches nil
   "The current project's exclude matches.")
 
+(defvar prj-tmp-project-name nil)
+
+(defvar prj-tmp-project-doctypes nil)
+
+(defvar prj-tmp-project-filepath nil)
+
+(defvar prj-tmp-project-exclude-matches nil)
+
 (defvar prj-current-project-config nil
   "The current project's configuration.")
 
@@ -159,17 +167,17 @@
   (remove-overlays)
   (prj--init-widget-variables)
 
-  (make-local-variable 'prj-current-project-name)
-  (make-local-variable 'prj-current-project-doctypes)
-  (make-local-variable 'prj-current-project-exclude-matches)
-  (make-local-variable 'prj-current-project-filepath)
+  (setq prj-tmp-project-name nil)
+  (setq prj-tmp-project-doctypes nil)
+  (setq prj-tmp-project-exclude-matches ".svn;.git")
+  (setq prj-tmp-project-filepath nil)
 
   (widget-insert "=== Create New Project ===\n")
   (widget-insert "\n")
   (widget-create 'editable-field
 		 :format "Project Name: %v"
 		 :notify (lambda (wid &rest ignore)
-			   (setq prj-current-project-name (widget-value wid))))
+			   (setq prj-tmp-project-name (widget-value wid))))
   (widget-insert "\n")
   (widget-insert "Document Types (Edit):\n") ;; TODO: add customizable link
   (dolist (type prj-document-types)
@@ -177,35 +185,64 @@
 			       :format (concat "%[%v%] " (car type) "\n")
 			       :notify (lambda (wid &rest ignore)
 					 (if (widget-value wid)
-					     (push (widget-get wid :doc-type) prj-current-project-doctypes)
-					   (setq prj-current-project-doctypes
-						 (delq (widget-get wid :doc-type) prj-current-project-doctypes)))
-					 (message "%s" prj-current-project-doctypes)
+					     (push (widget-get wid :doc-type) prj-tmp-project-doctypes)
+					   (setq prj-tmp-project-doctypes
+						 (delq (widget-get wid :doc-type) prj-tmp-project-doctypes)))
 					 ))
 		:doc-type type)
     )
   (widget-insert "\n")
   (widget-create 'editable-field
-		 :value ".git;.svn"
+		 :value prj-tmp-project-exclude-matches
 		 :format "Exclude Matches: %v"
 		 :notify (lambda (wid &rest ignore)
-			   (setq prj-current-project-name (widget-value wid))))
+			   (setq prj-tmp-project-exclude-matches (widget-value wid))))
   (widget-insert "\n")
   (widget-insert "Include Path:\n")
   (widget-create 'editable-list
 		 :entry-format "%i %d %v"
 		 :value '("")
 		 :notify (lambda (wid &rest ignore)
-		 	   (setq prj-current-project-filepath (widget-value wid)))
+		 	   (setq prj-tmp-project-filepath (widget-value wid)))
 		 '(editable-field :value ""))
   (widget-insert "\n")
   (widget-create 'push-button
 		 :notify (lambda (&rest ignore)
-			   (message "(setq prj-current-project-name %s)" prj-current-project-name)
-			   (message "(setq prj-current-project-doctypes %s)" prj-current-project-doctypes)
-			   (message "(setq prj-current-project-exclude-matches %s)" prj-current-project-exclude-matches)
-			   (message "(setq prj-current-project-filepath %s)" prj-current-project-filepath))
-		 "ok")
+			   (message "[Prj] Creating new project ...")
+			   (if (or (null prj-tmp-project-name)
+			   	   (null prj-tmp-project-doctypes)
+			   	   (null prj-tmp-project-exclude-matches)
+			   	   (null prj-tmp-project-filepath))
+			       (error "[Prj] Can't create new project due to invalid information."))
+			   (let* ((path (prj--config-path))
+				  (file (find-file-noselect path))
+				  (dir (file-name-directory path))
+				  (print-quoted t))
+			     (unless (file-directory-p dir)
+			       (make-directory dir))
+			     (with-current-buffer file
+			       (erase-buffer)
+			       
+			       (princ (concat "(setq prj-tmp-project-name " (pp-to-string prj-tmp-project-name) ")") file)
+			       (princ "\n" file)
+			       
+			       (princ (concat "(setq prj-tmp-project-doctypes '" (pp-to-string prj-tmp-project-doctypes) ")") file)
+			       (princ "\n" file)
+			       
+			       (princ (concat "(setq prj-tmp-project-exclude-matches " (pp-to-string prj-tmp-project-exclude-matches) ")") file)
+			       (princ "\n" file)
+			       
+			       (princ (concat "(setq prj-tmp-project-filepath '" (pp-to-string prj-tmp-project-filepath) ")") file)
+			       (princ "\n" file)
+
+			       (save-buffer)
+			       (kill-buffer)
+			       )
+			     ;; Kill this form.
+			     (kill-buffer)
+			     (message "[Prj] Creating new project ...done")
+			     ))
+			   "ok")
   (widget-insert " ")
   (widget-create 'push-button
 		 :notify (lambda (&rest ignore)
@@ -246,8 +283,9 @@
 	(setq prj-current-project-name dir)
 	;; Read buffer
 	(let ((buffer (find-file-noselect (prj--config-path))))
-	  ;; The buffer is Lisp script, (setq prj-current-project-config ...).
+	  ;; The buffer is Lisp script, so execute it.
 	  (eval-buffer buffer)
+	  (kill-buffer buffer)
 	  )
 	(message "[Prj] Load project, %s ...done" prj-current-project-name)
 	)
@@ -284,6 +322,7 @@
 	    file (ido-completing-read "[Prj] Find file: " db))
       )
     (find-file file)
+    (kill-buffer buffer)
     )
   )
 
