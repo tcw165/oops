@@ -397,6 +397,7 @@
 			       (error "[Prj] Can't create new project due to invalid information."))
 			   ;; Remove old directory if any.
 			   (unless (equal prj-tmp-project-name prj-current-project-name)
+			     ;; TODO: check whether current project directory is valid.
 			     ;; TODO: rename directory.
 			     )
 			   (let* ((config-file (expand-file-name (concat prj-workspace-path "/" prj-tmp-project-name "/" prj-config-name)))
