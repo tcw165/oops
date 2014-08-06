@@ -50,7 +50,8 @@
   (when (stringp value)
     (unless (file-exists-p value)
       (make-directory value))
-    (set symbol value)))
+    (when (file-exists-p value)
+      (set symbol (expand-file-name value)))))
 
 (defcustom prj-workspace-path "~/.emacs.d/.workspace"
   "The workspace path which is the place storing all the projects' configurations."
@@ -236,13 +237,7 @@
   ;; ok and cancel buttons.
   (widget-create 'push-button
 		 :notify (lambda (&rest ignore)
-			   ;; Return if there is an invalid info.
-			   (if (or (null prj-tmp-project-name)
-			   	   (null prj-tmp-project-doctypes)
-			   	   (null prj-tmp-project-exclude-matches)
-			   	   (null prj-tmp-project-filepath))
-			       (error "[Prj] Can't create new project due to invalid information."))
-			   (message "[Prj] Creating new project ...")
+			   (message "[Prj] Creating new project ...0")
 			   (let* ((config-file (expand-file-name (concat prj-workspace-path "/" prj-tmp-project-name "/" prj-config-name)))
 				  (file (find-file-noselect config-file))
 				  (dir (file-name-directory config-file)))
@@ -255,9 +250,17 @@
 					(push fp valid-fp))))
 			       (and valid-fp
 				    (setq prj-tmp-project-filepath valid-fp)))
+			     ;; Return if there is an invalid info.
+			     (unless (and prj-tmp-project-name
+					  prj-tmp-project-doctypes
+					  prj-tmp-project-exclude-matches
+					  prj-tmp-project-filepath)
+			       (error "[Prj] Can't create new project due to invalid information."))
+			     (message "[Prj] Creating new project ...25")
 			     ;; Prepare directory. Directory name is also the project name.
 			     (unless (file-directory-p dir)
 			       (make-directory dir))
+			     (message "[Prj] Creating new project ...50")
 			     ;; Export configuration.
 			     (with-current-buffer file
 			       (erase-buffer)
@@ -273,7 +276,8 @@
 
 			       (indent-region (point-min) (point-max))
 			       (save-buffer)
-			       (kill-buffer)))
+			       (kill-buffer)
+			       (message "[Prj] Creating new project ...75")))
 			   ;; Kill this form.
 			   (kill-buffer)
 			   (message "[Prj] Creating new project ...done"))
@@ -348,17 +352,17 @@
   (unless (prj-current-project-p)
     (error "[Prj] There's no project was loaded."))
 
-  (setq prj-tmp-project-name nil)
-  (setq prj-tmp-project-doctypes nil)
-  (setq prj-tmp-project-exclude-matches nil)
-  (setq prj-tmp-project-filepath nil)
+  (setq prj-tmp-project-name prj-current-project-name)
+  (setq prj-tmp-project-doctypes prj-current-project-doctypes)
+  (setq prj-tmp-project-exclude-matches prj-current-project-exclude-matches)
+  (setq prj-tmp-project-filepath prj-current-project-filepath)
 
   ;; Widget start ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
   (widget-insert "=== Edit Project ===\n")
   (widget-insert "\n")
   (widget-create 'editable-field
 		 :format "Project Name: %v"
-		 :value prj-current-project-name
+		 :value prj-tmp-project-name
 		 :notify (lambda (wid &rest ignore)
 			   (setq prj-tmp-project-name (widget-value wid))))
   (widget-insert "\n")
@@ -380,26 +384,28 @@
   (widget-insert "\n")
   (widget-create 'editable-field
 		 :format "Exclude Matches: %v"
-		 :value prj-current-project-exclude-matches
+		 :value prj-tmp-project-exclude-matches
 		 :notify (lambda (wid &rest ignore)
 			   (setq prj-tmp-project-exclude-matches (widget-value wid))))
   (widget-insert "\n")
   (widget-insert "Include Path:\n")
   (widget-create 'editable-list
   		 :entry-format "%i %d %v"
-  		 :value prj-current-project-filepath
-  		 :notify (lambda (&rest ignore)
-			   ;; Return if there is an invalid info.
-			   (if (or (null prj-tmp-project-name)
-			   	   (null prj-tmp-project-doctypes)
-			   	   (null prj-tmp-project-exclude-matches)
-			   	   (null prj-tmp-project-filepath))
-			       (error "[Prj] Can't create new project due to invalid information."))
+  		 :value prj-tmp-project-filepath
+  		 :notify (lambda (wid &rest ignore)
+			   (setq prj-tmp-project-filepath (widget-value wid)))
+  		 '(editable-field))
+  (widget-insert "\n")
+  ;; ok and cancel buttons.
+  (widget-create 'push-button
+		 :notify (lambda (&rest ignore)
 			   ;; Remove old directory if any.
 			   (unless (equal prj-tmp-project-name prj-current-project-name)
 			     ;; TODO: check whether current project directory is valid.
 			     ;; TODO: rename directory.
-			     )
+			     (let ((old (concat prj-workspace-path "/" prj-current-project-name))
+				   (new (concat prj-workspace-path "/" prj-tmp-project-name)))
+			       (rename-file old new)))
 			   (let* ((config-file (expand-file-name (concat prj-workspace-path "/" prj-tmp-project-name "/" prj-config-name)))
 				  (file (find-file-noselect config-file))
 				  (dir (file-name-directory config-file)))
@@ -432,15 +438,6 @@
 			       (save-buffer)
 			       (eval-buffer)
 			       (kill-buffer)))
-			   ;; Kill this form.
-			   (kill-buffer))
-  		 '(editable-field))
-  (widget-insert "\n")
-  ;; ok and cancel buttons.
-  (widget-create 'push-button
-		 :notify (lambda (&rest ignore)
-			   (unless (string-equal prj-tmp-project-name prj-current-project-name)
-			     )
 			   ;; Kill this form.
 			   (kill-buffer))
 		 "ok")
