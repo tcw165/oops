@@ -147,7 +147,13 @@
   ;; TODO: implemnt it.
   )
 
-(defun prj-init-widget-variables ()
+(defun prj-get-widget-buffer (name)
+  (switch-to-buffer name)
+  (kill-all-local-variables)
+  (let ((inhibit-read-only t))
+    (erase-buffer))
+  (remove-overlays)
+  
   (set (make-local-variable 'widget-documentation-face) 'custom-documentation)
   (set (make-local-variable 'widget-button-face) custom-button)
   (set (make-local-variable 'widget-button-pressed-face) custom-button-pressed)
@@ -187,12 +193,7 @@
 (defun prj-create-project ()
   "Create a new project."
   (interactive)
-  (switch-to-buffer "*Create Project*")
-  (kill-all-local-variables)
-  (let ((inhibit-read-only t))
-    (erase-buffer))
-  (remove-overlays)
-  (prj-init-widget-variables)
+  (prj-get-widget-buffer "*Create Project*")
 
   (setq prj-tmp-project-name nil)
   (setq prj-tmp-project-doctypes nil)
@@ -219,8 +220,8 @@
 		:doc-type type))
   (widget-insert "\n")
   (widget-create 'editable-field
-		 :value prj-tmp-project-exclude-matches
 		 :format "Exclude Matches: %v"
+		 :value prj-tmp-project-exclude-matches
 		 :notify (lambda (wid &rest ignore)
 			   (setq prj-tmp-project-exclude-matches (widget-value wid))))
   (widget-insert "\n")
@@ -235,12 +236,13 @@
   ;; ok and cancel buttons.
   (widget-create 'push-button
 		 :notify (lambda (&rest ignore)
-			   (message "[Prj] Creating new project ...")
+			   ;; Return if there is an invalid info.
 			   (if (or (null prj-tmp-project-name)
 			   	   (null prj-tmp-project-doctypes)
 			   	   (null prj-tmp-project-exclude-matches)
 			   	   (null prj-tmp-project-filepath))
 			       (error "[Prj] Can't create new project due to invalid information."))
+			   (message "[Prj] Creating new project ...")
 			   (let* ((config-file (expand-file-name (concat prj-workspace-path "/" prj-tmp-project-name "/" prj-config-name)))
 				  (file (find-file-noselect config-file))
 				  (dir (file-name-directory config-file)))
@@ -271,10 +273,10 @@
 
 			       (indent-region (point-min) (point-max))
 			       (save-buffer)
-			       (kill-buffer))
-			     ;; Kill this form.
-			     (kill-buffer)
-			     (message "[Prj] Creating new project ...done")))
+			       (kill-buffer)))
+			   ;; Kill this form.
+			   (kill-buffer)
+			   (message "[Prj] Creating new project ...done"))
 			   "ok")
   (widget-insert " ")
   (widget-create 'push-button
@@ -291,12 +293,7 @@
 (defun prj-delete-project ()
   "Delete projects which are no more needed."
   (interactive)
-  (switch-to-buffer "*Delete Project*")
-  (kill-all-local-variables)
-  (let ((inhibit-read-only t))
-    (erase-buffer))
-  (remove-overlays)
-  (prj-init-widget-variables)
+  (prj-get-widget-buffer "*Delete Project*")
 
   (setq prj-tmp-project-filepath nil)
 
@@ -339,6 +336,121 @@
   ;; Widget end ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
   (goto-char 56)
+  (use-local-map widget-keymap)
+  (widget-setup))
+
+;;;###autoload
+(defun prj-edit-project ()
+  "Edit project coniguration."
+  (interactive)
+  (prj-get-widget-buffer "*Edit Project*")
+
+  (unless (prj-current-project-p)
+    (error "[Prj] There's no project was loaded."))
+
+  (setq prj-tmp-project-name nil)
+  (setq prj-tmp-project-doctypes nil)
+  (setq prj-tmp-project-exclude-matches nil)
+  (setq prj-tmp-project-filepath nil)
+
+  ;; Widget start ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  (widget-insert "=== Edit Project ===\n")
+  (widget-insert "\n")
+  (widget-create 'editable-field
+		 :format "Project Name: %v"
+		 :value prj-current-project-name
+		 :notify (lambda (wid &rest ignore)
+			   (setq prj-tmp-project-name (widget-value wid))))
+  (widget-insert "\n")
+  (widget-insert "Document Types (Edit):\n") ;; TODO: add customizable link
+  (dolist (type prj-document-types)
+    (widget-put (widget-create 'checkbox
+			       :format (concat "%[%v%] " (car type) " (" (cdr type) ")\n")
+			       :value (let (res)
+					(dolist (current-type prj-current-project-doctypes)
+					  (if (string-equal (car current-type) (car type))
+					      (setq res t)))
+					res)
+			       :notify (lambda (wid &rest ignore)
+					 (if (widget-value wid)
+					     (push (widget-get wid :doc-type) prj-tmp-project-doctypes)
+					   (setq prj-tmp-project-doctypes
+						 (delq (widget-get wid :doc-type) prj-tmp-project-doctypes)))))
+		:doc-type type))
+  (widget-insert "\n")
+  (widget-create 'editable-field
+		 :format "Exclude Matches: %v"
+		 :value prj-current-project-exclude-matches
+		 :notify (lambda (wid &rest ignore)
+			   (setq prj-tmp-project-exclude-matches (widget-value wid))))
+  (widget-insert "\n")
+  (widget-insert "Include Path:\n")
+  (widget-create 'editable-list
+  		 :entry-format "%i %d %v"
+  		 :value prj-current-project-filepath
+  		 :notify (lambda (&rest ignore)
+			   ;; Return if there is an invalid info.
+			   (if (or (null prj-tmp-project-name)
+			   	   (null prj-tmp-project-doctypes)
+			   	   (null prj-tmp-project-exclude-matches)
+			   	   (null prj-tmp-project-filepath))
+			       (error "[Prj] Can't create new project due to invalid information."))
+			   ;; Remove old directory if any.
+			   (unless (equal prj-tmp-project-name prj-current-project-name)
+			     ;; TODO: rename directory.
+			     )
+			   (let* ((config-file (expand-file-name (concat prj-workspace-path "/" prj-tmp-project-name "/" prj-config-name)))
+				  (file (find-file-noselect config-file))
+				  (dir (file-name-directory config-file)))
+			     ;; Prepare valid file paths.
+			     (let (valid-fp)
+			       (dolist (f prj-tmp-project-filepath)
+				 (let ((fp (and (file-exists-p f)
+						(expand-file-name f))))
+				   (and fp
+					(push fp valid-fp))))
+			       (and valid-fp
+				    (setq prj-tmp-project-filepath valid-fp)))
+			     ;; Prepare directory. Directory name is also the project name.
+			     (unless (file-directory-p dir)
+			       (make-directory dir))
+			     ;; Export configuration.
+			     (with-current-buffer file
+			       (erase-buffer)
+
+			       (princ (concat "(setq prj-current-project-doctypes '" (pp-to-string prj-tmp-project-doctypes)) file)
+			       (princ "\n" file)
+			       
+			       (princ (concat "prj-current-project-exclude-matches " (pp-to-string prj-tmp-project-exclude-matches)) file)
+			       (princ "\n" file)
+			       
+			       (princ (concat "prj-current-project-filepath '" (pp-to-string prj-tmp-project-filepath)) file)
+			       (princ ")" file)
+
+			       (indent-region (point-min) (point-max))
+			       (save-buffer)
+			       (eval-buffer)
+			       (kill-buffer)))
+			   ;; Kill this form.
+			   (kill-buffer))
+  		 '(editable-field))
+  (widget-insert "\n")
+  ;; ok and cancel buttons.
+  (widget-create 'push-button
+		 :notify (lambda (&rest ignore)
+			   (unless (string-equal prj-tmp-project-name prj-current-project-name)
+			     )
+			   ;; Kill this form.
+			   (kill-buffer))
+		 "ok")
+  (widget-insert " ") 
+  (widget-create 'push-button
+		 :notify (lambda (&rest ignore)
+			   (kill-buffer))
+		 "cancel")[cancel]
+  ;; Widget end ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+  (goto-char 37)
   (use-local-map widget-keymap)
   (widget-setup))
 
