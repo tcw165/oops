@@ -20,6 +20,14 @@
 ;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ;;
 ;;; Commentary:
+;; TODO:
+;; - Support keymap (menu and toolbar).
+;;           `prj-create-project', `prj-delete-project',
+;;           `prj-load-project', `prj-unload-project',
+;;           `prj-build-database', `prj-find-file'.
+;; - Support database using more efficient way (e.g. hash map).
+;; - Support category search.
+;; - Support project's local variable.
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -151,6 +159,11 @@
     (set (make-local-variable 'widget-link-prefix) "")
     (set (make-local-variable 'widget-link-suffix) ""))
   (setq show-trailing-whitespace nil))
+
+(defun prj-current-project-p ()
+  (and prj-current-project-name
+       prj-current-project-doctypes
+       prj-current-project-filepath))
 
 ;;;###autoload
 (defun prj-customize-document-types ()
@@ -354,7 +367,7 @@
 (defun prj-unload-project ()
   "Unload current project."
   (interactive)
-  (when prj-current-project-name
+  (when (prj-current-project-p)
     (setq prj-current-project-name nil
 	  prj-current-project-doctypes nil
 	  prj-current-project-exclude-matches nil
@@ -366,7 +379,7 @@
   "Build file list and tags."
   (interactive)
   ;; Create file list which is the data base of the project's files.
-  (when prj-current-project-config
+  (when (prj-current-project-p)
     (prj-build-file-db)
     (prj-build-tags)))
 
@@ -374,8 +387,8 @@
 (defun prj-find-file ()
   "Open file by the given file name."
   (interactive)
-  ;; Load project if `prj-current-project-name' is nil.
-  (unless prj-current-project-name
+  ;; Load project if `prj-current-project-p' return nil.
+  (unless (prj-current-project-p)
     (prj-load-project))
   ;; TODO: Support history.
   ;; TODO: Support auto-complete.
