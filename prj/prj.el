@@ -137,7 +137,7 @@
 	;; A directory.
 	(dolist (f fs)
 	  (setq res (append res (prj-scan-dir f match))))
-      ;; A file
+      ;; A file.
       (message "Add ...%s" path)
       (setq res (append res (list path))))
     res))
@@ -165,7 +165,9 @@
     (setq prj-current-project-file-db nil)
     (dolist (f prj-current-project-filepath)
       (setq prj-current-project-file-db
-	    (append prj-current-project-file-db (prj-scan-dir f match))))))
+	    (append prj-current-project-file-db (prj-scan-dir f match)))))
+  ;; Export database.
+  (prj-export-file-db))
 
 (defun prj-build-tags ()
   ;; TODO: implemnt it.
