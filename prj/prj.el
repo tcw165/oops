@@ -59,17 +59,17 @@
   :set 'prj-cus-set-workspace
   :group 'prj-group)
 
-(defcustom prj-document-types '(("Text" . ".txt")
+(defcustom prj-document-types '(("Text" . ".txt;.uni")
 				("Lisp" . "*.el")
 				("Python" . "*.py")
 				("C/C++" . "*.h;*.c;*.hpp;*.cpp")
-				("GNU Project" . "Makefile;makefile;Configure.ac;configure.ac"))
+				("GNU Project" . "Makefile;makefile;Configure.ac;configure.ac;*.mk"))
   "Categorize file names refer to specific matches and give them type names. It is a list of (DOC_NAME . MATCHES). Each matches in MATCHES should be delimit with ';'."
   ;; TODO: give GUI a pretty appearance.
   :type '(repeat (cons string string))
   :group 'prj-group)
 
-(defcustom prj-exclude-types ".git;.svn"
+(defcustom prj-exclude-types ".git;.svn;.#*"
   "Those kinds of file should be excluded in the project. Each matches should be delimit with ';'."
   ;; TODO: give GUI a pretty appearance.
   :type '(string)
@@ -237,10 +237,9 @@
   ;; ok and cancel buttons.
   (widget-create 'push-button
 		 :notify (lambda (&rest ignore)
-			   (message "[Prj] Creating new project ...0")
-			   (let* ((config-file (expand-file-name (concat prj-workspace-path "/" prj-tmp-project-name "/" prj-config-name)))
-				  (file (find-file-noselect config-file))
-				  (dir (file-name-directory config-file)))
+			   (message "[%s] Creating new project ..." prj-tmp-project-name)
+			   (let* ((config-file-path (expand-file-name (concat prj-workspace-path "/" prj-tmp-project-name "/" prj-config-name)))
+				  (dir (file-name-directory config-file-path)))
 			     ;; Prepare valid file paths.
 			     (let (valid-fp)
 			       (dolist (f prj-tmp-project-filepath)
@@ -256,31 +255,26 @@
 					  prj-tmp-project-exclude-matches
 					  prj-tmp-project-filepath)
 			       (error "[Prj] Can't create new project due to invalid information."))
-			     (message "[Prj] Creating new project ...25")
 			     ;; Prepare directory. Directory name is also the project name.
 			     (unless (file-directory-p dir)
 			       (make-directory dir))
-			     (message "[Prj] Creating new project ...50")
 			     ;; Export configuration.
-			     (with-current-buffer file
-			       (erase-buffer)
-
-			       (princ (concat "(setq prj-current-project-doctypes '" (pp-to-string prj-tmp-project-doctypes)) file)
-			       (princ "\n" file)
-			       
-			       (princ (concat "prj-current-project-exclude-matches " (pp-to-string prj-tmp-project-exclude-matches)) file)
-			       (princ "\n" file)
-			       
-			       (princ (concat "prj-current-project-filepath '" (pp-to-string prj-tmp-project-filepath)) file)
-			       (princ ")" file)
-
-			       (indent-region (point-min) (point-max))
-			       (save-buffer)
-			       (kill-buffer)
-			       (message "[Prj] Creating new project ...75")))
-			   ;; Kill this form.
-			   (kill-buffer)
-			   (message "[Prj] Creating new project ...done"))
+			     (with-temp-file config-file-path
+			       (insert
+				(let (print-length)
+				  (concat
+				   "(setq prj-current-project-doctypes '"
+				   (prin1-to-string prj-tmp-project-doctypes)
+				   "\n      "
+				   "prj-current-project-exclude-matches "
+				   (prin1-to-string prj-tmp-project-exclude-matches)
+				   "\n      "
+				   "prj-current-project-filepath '"
+				   (prin1-to-string prj-tmp-project-filepath)
+				   ")"))))
+			     ;; Kill the "Create Project" form.
+			     (kill-buffer)
+			     (message "[%s] Creating new project ...done" prj-tmp-project-name)))
 			   "ok")
   (widget-insert " ")
   (widget-create 'push-button
@@ -352,6 +346,7 @@
   (unless (prj-current-project-p)
     (error "[Prj] There's no project was loaded."))
 
+  ;; Load current configuration.
   (setq prj-tmp-project-name prj-current-project-name)
   (setq prj-tmp-project-doctypes prj-current-project-doctypes)
   (setq prj-tmp-project-exclude-matches prj-current-project-exclude-matches)
@@ -401,14 +396,12 @@
 		 :notify (lambda (&rest ignore)
 			   ;; Remove old directory if any.
 			   (unless (equal prj-tmp-project-name prj-current-project-name)
-			     ;; TODO: check whether current project directory is valid.
-			     ;; TODO: rename directory.
 			     (let ((old (concat prj-workspace-path "/" prj-current-project-name))
 				   (new (concat prj-workspace-path "/" prj-tmp-project-name)))
 			       (rename-file old new)))
-			   (let* ((config-file (expand-file-name (concat prj-workspace-path "/" prj-tmp-project-name "/" prj-config-name)))
-				  (file (find-file-noselect config-file))
-				  (dir (file-name-directory config-file)))
+			   ;; Apply new changes.
+			   (let* ((config-file-path (expand-file-name (concat prj-workspace-path "/" prj-tmp-project-name "/" prj-config-name)))
+				  (dir (file-name-directory config-file-path)))
 			     ;; Prepare valid file paths.
 			     (let (valid-fp)
 			       (dolist (f prj-tmp-project-filepath)
@@ -422,23 +415,23 @@
 			     (unless (file-directory-p dir)
 			       (make-directory dir))
 			     ;; Export configuration.
-			     (with-current-buffer file
-			       (erase-buffer)
-
-			       (princ (concat "(setq prj-current-project-doctypes '" (pp-to-string prj-tmp-project-doctypes)) file)
-			       (princ "\n" file)
-			       
-			       (princ (concat "prj-current-project-exclude-matches " (pp-to-string prj-tmp-project-exclude-matches)) file)
-			       (princ "\n" file)
-			       
-			       (princ (concat "prj-current-project-filepath '" (pp-to-string prj-tmp-project-filepath)) file)
-			       (princ ")" file)
-
-			       (indent-region (point-min) (point-max))
-			       (save-buffer)
-			       (eval-buffer)
-			       (kill-buffer)))
-			   ;; Kill this form.
+			     (with-temp-file config-file-path
+			       (insert
+				(let (print-length)
+				  (concat
+				   "(setq prj-current-project-doctypes '"
+				   (prin1-to-string prj-tmp-project-doctypes)
+				   "\n      "
+				   "prj-current-project-exclude-matches "
+				   (prin1-to-string prj-tmp-project-exclude-matches)
+				   "\n      "
+				   "prj-current-project-filepath '"
+				   (prin1-to-string prj-tmp-project-filepath)
+				   ")")))
+			       ;; Apply new configuration.
+			       (setq prj-current-project-name prj-tmp-project-name)
+			       (eval-buffer)))
+			   ;; Kill the "Edit Project" form.
 			   (kill-buffer))
 		 "ok")
   (widget-insert " ") 
@@ -471,18 +464,18 @@
       (let ((buffer (find-file-noselect (prj-current-config-path))))
 	(eval-buffer buffer)
 	(kill-buffer buffer))
-      (message "[Prj] Load project, %s ...done" prj-current-project-name))))
+      (message "[%s] Load project ...done" prj-current-project-name))))
 
 ;;;###autoload
 (defun prj-unload-project ()
   "Unload current project."
   (interactive)
   (when (prj-current-project-p)
+    (message "[%s] Unload project ...done" prj-current-project-name)
     (setq prj-current-project-name nil
 	  prj-current-project-doctypes nil
 	  prj-current-project-exclude-matches nil
-	  prj-current-project-filepath nil)
-    (message "[Prj] Unload project ...done")))
+	  prj-current-project-filepath nil)))
 
 ;;;###autoload
 (defun prj-build-database ()
@@ -508,7 +501,7 @@
 	 file)
     (with-current-buffer db-buffer
       (setq db (split-string (buffer-string) "\\(\n\\|\r\\)" t)
-	    file (ido-completing-read "[Prj] Find file: " db))
+	    file (ido-completing-read (format "[%s] Find file: " prj-current-project-name) db))
       (find-file file))
     (kill-buffer db-buffer)))
 
@@ -524,7 +517,7 @@
   ;; TODO: Support auto-complete.
   (let ((str (read-from-minibuffer "[Prj] Search string: ")))
     (when (not (string-equal str ""))
-      (message "[Prj] Searching %s..." str)
+      (message "[%s] Searching %s..." prj-current-project-name str)
       (let* ((search-db-file (find-file (prj-search-db-path-path))))
 	;; Add title.
 	(end-of-buffer)
