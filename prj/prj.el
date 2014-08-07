@@ -98,9 +98,6 @@
 (defvar prj-current-project-exclude-matches nil
   "The current project's exclude matches.")
 
-(defvar prj-current-project-file-db nil
-  "The current project's hash map for files.")
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; They are temporary data for widgets when calling `prj-create-project', `prj-delete-project'.
 
@@ -114,23 +111,36 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defun prj-current-project-p ()
+  "Return t if any project was loaded (current project)."
+  (and prj-current-project-name
+       prj-current-project-doctypes
+       prj-current-project-filepath))
+
 (defun prj-current-config-path ()
   (expand-file-name (concat prj-workspace-path "/" prj-current-project-name "/" prj-config-name)))
 
-(defun prj-current-file-db-path ()
+(defun prj-current-filedb-path ()
   (expand-file-name (concat prj-workspace-path "/" prj-current-project-name "/" prj-file-db-name)))
 
-(defun prj-search-db-path ()
+(defun prj-current-searchdb-path ()
   (expand-file-name (concat prj-workspace-path "/" prj-current-project-name "/" prj-search-db-name)))
 
-(defun prj-export-file-db ()
-  )
+(defun prj-export-data (filename data)
+  "Export `data' to `filename' file. The saved data can be imported with `prj-import-data'."
+  (when (file-writable-p filename)
+    (with-temp-file filename
+      (insert (let (print-length)
+		(prin1-to-string data))))))
 
-(defun prj-import-file-db ()
-  )
+(defun prj-import-data (filename)
+  "Read data exported by `prj-export-data' from `filename'."
+  (when (file-exists-p filename)
+    (with-temp-buffer
+      (insert-file-contents filename)
+      (read (buffer-string)))))
 
-;; (directory-files "~/.emacs.d/oops/prj" t "[^.]$" t)
-(defun prj-scan-dir (path match)
+(defun prj-build-filedb-internal (path match)
   "Return a list that is made by recursively scan `dir' with file name which matches the regexp `match'."
   (let* ((fs (and (file-directory-p path)
 		  (directory-files path t "[^.]$" t)))
@@ -138,15 +148,16 @@
     (if fs
 	;; A directory.
 	(dolist (f fs)
-	  (setq res (append res (prj-scan-dir f match))))
+	  (setq res (append res (prj-build-filedb-internal f match))))
       ;; A file.
       (when (string-match match path)
 	(setq res (append res (list path)))
 	(message "Add ...%s" path)))
     res))
 
-(defun prj-build-file-db ()
-  (let (match)
+(defun prj-build-filedb ()
+  "Create a list that contains all the files which should be included in the current project. Export the list to a file."
+  (let (match db)
     ;; Prepare regexp for filtering file names.
     (setq match (concat
 		 ;; Skip file name that starts with '.', '~' and '#'.
@@ -165,18 +176,18 @@
 	  ;; Replace redundant syntax, "\\|\\)" with "\\)".
 	  match (replace-regexp-in-string "\\\\|\\\\)" "\\\\)" match))
     ;; Search recursively in the project.
-    (setq prj-current-project-file-db nil)
     (dolist (f prj-current-project-filepath)
-      (setq prj-current-project-file-db
-	    (append prj-current-project-file-db (prj-scan-dir f match)))))
+      (setq db
+	    (append db (prj-build-filedb-internal f match)))))
   ;; Export database.
-  (prj-export-file-db))
+  (prj-export-data (prj-current-filedb-path) db))
 
 (defun prj-build-tags ()
   ;; TODO: implemnt it.
   )
 
 (defun prj-get-widget-buffer (name)
+  "Create a widget buffer with fine setting and switch to it."
   (switch-to-buffer name)
   (kill-all-local-variables)
   (let ((inhibit-read-only t))
@@ -194,11 +205,6 @@
     (set (make-local-variable 'widget-link-prefix) "")
     (set (make-local-variable 'widget-link-suffix) ""))
   (setq show-trailing-whitespace nil))
-
-(defun prj-current-project-p ()
-  (and prj-current-project-name
-       prj-current-project-doctypes
-       prj-current-project-filepath))
 
 ;;;###autoload
 (defun prj-customize-document-types ()
@@ -302,7 +308,8 @@
 				   ")"))))
 			     ;; Kill the "Create Project" form.
 			     (kill-buffer)
-			     (message "[%s] Creating new project ...done" prj-tmp-project-name)))
+			     (and (string-equal "yes" (ido-completing-read (format "[%s] Project is created! Load project? " prj-tmp-project-name) '("yes" "no")))
+				  (prj-load-project))))
 		 "ok")
   (widget-insert " ")
   (widget-create 'push-button
@@ -509,29 +516,28 @@
 (defun prj-build-database ()
   "Build file list and tags."
   (interactive)
+  (unless (prj-current-project-p)
+    (prj-load-project))
   ;; Create file list which is the data base of the project's files.
   (when (prj-current-project-p)
-    (prj-build-file-db)
+    (prj-build-filedb)
     (prj-build-tags)))
 
+;; (prj-import-data (prj-current-filedb-path))
 ;;;###autoload
 (defun prj-find-file ()
   "Open file by the given file name."
   (interactive)
-  ;; Load project if `prj-current-project-p' return nil.
+  ;; Load project if wasn't loaded.
   (unless (prj-current-project-p)
     (prj-load-project))
-  ;; TODO: Support history.
-  ;; TODO: Support auto-complete.
-  ;; Find.
-  (let* ((db-buffer (find-file-noselect (prj-current-file-db-path)))
-	 db
-	 file)
-    (with-current-buffer db-buffer
-      (setq db (split-string (buffer-string) "\\(\n\\|\r\\)" t)
-	    file (ido-completing-read (format "[%s] Find file: " prj-current-project-name) db))
-      (find-file file))
-    (kill-buffer db-buffer)))
+  ;; Find file.
+  (let* ((filedb (prj-import-data (prj-current-filedb-path)))
+	 (file (ido-completing-read (format "[%s] Find file: " prj-current-project-name) filedb)))
+    (unless (member file filedb)
+      (error (format "[%s] Can't find %s!" prj-current-project-name file)))
+    (find-file file))
+  (garbage-collect))
 
 ;;;###autoload
 (defun prj-search-string ()
@@ -546,12 +552,12 @@
   (let ((str (read-from-minibuffer "[Prj] Search string: ")))
     (when (not (string-equal str ""))
       (message "[%s] Searching %s..." prj-current-project-name str)
-      (let* ((search-db-file (find-file (prj-search-db-path))))
+      (let* ((search-db-file (find-file (prj-current-searchdb-path))))
 	;; Add title.
 	(end-of-buffer)
 	(princ (format "=== Search: %s ===\n" str) search-db-file)
 	;; Search.
-	(call-process-shell-command (format "xargs grep -nH \"%s\" < %s" str (prj-current-file-db-path)) nil search-db-file nil)
+	(call-process-shell-command (format "xargs grep -nH \"%s\" < %s" str (prj-current-filedb-path)) nil search-db-file nil)
 	;; Cache search result.
 	(princ "\n" search-db-file)
 	(save-buffer)))))
