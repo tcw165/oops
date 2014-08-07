@@ -54,7 +54,7 @@
       (set symbol (expand-file-name value)))))
 
 (defcustom prj-workspace-path "~/.emacs.d/.workspace"
-  "The workspace path which is the place storing all the projects' configurations."
+  "The place storing all the projects' configurations."
   :type '(string)
   :set 'prj-cus-set-workspace
   :group 'prj-group)
@@ -78,11 +78,13 @@
 (defconst prj-config-name "config.el"
   "The file name of project configuration.")
 
-(defconst prj-file-db-name "files.txt"
+(defconst prj-file-db-name "files.db"
   "The file name of project file-list database.")
 
-(defconst prj-search-db-name "search.txt"
+(defconst prj-search-db-name "search.db"
   "The simple text file which caches the search result that users have done in the last session.")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defvar prj-current-project-name nil
   "The current project's name.")
@@ -95,6 +97,9 @@
 
 (defvar prj-current-project-exclude-matches nil
   "The current project's exclude matches.")
+
+(defvar prj-current-project-file-db nil
+  "The current project's hash map for files.")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; They are temporary data for widgets when calling `prj-create-project', `prj-delete-project'.
@@ -115,34 +120,52 @@
 (defun prj-current-file-db-path ()
   (expand-file-name (concat prj-workspace-path "/" prj-current-project-name "/" prj-file-db-name)))
 
-(defun prj-search-db-path-path ()
+(defun prj-search-db-path ()
   (expand-file-name (concat prj-workspace-path "/" prj-current-project-name "/" prj-search-db-name)))
 
+(defun prj-export-file-db ()
+  )
+
+(defun prj-import-file-db ()
+  )
+
+(defun prj-scan-dir (path match)
+  "Return a list that is made by recursively scan `dir' with file name which matches the regexp `match'."
+  (let* ((fs (directory-files path t match))
+	 res)
+    (if fs
+	;; A directory.
+	(dolist (f fs)
+	  (setq res (append res (prj-scan-dir f match))))
+      ;; A file
+      (message "Add ...%s" path)
+      (setq res (append res (list path))))
+    res))
+
 (defun prj-build-file-db ()
-  ;; TODO: fix it
-  (let* ((matches (plist-get prj-current-project-config :match))
-	 (includes (plist-get prj-current-project-config :include))
-	 (db-path (prj-current-file-db-path))
-	 (buffer (find-file-noselect db-path)))
-    (message "[Prj] Building file list ...")
-    (with-current-buffer buffer
-      ;; Erase old content.
-      (erase-buffer)
-      ;; Create file database.
-      ;; 1. For file.
-      (dolist (f (split-string includes " " t))
-	(unless (file-directory-p f)
-	  (princ (expand-file-name f) buffer)
-	  (princ "\n" buffer)
-	  )
-	)
-      ;; 2. For directory.
-      (call-process-shell-command (format "find %s -type f %s 2>/dev/null" includes matches) nil buffer nil)
-      ;; Save new content.
-      (save-buffer)
-      (kill-buffer)
-      )
-    (message "[Prj] Building file list ...done")))
+  (let (match)
+    ;; Prepare regexp for filtering file names.
+    (setq match (concat
+		 ;; Skip file name that starts with '.', '~' and '#'.
+		 "^[^.~#].*\\("
+		 (let (reg)
+		   (dolist (doctype prj-current-project-doctypes)
+		     (let ((type (cdr doctype)))
+		       ;; Replace ';' with "\\|"; '*.' with "\\."
+		       (setq reg (concat
+				  reg
+				  (replace-regexp-in-string "*." "\\\\."
+							    (replace-regexp-in-string ";" "\\\\|" type t) t)
+				  "\\|"))))
+		   reg)
+		 "\\)$")
+	  ;; Replace redundant syntax, "\\|\\)" with "\\)".
+	  match (replace-regexp-in-string "\\\\|\\\\)" "\\\\)" match))
+    ;; Search recursively in the project.
+    (setq prj-current-project-file-db nil)
+    (dolist (f prj-current-project-filepath)
+      (setq prj-current-project-file-db
+	    (append prj-current-project-file-db (prj-scan-dir f match))))))
 
 (defun prj-build-tags ()
   ;; TODO: implemnt it.
@@ -518,7 +541,7 @@
   (let ((str (read-from-minibuffer "[Prj] Search string: ")))
     (when (not (string-equal str ""))
       (message "[%s] Searching %s..." prj-current-project-name str)
-      (let* ((search-db-file (find-file (prj-search-db-path-path))))
+      (let* ((search-db-file (find-file (prj-search-db-path))))
 	;; Add title.
 	(end-of-buffer)
 	(princ (format "=== Search: %s ===\n" str) search-db-file)
