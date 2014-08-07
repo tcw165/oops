@@ -59,11 +59,15 @@
   :set 'prj-cus-set-workspace
   :group 'prj-group)
 
-(defcustom prj-document-types '(("Text" . ".txt;.uni")
+(defcustom prj-document-types '(("Text" . ".txt")
 				("Lisp" . ".emacs;*.el")
 				("Python" . "*.py")
+				("Java" . "*.java")
 				("C/C++" . "*.h;*.c;*.hpp;*.cpp")
-				("GNU Project" . "Makefile;makefile;Configure.ac;configure.ac;*.mk"))
+				("Makfile" . "Makefile;makefile;Configure.ac;configure.ac;*.mk")
+				("UEFI metafile" . "*.dsc;*.fdf;*.inf;*.env")
+				("UEFI HII metafile" . "*.vfr;*.uni")
+				)
   "Categorize file names refer to specific matches and give them type names. It is a list of (DOC_NAME . MATCHES). Each matches in MATCHES should be delimit with ';'."
   ;; TODO: give GUI a pretty appearance.
   :type '(repeat (cons string string))
@@ -95,9 +99,6 @@
 (defvar prj-current-project-filepath nil
   "The current project's file path.")
 
-(defvar prj-current-project-exclude-matches nil
-  "The current project's exclude matches.")
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; They are temporary data for widgets when calling `prj-create-project', `prj-delete-project'.
 
@@ -106,8 +107,6 @@
 (defvar prj-tmp-project-doctypes nil)
 
 (defvar prj-tmp-project-filepath nil)
-
-(defvar prj-tmp-project-exclude-matches nil)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -232,7 +231,6 @@
 
   (setq prj-tmp-project-name nil)
   (setq prj-tmp-project-doctypes nil)
-  (setq prj-tmp-project-exclude-matches prj-exclude-types)
   (setq prj-tmp-project-filepath nil)
 
   ;; Widget start ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -253,12 +251,6 @@
 					   (setq prj-tmp-project-doctypes
 						 (delq (widget-get wid :doc-type) prj-tmp-project-doctypes)))))
 		:doc-type type))
-  (widget-insert "\n")
-  (widget-create 'editable-field
-		 :format "Exclude Matches: %v"
-		 :value prj-tmp-project-exclude-matches
-		 :notify (lambda (wid &rest ignore)
-			   (setq prj-tmp-project-exclude-matches (widget-value wid))))
   (widget-insert "\n")
   (widget-insert "Include Path:\n")
   (widget-create 'editable-list
@@ -286,7 +278,6 @@
 			     ;; Return if there is an invalid info.
 			     (unless (and prj-tmp-project-name
 					  prj-tmp-project-doctypes
-					  prj-tmp-project-exclude-matches
 					  prj-tmp-project-filepath)
 			       (error "[Prj] Can't create new project due to invalid information."))
 			     ;; Prepare directory. Directory name is also the project name.
@@ -299,9 +290,6 @@
 				  (concat
 				   "(setq prj-current-project-doctypes '"
 				   (prin1-to-string prj-tmp-project-doctypes)
-				   "\n      "
-				   "prj-current-project-exclude-matches "
-				   (prin1-to-string prj-tmp-project-exclude-matches)
 				   "\n      "
 				   "prj-current-project-filepath '"
 				   (prin1-to-string prj-tmp-project-filepath)
@@ -384,7 +372,6 @@
   ;; Load current configuration.
   (setq prj-tmp-project-name prj-current-project-name)
   (setq prj-tmp-project-doctypes prj-current-project-doctypes)
-  (setq prj-tmp-project-exclude-matches prj-current-project-exclude-matches)
   (setq prj-tmp-project-filepath prj-current-project-filepath)
 
   ;; Widget start ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -411,12 +398,6 @@
 					   (setq prj-tmp-project-doctypes
 						 (delq (widget-get wid :doc-type) prj-tmp-project-doctypes)))))
 		:doc-type type))
-  (widget-insert "\n")
-  (widget-create 'editable-field
-		 :format "Exclude Matches: %v"
-		 :value prj-tmp-project-exclude-matches
-		 :notify (lambda (wid &rest ignore)
-			   (setq prj-tmp-project-exclude-matches (widget-value wid))))
   (widget-insert "\n")
   (widget-insert "Include Path:\n")
   (widget-create 'editable-list
@@ -456,9 +437,6 @@
 				  (concat
 				   "(setq prj-current-project-doctypes '"
 				   (prin1-to-string prj-tmp-project-doctypes)
-				   "\n      "
-				   "prj-current-project-exclude-matches "
-				   (prin1-to-string prj-tmp-project-exclude-matches)
 				   "\n      "
 				   "prj-current-project-filepath '"
 				   (prin1-to-string prj-tmp-project-filepath)
@@ -509,7 +487,6 @@
     (message "[%s] Unload project ...done" prj-current-project-name)
     (setq prj-current-project-name nil
 	  prj-current-project-doctypes nil
-	  prj-current-project-exclude-matches nil
 	  prj-current-project-filepath nil)))
 
 ;;;###autoload
