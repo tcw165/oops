@@ -60,7 +60,7 @@
   :group 'prj-group)
 
 (defcustom prj-document-types '(("Text" . ".txt;.uni")
-				("Lisp" . "*.el")
+				("Lisp" . ".emacs;*.el")
 				("Python" . "*.py")
 				("C/C++" . "*.h;*.c;*.hpp;*.cpp")
 				("GNU Project" . "Makefile;makefile;Configure.ac;configure.ac;*.mk"))
@@ -129,17 +129,20 @@
 (defun prj-import-file-db ()
   )
 
+;; (directory-files "~/.emacs.d/oops/prj" t "[^.]$" t)
 (defun prj-scan-dir (path match)
   "Return a list that is made by recursively scan `dir' with file name which matches the regexp `match'."
-  (let* ((fs (directory-files path t match))
+  (let* ((fs (and (file-directory-p path)
+		  (directory-files path t "[^.]$" t)))
 	 res)
     (if fs
 	;; A directory.
 	(dolist (f fs)
 	  (setq res (append res (prj-scan-dir f match))))
       ;; A file.
-      (message "Add ...%s" path)
-      (setq res (append res (list path))))
+      (when (string-match match path)
+	(setq res (append res (list path)))
+	(message "Add ...%s" path)))
     res))
 
 (defun prj-build-file-db ()
@@ -151,10 +154,10 @@
 		 (let (reg)
 		   (dolist (doctype prj-current-project-doctypes)
 		     (let ((type (cdr doctype)))
-		       ;; Replace ';' with "\\|"; '*.' with "\\."
+		       ;; Replace ';' with "\\|"; "*." or '.' with "\\."
 		       (setq reg (concat
 				  reg
-				  (replace-regexp-in-string "*." "\\\\."
+				  (replace-regexp-in-string "\\(\\.\\|\\*\\.\\)" "\\\\."
 							    (replace-regexp-in-string ";" "\\\\|" type t) t)
 				  "\\|"))))
 		   reg)
@@ -300,7 +303,7 @@
 			     ;; Kill the "Create Project" form.
 			     (kill-buffer)
 			     (message "[%s] Creating new project ...done" prj-tmp-project-name)))
-			   "ok")
+		 "ok")
   (widget-insert " ")
   (widget-create 'push-button
 		 :notify (lambda (&rest ignore)
@@ -464,11 +467,11 @@
 		 :notify (lambda (&rest ignore)
 			   (kill-buffer))
 		 "cancel")[cancel]
-  ;; Widget end ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+		 ;; Widget end ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-  (goto-char 37)
-  (use-local-map widget-keymap)
-  (widget-setup))
+		 (goto-char 37)
+		 (use-local-map widget-keymap)
+		 (widget-setup))
 
 ;;;###autoload
 (defun prj-load-project ()
