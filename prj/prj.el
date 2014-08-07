@@ -364,10 +364,11 @@
 (defun prj-edit-project ()
   "Edit project coniguration."
   (interactive)
-  (prj-get-widget-buffer "*Edit Project*")
-
+  
   (unless (prj-current-project-p)
     (error "[Prj] There's no project was loaded."))
+  
+  (prj-get-widget-buffer "*Edit Project*")
 
   ;; Load current configuration.
   (setq prj-tmp-project-name prj-current-project-name)
@@ -517,27 +518,74 @@
   (garbage-collect))
 
 ;;;###autoload
-(defun prj-search-string ()
+(defun prj-search-project ()
   ;; TODO: fix it.
   "Search string in the project. Append new search result to the old caches if `new' is nil."
   (interactive)
-  ;; Load project if `prj-current-project-config' is nil.
-  (unless prj-current-project-config
+  ;; Load project if no project was loaded.
+  (unless (prj-current-project-p)
     (prj-load-project))
-  ;; TODO: Support history.
-  ;; TODO: Support auto-complete.
-  (let ((str (read-from-minibuffer "[Prj] Search string: ")))
-    (when (not (string-equal str ""))
-      (message "[%s] Searching %s..." prj-current-project-name str)
-      (let* ((search-db-file (find-file (prj-current-searchdb-path))))
-	;; Add title.
-	(end-of-buffer)
-	(princ (format "=== Search: %s ===\n" str) search-db-file)
-	;; Search.
-	(call-process-shell-command (format "xargs grep -nH \"%s\" < %s" str (prj-current-filedb-path)) nil search-db-file nil)
-	;; Cache search result.
-	(princ "\n" search-db-file)
-	(save-buffer)))))
+
+  (prj-get-widget-buffer "*Search Project*")
+
+    ;; Widget start ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  (widget-insert "=== Search Project ===\n")
+  (widget-insert "\n")
+  (widget-create 'editable-field
+		 :format "Search: %v"
+		 :notify (lambda (wid &rest ignore)
+			   ))
+  (widget-insert "\n")
+  (widget-insert "Document Types ")
+  (widget-create 'push-button
+		 :notify (lambda (&rest ignore)
+			   )
+		 "Select All")
+  (widget-insert " ")
+  (widget-create 'push-button
+		 :notify (lambda (&rest ignore)
+			   )
+		 "Deselect All")
+  (widget-insert " :\n")
+  (dolist (type prj-current-project-doctypes)
+    (widget-put (widget-create 'checkbox
+			       :format (concat "%[%v%] " (car type) " (" (cdr type) ")\n")
+			       :notify (lambda (wid &rest ignore)
+					 ))
+		:doc-type type))
+  (widget-insert "\n")
+  ;; ok and cancel buttons.
+  (widget-create 'push-button
+		 :notify (lambda (&rest ignore)
+			   ;; Kill the "Create Project" form.
+			   (kill-buffer))
+		 "ok")
+  (widget-insert " ")
+  (widget-create 'push-button
+		 :notify (lambda (&rest ignore)
+			   (kill-buffer))
+		 "cancel")
+  ;; Widget end ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+  (goto-char 33)
+  (use-local-map widget-keymap)
+  (widget-setup)
+  
+  ;; ;; TODO: Support history.
+  ;; ;; TODO: Support auto-complete.
+  ;; (let ((str (read-from-minibuffer "[Prj] Search string: ")))
+  ;;   (when (not (string-equal str ""))
+  ;;     (message "[%s] Searching %s..." prj-current-project-name str)
+  ;;     (let* ((search-db-file (find-file (prj-current-searchdb-path))))
+  ;; 	;; Add title.
+  ;; 	(end-of-buffer)
+  ;; 	(princ (format "=== Search: %s ===\n" str) search-db-file)
+  ;; 	;; Search.
+  ;; 	(call-process-shell-command (format "xargs grep -nH \"%s\" < %s" str (prj-current-filedb-path)) nil search-db-file nil)
+  ;; 	;; Cache search result.
+  ;; 	(princ "\n" search-db-file)
+  ;; 	(save-buffer))))
+  )
 
 ;;;###autoload
 (defun prj-toggle-search-buffer ()
