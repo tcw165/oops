@@ -89,6 +89,12 @@
 (defconst prj-searchdb-name "search.db"
   "The simple text file which caches the search result that users have done in the last session.")
 
+(defvar prj-config nil
+  "A hash map which represent project's configuration.")
+
+(defvar prj-tmp-config nil
+  "A temporary hash map.")
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
@@ -112,31 +118,29 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun prj-config-path ()
-  (expand-file-name (concat prj-workspace-path "/" (prj-project-name) "/" prj-config-name)))
+  (expand-file-name (format "%s/%s/%s" prj-workspace-path (prj-project-name) prj-config-name)))
 
 (defun prj-filedb-path ()
-  (expand-file-name (concat prj-workspace-path "/" (prj-project-name) "/" prj-filedb-name)))
+  (expand-file-name (format "%s/%s/%s" prj-workspace-path (prj-project-name) prj-filedb-name)))
 
 (defun prj-searchdb-path ()
-  (expand-file-name (concat prj-workspace-path "/" (prj-project-name) "/" prj-searchdb-name)))
-
-(defvar prj-config nil
-  "A hash map which represent project's configuration.")
-
-(defvar prj-tmp-config nil
-  "A temporary hash map.")
+  (expand-file-name (format "%s/%s/%s" prj-workspace-path (prj-project-name) prj-searchdb-name)))
 
 (defun prj-project-name ()
   "The current project's name."
   (gethash :name prj-config))
 
 (defun prj-project-doctypes ()
-  "The current project's document types."
+  "The current project's document types value."
   (gethash :doctypes prj-config))
 
 (defun prj-project-filepaths ()
-  "The current project's file path."
+  "The current project's file path value."
   (gethash :filepaths prj-config))
+
+(defun prj-project-searchdb ()
+  "The current project's search value."
+  (gethash :search prj-config))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -248,6 +252,29 @@
     (set (make-local-variable 'widget-link-suffix) ""))
   (setq show-trailing-whitespace nil))
 
+(defmacro prj-widget-common-notify (type config)
+  "Notify function of widget for 'editable-field and 'editable-list."
+  `(lambda (wid &rest ignore)
+     (puthash ,type (widget-value wid) ,config)))
+
+(defmacro prj-widget-checkbox-notify (type config)
+  "Notify function of widget for 'checkbox."
+  `(lambda (wid &rest ignore)
+     (if (widget-value wid)
+	 (puthash
+	  ,type
+	  (push (widget-get wid ,type) (gethash ,type ,config))
+	  ,config)
+       (puthash
+	,type
+	(delq (widget-get wid ,type) (gethash ,type ,config))
+	,config))))
+
+(defmacro prj-widget-cancel-notify ()
+  "Notify function of widget for cancel 'push-button."
+  `(lambda (&rest ignore)
+     (kill-buffer)))
+
 ;;;###autoload
 (defun prj-create-project ()
   "Create a new project."
@@ -259,42 +286,29 @@
   (widget-insert "\n")
   (widget-create 'editable-field
 		 :format "Project Name: %v"
-		 :notify (lambda (wid &rest ignore)
-			   (puthash :name (widget-value wid) prj-tmp-config)))
+		 :notify (prj-widget-common-notify :name prj-tmp-config))
   (widget-insert "\n")
   (widget-insert "Document Types (Edit):\n") ;; TODO: add customizable link
   (dolist (type prj-document-types)
     (widget-put (widget-create 'checkbox
 			       :format (concat "%[%v%] " (car type) " (" (cdr type) ")\n")
-			       :notify (lambda (wid &rest ignore)
-					 (if (widget-value wid)
-					     (puthash
-					      :doctypes
-					      (push (widget-get wid :doctype) (gethash :doctypes prj-tmp-config))
-					      prj-tmp-config)
-					   (puthash
-					    :doctypes
-					    (delq (widget-get wid :doctype) (gethash :doctypes prj-tmp-config))
-					    prj-tmp-config))))
-		:doctype type))
+			       :notify (prj-widget-checkbox-notify :doctypes prj-tmp-config))
+		:doctypes type))
   (widget-insert "\n")
   (widget-insert "Include Path:\n")
   (widget-create 'editable-list
 		 :entry-format "%i %d %v"
 		 :value '("")
-		 :notify (lambda (wid &rest ignore)
-			   (puthash :filepaths (widget-value wid) prj-tmp-config))
+		 :notify (prj-widget-common-notify :filepaths prj-tmp-config)
 		 '(editable-field :value ""))
   (widget-insert "\n")
   ;; ok and cancel buttons.
   (widget-create 'push-button
 		 :notify (lambda (&rest ignore)
 			   (message "[%s] Creating new project ..." (gethash :name prj-tmp-config))
-			   (let* ((config-file-path (expand-file-name (concat
+			   (let* ((config-file-path (expand-file-name (format "%s/%s/%s"
 								       prj-workspace-path
-								       "/"
 								       (gethash :name prj-tmp-config)
-								       "/"
 								       prj-config-name)))
 				  (dir (file-name-directory config-file-path)))
 			     ;; Valid file paths.
@@ -315,8 +329,7 @@
 		 "ok")
   (widget-insert " ")
   (widget-create 'push-button
-		 :notify (lambda (&rest ignore)
-			   (kill-buffer))
+		 :notify (prj-widget-cancel-notify)
 		 "cancel")
   ;; Widget end ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -336,7 +349,7 @@
   (widget-insert "Select projects to be deleted:\n")
   (let (choices)
     (dolist (f (directory-files prj-workspace-path))
-      (let ((config-file (concat prj-workspace-path "/" f "/" prj-config-name)))
+      (let ((config-file (format "%s/%s/%s" prj-workspace-path f prj-config-name)))
 	(when (file-exists-p config-file)
 	  (push f choices))))
     (unless choices
@@ -345,15 +358,8 @@
     (dolist (c choices)
       (widget-put (widget-create 'checkbox
 				 :format (concat "%[%v%] " c "\n")
-				 :notify (lambda (wid &rest ignore)
-					   (if (widget-value wid)
-					       (puthash :filepaths
-							(push (widget-get wid :filepath) (gethash :filepaths prj-tmp-config))
-							prj-tmp-config)
-					     (puthash :filepaths
-						      (delq (widget-get wid :filepath) (gethash :filepaths prj-tmp-config))
-						      prj-tmp-config))))
-		  :filepath c)))
+				 :notify (prj-widget-checkbox-notify :filepaths prj-tmp-config))
+		  :filepaths c)))
   (widget-insert "\n")
   ;; ok and cancel buttons.
   (widget-create 'push-button
@@ -365,15 +371,13 @@
 					  (string-equal (prj-project-name) c))
 				 (prj-unload-project))
 			       ;; Delete directory
-			       (delete-directory (expand-file-name (format "%s/%s" prj-workspace-path c)) t t))
-			     )
+			       (delete-directory (format "%s/%s" prj-workspace-path c) t t)))
 			   (kill-buffer)
 			   (message "[Prj] Delet project ...done"))
 		 "ok")
   (widget-insert " ")
   (widget-create 'push-button
-		 :notify (lambda (&rest ignore)
-			   (kill-buffer))
+		 :notify (prj-widget-cancel-notify)
 		 "cancel")
   ;; Widget end ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -405,26 +409,14 @@
 					  (if (string-equal (car currtype) (car type))
 					      (setq res t)))
 					res)
-			       :notify (lambda (wid &rest ignore)
-					 (if (widget-value wid)
-					     (puthash
-					      :doctypes
-					      (push (widget-get wid :doctype) (gethash :doctypes prj-config))
-					      prj-tmp-config)
-					   (puthash
-					    :doctypes
-					    (delq (widget-get wid :doctype) (gethash :doctypes prj-config))
-					    prj-tmp-config))))
-		:doc-type type))
+			       :notify (prj-widget-checkbox-notify :doctypes prj-config))
+		:doctypes type))
   (widget-insert "\n")
   (widget-insert "Include Path:\n")
   (widget-create 'editable-list
   		 :entry-format "%i %d %v"
   		 :value (gethash :filepaths prj-config)
-  		 :notify (lambda (wid &rest ignore)
-			   (puthash :filepaths
-				    (widget-value wid)
-				    prj-config))
+		 :notify (prj-widget-common-notify :filepaths prj-config)
   		 '(editable-field))
   (widget-insert "\n")
   ;; ok and cancel buttons.
@@ -439,8 +431,7 @@
 		 "ok")
   (widget-insert " ") 
   (widget-create 'push-button
-		 :notify (lambda (&rest ignore)
-			   (kill-buffer))
+		 :notify (prj-widget-cancel-notify)
 		 "cancel")
   ;; Widget end ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -455,7 +446,7 @@
   (let (choices)
     ;; Find available directories which represent a project.
     (dolist (f (directory-files prj-workspace-path))
-      (let ((config-file (concat prj-workspace-path "/" f "/" prj-config-name)))
+      (let ((config-file (format "%s/%s/%s" prj-workspace-path f prj-config-name)))
 	(when (file-exists-p config-file)
 	  (push f choices))))
     ;; Prompt user to load project.
@@ -519,19 +510,13 @@
   (widget-insert "=== Search Project ===\n")
   (widget-insert "\n")
   (widget-create 'editable-field
-		 :format "Search: %v"
-		 :notify (lambda (wid &rest ignore)
-			   ))
+		 :format "Search: %v")
   (widget-insert "\n")
   (widget-insert "Document Types ")
   (widget-create 'push-button
-		 :notify (lambda (&rest ignore)
-			   )
 		 "Select All")
   (widget-insert " ")
   (widget-create 'push-button
-		 :notify (lambda (&rest ignore)
-			   )
 		 "Deselect All")
   (widget-insert " :\n")
   (dolist (type (prj-project-doctypes))
@@ -549,8 +534,7 @@
 		 "ok")
   (widget-insert " ")
   (widget-create 'push-button
-		 :notify (lambda (&rest ignore)
-			   (kill-buffer))
+		 :notify (prj-widget-cancel-notify)
 		 "cancel")
   ;; Widget end ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

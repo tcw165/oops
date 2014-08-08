@@ -29,29 +29,6 @@
 ;;    Initial release.
 
 ;;;###autoload
-(defun prj-switch-to-search-buffer ()
-  "Find file \".prj-search.txt\", load it into a buffer and switch to the buffer. If the file doesn't exist, it will create one for you."
-  (interactive)
-  (find-file "~/.emacs.d/.prj-search.txt")
-  (search-list-mode)
-  (rename-buffer "**Search List**")
-  (save-buffer)
-  )
-
-;;;###autoload
-(defun prj-search-project (str-or-regexp)
-  (interactive (list 0))
-  (prj-switch-to-search-buffer)
-  )
-
-;;;###autoload
-(defun prj-search-buffer (str-or-regexp)
-  (interactive (list 0))
-  (prj-switch-to-search-buffer)
-  )
-;; (execute-extended-command)
-
-;;;###autoload
 (define-derived-mode search-list-mode special-mode "search-list"
   "Major mode for search buffers."
   :group 'search-list
