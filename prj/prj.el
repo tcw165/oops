@@ -155,15 +155,16 @@
     (garbage-collect)
     config))
 
-(defun prj-validate-config-filepaths ()
+(defun prj-validate-filepaths (config)
+  "Iterate the file paths in the configuration in order to discard invalid paths."
   (let ((valid-fp '()))
-    (dolist (f (gethash :filepaths prj-config))
+    (dolist (f (gethash :filepaths config))
       (let ((fp (and (file-exists-p f)
 		     (expand-file-name f))))
 	(and fp
 	     (push fp valid-fp))))
     (and valid-fp
-	 (puthash :filepaths valid-fp prj-config))))
+	 (puthash :filepaths valid-fp config))))
 
 (defun prj-export-data (filename data)
   "Export `data' to `filename' file. The saved data can be imported with `prj-import-data'."
@@ -189,9 +190,9 @@
 	(dolist (f fs)
 	  (setq res (append res (prj-build-filedb-internal f match))))
       ;; A file.
-      (when (string-match match path)
-	(setq res (append res (list path)))
-	(message "Building database and may take a moment.\nAdd ...%s" path)))
+      (message "Building database and may take a moment.\nScan ...%s" path)
+      (and (string-match match path)
+	   (setq res (append res (list path)))))
     res))
 
 (defun prj-build-filedb ()
@@ -296,15 +297,8 @@
 								       "/"
 								       prj-config-name)))
 				  (dir (file-name-directory config-file-path)))
-			     ;; Prepare valid file paths.
-			     (let ((valid-fp '()))
-			       (dolist (f (gethash :filepaths prj-tmp-config))
-				 (let ((fp (and (file-exists-p f)
-						(expand-file-name f))))
-				   (and fp
-					(push fp valid-fp))))
-			       (and valid-fp
-				    (puthash :filepaths valid-fp prj-tmp-config)))
+			     ;; Valid file paths.
+			     (prj-validate-filepaths prj-tmp-config)
 			     ;; Return if there is an invalid info.
 			     (unless (and (gethash :name prj-tmp-config)
 					  (> (length (gethash :doctypes prj-tmp-config)) 0)
@@ -437,7 +431,7 @@
   (widget-create 'push-button
 		 :notify (lambda (&rest ignore)
 			   ;; Validate file paths.
-			   (prj-validate-config-filepaths)
+			   (prj-validate-filepaths prj-config)
 			   ;; Export configuration.
 			   (prj-export-data (prj-config-path) prj-config)
 			   ;; Kill the "Edit Project" form.
@@ -447,12 +441,12 @@
   (widget-create 'push-button
 		 :notify (lambda (&rest ignore)
 			   (kill-buffer))
-		 "cancel")[cancel]
-		 ;; Widget end ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+		 "cancel")
+  ;; Widget end ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-		 (goto-char 37)
-		 (use-local-map widget-keymap)
-		 (widget-setup))
+  (goto-char 37)
+  (use-local-map widget-keymap)
+  (widget-setup))
 
 ;;;###autoload
 (defun prj-load-project ()
