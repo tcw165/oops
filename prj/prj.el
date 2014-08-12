@@ -58,7 +58,7 @@
   :set 'prj-cus-set-workspace
   :group 'prj-group)
 
-(defcustom prj-document-types '(("Text" . ".txt")
+(defcustom prj-document-types '(("Text" . "*.txt")
 				("Lisp" . ".emacs;*.el")
 				("Python" . "*.py")
 				("Java" . "*.java")
