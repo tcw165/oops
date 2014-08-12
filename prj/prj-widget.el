@@ -76,15 +76,16 @@
      (use-local-map widget-keymap)
      (widget-setup)))
 
-(defun prj-validate-filepaths (paths)
+(defmacro prj-validate-filepaths (paths)
   "Iterate the file paths in the configuration in order to discard invalid paths."
-  (let ((valid-fp '()))
-    (dolist (f paths)
-      (let ((fp (and (file-exists-p f)
-		     (expand-file-name f))))
-	(and fp
-	     (push fp valid-fp))))
-    (and valid-fp)))
+  `(let (valid-fp)
+     (dolist (f ,paths)
+       (let ((fp (and (file-exists-p f)
+		      (expand-file-name f))))
+	 (and fp
+	      (push fp valid-fp))))
+     (and valid-fp
+	  (setq ,paths valid-fp))))
 
 (defmacro prj-with-file (name file &rest body)
   (declare (indent 1) (debug t))
@@ -105,7 +106,7 @@
 							 prj-config-name)))
 	     (dir (file-name-directory config-file-path)))
 	;; Validate file paths.
-	(setq prj-tmp-list2 (prj-validate-filepaths prj-tmp-list2))
+	(prj-validate-filepaths prj-tmp-list2)
 	;; Return if there is an invalid info.
 	(unless (and prj-tmp-string
 		     (> (length prj-tmp-list1) 0)
@@ -198,7 +199,7 @@
     ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     (lambda (&rest ignore)
       ;; Validate file paths.
-      (setq prj-tmp-list2 (prj-validate-filepaths prj-tmp-list2))
+      (prj-validate-filepaths prj-tmp-list2)
       ;; Export configuration.
       (puthash :doctypes prj-tmp-list1 prj-config)
       (puthash :filepaths prj-tmp-list2 prj-config)

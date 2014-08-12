@@ -61,11 +61,7 @@
       (set symbol value)
       (when hl-paren-mode
         (hl-paren-mode -1)
-        (hl-paren-mode 1)
-        )
-      )
-    )
-  )
+        (hl-paren-mode 1)))))
 
 (defcustom hl-outward-paren-fg-colors nil
   "List of colors for the highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
@@ -119,22 +115,17 @@
     (while (or fg bg)
       (setq attributes (face-attr-construct 'hl-paren-face))
       (when (car fg)
-        (setq attributes (plist-put attributes :foreground (car fg)))
-        )
+        (setq attributes (plist-put attributes :foreground (car fg))))
       (pop fg)
       (when (car bg)
-        (setq attributes (plist-put attributes :background (car bg)))
-        )
+        (setq attributes (plist-put attributes :background (car bg))))
       (pop bg)
 
       ;; Make pair overlays for every attribute.
       (dotimes (i 2)
         (push (make-overlay 0 0) hl--outward-paren-overlays)
-        (overlay-put (car hl--outward-paren-overlays) 'face attributes)
-        )
-      )
-    (setq hl--outward-paren-overlays (nreverse hl--outward-paren-overlays))
-    )
+        (overlay-put (car hl--outward-paren-overlays) 'face attributes)))
+    (setq hl--outward-paren-overlays (nreverse hl--outward-paren-overlays)))
   ;; inward overlays.
   (let ((fg hl-inward-paren-fg-colors)
         (bg hl-inward-paren-bg-colors)
@@ -142,22 +133,16 @@
     (while (or fg bg)
       (setq attributes (face-attr-construct 'hl-paren-face))
       (when (car fg)
-        (setq attributes (plist-put attributes :foreground (car fg)))
-        )
+        (setq attributes (plist-put attributes :foreground (car fg))))
       (pop fg)
       (when (car bg)
-        (setq attributes (plist-put attributes :background (car bg)))
-        )
-      (pop bg)
-      )
+        (setq attributes (plist-put attributes :background (car bg))))
+      (pop bg))
 
     ;; Make pair overlays for every attribute.
     (dotimes (i 2)
       (push (make-overlay 0 0) hl--inward-paren-overlays)
-      (overlay-put (car hl--inward-paren-overlays) 'face attributes)
-      )
-    )
-  )
+      (overlay-put (car hl--inward-paren-overlays) 'face attributes))))
 
 (defun hl--paren-update ()
   "Highlight the parentheses around point."
@@ -290,8 +275,7 @@ Maybe you'll need it for history and navigation feature.")
 
 (defun hl--thing-p (thing)
   "Test if the thing is currently highlighted."
-  (member thing hl--things-list)
-  )
+  (member thing hl--things-list))
 
 (defun hl--thingatpt ()
   "Return a list, (REGEXP_STRING BEG END), on which the point is or just string of selection."
@@ -300,8 +284,7 @@ Maybe you'll need it for history and navigation feature.")
       (let ((str (buffer-substring-no-properties (region-beginning) (region-end))))
         (list (regexp-quote str)
               (region-beginning)
-              (region-end))
-        )
+              (region-end)))
     ;; else.
     ;; TODO: Use the highlight if point is on it.
     (let ((bound (bounds-of-thing-at-point 'symbol))
@@ -311,11 +294,7 @@ Maybe you'll need it for history and navigation feature.")
         ;; (format "\\<%s\\>" (regexp-quote thing))
         (list (regexp-quote thing)
               (car bound)
-              (cdr bound))
-        )
-      )
-    )
-  )
+              (cdr bound))))))
 
 (defun hl--thing-add (thing)
   ;; TODO: get understand what it is exactly doing.
@@ -330,21 +309,16 @@ Maybe you'll need it for history and navigation feature.")
     (and (null fg-color)
          ;; (setq fg-color (car hl-thing-fg-colors))
          ;; TODO: if no fg-color, use default.
-         (setq fg-color "red")
-         )
+         (setq fg-color "red"))
     (and (null bg-color)
-         (setq bg-color (car hl-thing-bg-colors))
-         )
+         (setq bg-color (car hl-thing-bg-colors)))
     ;; TODO: if no fg-color, use default.
     (setq color `((foreground-color . ,fg-color)
                   (background-color . ,bg-color)))
     ;; highlight
     (font-lock-add-keywords nil `((,thing 0 ',color prepend)) 'append)
     (font-lock-fontify-buffer)
-    (push thing hl--things-list)
-    )
-  (message "[hl-anything] highlight thing, \"%s\"." thing)
-  )
+    (push thing hl--things-list)))
 
 (defun hl--thing-remove (thing)
   (setq hl--things-list (delete thing hl--things-list))
@@ -353,10 +327,7 @@ Maybe you'll need it for history and navigation feature.")
                                   font-lock-keywords
                                   ))))
     (font-lock-remove-keywords nil (list keyword))
-    (font-lock-fontify-buffer)
-    )
-  (message "[hl-anything] unhighlight thing, \"%s\"." thing)
-  )
+    (font-lock-fontify-buffer)))
 
 (defun hl--thing-find (step)
   (let* ((case-fold-search t)
@@ -383,14 +354,11 @@ Maybe you'll need it for history and navigation feature.")
         (when (> step 0)
           (setq end (point))
           (re-search-backward str nil t 1)
-          (setq beg (point))
-          )
+          (setq beg (point)))
         (when (< step 0)
           (setq beg (point))
           (re-search-forward str nil t 1)
-          (setq end (point))
-          )
-        )
+          (setq end (point))))
       (set-marker (mark-marker) beg)
       (goto-char end)
       (setq mark-active t)
@@ -398,10 +366,7 @@ Maybe you'll need it for history and navigation feature.")
                str
                (if (> step 0) "forwardly" "backwardly"))
       ;; Hook after searching.
-      (run-hook-with-args hl-thing-after-find-hook (list str beg end))
-      )
-    )
-  )
+      (run-hook-with-args hl-thing-after-find-hook (list str beg end)))))
 
 ;;;###autoload
 (defun hl-thing-at-point ()
@@ -412,33 +377,25 @@ Maybe you'll need it for history and navigation feature.")
     (when thing
       (if (hl--thing-p str)
           (hl--thing-remove str)
-        (hl--thing-add str)
-        )
-      )
-    )
-  )
+        (hl--thing-add str)))))
 
 ;;;###autoload
 (defun hl-thing-remove-all ()
   "Remove all the highlights in buffer."
   (interactive)
-  (mapc 'hl--thing-remove hl--things-list)
-  (message "[hl-anything] Discard all the highlights.")
-  )
+  (mapc 'hl--thing-remove hl--things-list))
 
 ;;;###autoload
 (defun hl-thing-find-forward ()
   "Find thing forwardly and jump to it."
   (interactive)
-  (hl--thing-find 1)
-  )
+  (hl--thing-find 1))
 
 ;;;###autoload
 (defun hl-thing-find-backward ()
   "Find thing backwardly and jump to it."
   (interactive)
-  (hl--thing-find -1)
-  )
+  (hl--thing-find -1))
 
 ;; TODO: Save highlights of last session.
 ;; ;;;###autoload
