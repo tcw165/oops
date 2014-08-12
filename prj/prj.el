@@ -29,6 +29,7 @@
 ;; - Support database using more efficient way (e.g. hash map).
 ;; - Support category search.
 ;; - Support project's local variable.
+;; - Modulize widget function.
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -41,10 +42,11 @@
 (require 'cus-edit)
 (require 'widget)
 (require 'wid-edit)
+(require 'prj-widget)
 (require 'search-list)
 
 (defgroup prj-group nil
-  "Project.")
+  "A Project management utility.")
 
 (defun prj-cus-set-workspace (symbol value)
   "Make sure the directory is present."
@@ -67,8 +69,7 @@
 				("C/C++" . "*.h;*.c;*.hpp;*.cpp")
 				("Makfile" . "Makefile;makefile;Configure.ac;configure.ac;*.mk")
 				("UEFI metafile" . "*.dsc;*.fdf;*.inf;*.env")
-				("UEFI HII metafile" . "*.vfr;*.uni")
-				)
+				("UEFI HII metafile" . "*.vfr;*.uni"))
   "Categorize file names refer to specific matches and give them type names. It is a list of (DOC_NAME . MATCHES). Each matches in MATCHES should be delimit with ';'."
   ;; TODO: give GUI a pretty appearance.
   :type '(repeat (cons string string))
@@ -98,22 +99,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
-(defun prj-customize-document-types ()
+(defun prj-preference ()
   "Customize document types."
   (interactive)
-  (customize-option 'prj-document-types))
-
-;;;###autoload
-(defun prj-customize-excluded-types ()
-  "Customize excluded types."
-  (interactive)
-  (customize-option 'prj-exclude-types))
-
-;;;###autoload
-(defun prj-customize-workspace-path ()
-  "Customize workspace path."
-  (interactive)
-  (customize-option 'prj-workspace-path))
+  (customize-group 'prj-group))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -178,7 +167,7 @@
 		(prin1-to-string data))))))
 
 (defun prj-import-data (filename)
-  "Read data exported by `prj-export-data' from `filename'."
+  "Read data exported by `prj-export-data' from file `filename'."
   (when (file-exists-p filename)
     (with-temp-buffer
       (insert-file-contents filename)
@@ -230,214 +219,25 @@
   ;; TODO: implemnt it.
   )
 
-(defun prj-get-widget-buffer (name)
-  "Create a widget buffer with fine setting and switch to it."
-  (switch-to-buffer name)
-  (kill-all-local-variables)
-  (let ((inhibit-read-only t))
-    (erase-buffer))
-  (remove-overlays)
-
-  (setq prj-tmp-config (prj-new-config))
-  
-  (set (make-local-variable 'widget-documentation-face) 'custom-documentation)
-  (set (make-local-variable 'widget-button-face) custom-button)
-  (set (make-local-variable 'widget-button-pressed-face) custom-button-pressed)
-  (set (make-local-variable 'widget-mouse-face) custom-button-mouse)
-  ;; When possible, use relief for buttons, not bracketing.
-  (when custom-raised-buttons
-    (set (make-local-variable 'widget-push-button-prefix) " ")
-    (set (make-local-variable 'widget-push-button-suffix) " ")
-    (set (make-local-variable 'widget-link-prefix) "")
-    (set (make-local-variable 'widget-link-suffix) ""))
-  (setq show-trailing-whitespace nil))
-
-(defmacro prj-widget-common-notify (type config)
-  "Notify function of widget for 'editable-field and 'editable-list."
-  `(lambda (wid &rest ignore)
-     (puthash ,type (widget-value wid) ,config)))
-
-(defmacro prj-widget-checkbox-notify (type config)
-  "Notify function of widget for 'checkbox."
-  `(lambda (wid &rest ignore)
-     (if (widget-value wid)
-	 (puthash
-	  ,type
-	  (push (widget-get wid ,type) (gethash ,type ,config))
-	  ,config)
-       (puthash
-	,type
-	(delq (widget-get wid ,type) (gethash ,type ,config))
-	,config))))
-
-(defmacro prj-widget-cancel-notify ()
-  "Notify function of widget for cancel 'push-button."
-  `(lambda (&rest ignore)
-     (kill-buffer)))
-
 ;;;###autoload
 (defun prj-create-project ()
-  "Create a new project."
+  "Show configuration for creating new project."
   (interactive)
-  (prj-get-widget-buffer "*Create Project*")
-
-  ;; Widget start ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-  (widget-insert "=== Create New Project ===\n")
-  (widget-insert "\n")
-  (widget-create 'editable-field
-		 :format "Project Name: %v"
-		 :notify (prj-widget-common-notify :name prj-tmp-config))
-  (widget-insert "\n")
-  (widget-insert "Document Types (Edit):\n") ;; TODO: add customizable link
-  (dolist (type prj-document-types)
-    (widget-put (widget-create 'checkbox
-			       :format (concat "%[%v%] " (car type) " (" (cdr type) ")\n")
-			       :notify (prj-widget-checkbox-notify :doctypes prj-tmp-config))
-		:doctypes type))
-  (widget-insert "\n")
-  (widget-insert "Include Path:\n")
-  (widget-create 'editable-list
-		 :entry-format "%i %d %v"
-		 :value '("")
-		 :notify (prj-widget-common-notify :filepaths prj-tmp-config)
-		 '(editable-field :value ""))
-  (widget-insert "\n")
-  ;; ok and cancel buttons.
-  (widget-create 'push-button
-		 :notify (lambda (&rest ignore)
-			   (message "[%s] Creating new project ..." (gethash :name prj-tmp-config))
-			   (let* ((config-file-path (expand-file-name (format "%s/%s/%s"
-								       prj-workspace-path
-								       (gethash :name prj-tmp-config)
-								       prj-config-name)))
-				  (dir (file-name-directory config-file-path)))
-			     ;; Valid file paths.
-			     (prj-validate-filepaths prj-tmp-config)
-			     ;; Return if there is an invalid info.
-			     (unless (and (gethash :name prj-tmp-config)
-					  (> (length (gethash :doctypes prj-tmp-config)) 0)
-					  (> (length (gethash :filepaths prj-tmp-config)) 0))
-			       (error "[Prj] Can't create new project due to invalid information."))
-			     ;; Prepare directory. Directory name is also the project name.
-			     (unless (file-directory-p dir)
-			       (make-directory dir))
-			     ;; Export configuration.
-			     (prj-export-data config-file-path prj-tmp-config)
-			     ;; Kill the "Create Project" form.
-			     (kill-buffer)
-			     (prj-load-project)))
-		 "ok")
-  (widget-insert " ")
-  (widget-create 'push-button
-		 :notify (prj-widget-cancel-notify)
-		 "cancel")
-  ;; Widget end ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-  (goto-char 43)
-  (use-local-map widget-keymap)
-  (widget-setup))
+  (prj-setup-create-project-widget))
 
 ;;;###autoload
 (defun prj-delete-project ()
-  "Delete projects which are no more needed."
+  "Show configuration for deleting projects."
   (interactive)
-  (prj-get-widget-buffer "*Delete Project*")
-
-  ;; Widget start ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-  (widget-insert "=== Delete Project ===\n")
-  (widget-insert "\n")
-  (widget-insert "Select projects to be deleted:\n")
-  (let (choices)
-    (dolist (f (directory-files prj-workspace-path))
-      (let ((config-file (format "%s/%s/%s" prj-workspace-path f prj-config-name)))
-	(when (file-exists-p config-file)
-	  (push f choices))))
-    (unless choices
-      (kill-buffer)
-      (error "[Prj] No projects can be deleted."))
-    (dolist (c choices)
-      (widget-put (widget-create 'checkbox
-				 :format (concat "%[%v%] " c "\n")
-				 :notify (prj-widget-checkbox-notify :filepaths prj-tmp-config))
-		  :filepaths c)))
-  (widget-insert "\n")
-  ;; ok and cancel buttons.
-  (widget-create 'push-button
-		 :notify (lambda (&rest ignore)
-			   (let ((cs (gethash :filepaths prj-tmp-config)))
-			     (dolist (c cs)
-			       ;; Unload current project if it is selected.
-			       (when (and (prj-project-p)
-					  (string-equal (prj-project-name) c))
-				 (prj-unload-project))
-			       ;; Delete directory
-			       (delete-directory (format "%s/%s" prj-workspace-path c) t t)))
-			   (kill-buffer)
-			   (message "[Prj] Delet project ...done"))
-		 "ok")
-  (widget-insert " ")
-  (widget-create 'push-button
-		 :notify (prj-widget-cancel-notify)
-		 "cancel")
-  ;; Widget end ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-  (goto-char 56)
-  (use-local-map widget-keymap)
-  (widget-setup))
+  (prj-setup-delete-project-widget))
 
 ;;;###autoload
 (defun prj-edit-project ()
-  "Edit project coniguration."
+  "Show configuration for editing project's setting."
   (interactive)
-  
   (unless (prj-project-p)
     (error "[Prj] There's no project was loaded."))
-  
-  (prj-get-widget-buffer "*Edit Project*")
-
-  ;; Widget start ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-  (widget-insert "=== Edit Project ===\n")
-  (widget-insert "\n")
-  (widget-insert (format "Project Name: %s\n" (prj-project-name)))
-  (widget-insert "\n")
-  (widget-insert "Document Types (Edit):\n") ;; TODO: add customizable link
-  (dolist (type prj-document-types)
-    (widget-put (widget-create 'checkbox
-			       :format (concat "%[%v%] " (car type) " (" (cdr type) ")\n")
-			       :value (let (res)
-					(dolist (currtype (gethash :doctypes prj-config))
-					  (if (string-equal (car currtype) (car type))
-					      (setq res t)))
-					res)
-			       :notify (prj-widget-checkbox-notify :doctypes prj-config))
-		:doctypes type))
-  (widget-insert "\n")
-  (widget-insert "Include Path:\n")
-  (widget-create 'editable-list
-  		 :entry-format "%i %d %v"
-  		 :value (gethash :filepaths prj-config)
-		 :notify (prj-widget-common-notify :filepaths prj-config)
-  		 '(editable-field))
-  (widget-insert "\n")
-  ;; ok and cancel buttons.
-  (widget-create 'push-button
-		 :notify (lambda (&rest ignore)
-			   ;; Validate file paths.
-			   (prj-validate-filepaths prj-config)
-			   ;; Export configuration.
-			   (prj-export-data (prj-config-path) prj-config)
-			   ;; Kill the "Edit Project" form.
-			   (kill-buffer))
-		 "ok")
-  (widget-insert " ") 
-  (widget-create 'push-button
-		 :notify (prj-widget-cancel-notify)
-		 "cancel")
-  ;; Widget end ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-  (goto-char 37)
-  (use-local-map widget-keymap)
-  (widget-setup))
+  (prj-setup-edit-project-widget))
 
 ;;;###autoload
 (defun prj-load-project ()
@@ -476,7 +276,6 @@
     (prj-build-filedb)
     (prj-build-tags)))
 
-;; (prj-import-data (prj-filedb-path))
 ;;;###autoload
 (defun prj-find-file ()
   "Open file by the given file name."
@@ -497,66 +296,12 @@
 
 ;;;###autoload
 (defun prj-search-project ()
-  ;; TODO: fix it.
   "Search string in the project. Append new search result to the old caches if `new' is nil."
   (interactive)
   ;; Load project if no project was loaded.
   (unless (prj-project-p)
     (prj-load-project))
-
-  (prj-get-widget-buffer "*Search Project*")
-
-    ;; Widget start ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-  (widget-insert "=== Search Project ===\n")
-  (widget-insert "\n")
-  (widget-create 'editable-field
-		 :format "Search: %v")
-  (widget-insert "\n")
-  (widget-insert "Document Types ")
-  (widget-create 'push-button
-		 "Select All")
-  (widget-insert " ")
-  (widget-create 'push-button
-		 "Deselect All")
-  (widget-insert " :\n")
-  (dolist (type (prj-project-doctypes))
-    (widget-put (widget-create 'checkbox
-			       :format (concat "%[%v%] " (car type) " (" (cdr type) ")\n")
-			       :notify (lambda (wid &rest ignore)
-					 ))
-		:doc-type type))
-  (widget-insert "\n")
-  ;; ok and cancel buttons.
-  (widget-create 'push-button
-		 :notify (lambda (&rest ignore)
-			   ;; Kill the "Create Project" form.
-			   (kill-buffer))
-		 "ok")
-  (widget-insert " ")
-  (widget-create 'push-button
-		 :notify (prj-widget-cancel-notify)
-		 "cancel")
-  ;; Widget end ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-  (goto-char 33)
-  (use-local-map widget-keymap)
-  (widget-setup)
-  
-  ;; ;; TODO: Support history.
-  ;; ;; TODO: Support auto-complete.
-  ;; (let ((str (read-from-minibuffer "[Prj] Search string: ")))
-  ;;   (when (not (string-equal str ""))
-  ;;     (message "[%s] Searching %s..." prj-project-name str)
-  ;;     (let* ((search-db-file (find-file (prj-searchdb-path))))
-  ;; 	;; Add title.
-  ;; 	(end-of-buffer)
-  ;; 	(princ (format "=== Search: %s ===\n" str) search-db-file)
-  ;; 	;; Search.
-  ;; 	(call-process-shell-command (format "xargs grep -nH \"%s\" < %s" str (prj-filedb-path)) nil search-db-file nil)
-  ;; 	;; Cache search result.
-  ;; 	(princ "\n" search-db-file)
-  ;; 	(save-buffer))))
-  )
+  (prj-setup-search-project-widget))
 
 ;;;###autoload
 (defun prj-toggle-search-buffer ()
