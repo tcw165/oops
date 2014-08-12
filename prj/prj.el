@@ -1,4 +1,3 @@
-
 ;; Copyright (C) 2014
 ;;
 ;; Author: BoyW165
@@ -39,9 +38,6 @@
 ;;    Initial release.
 
 (require 'ido)
-(require 'cus-edit)
-(require 'widget)
-(require 'wid-edit)
 (require 'prj-widget)
 (require 'search-list)
 
@@ -93,9 +89,6 @@
 (defvar prj-config nil
   "A hash map which represent project's configuration.")
 
-(defvar prj-tmp-config nil
-  "A temporary hash map.")
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
@@ -144,20 +137,8 @@
     (puthash :name nil config)
     (puthash :doctypes '() config)
     (puthash :filepaths '() config)
-    (puthash :search '() config)
     (garbage-collect)
     config))
-
-(defun prj-validate-filepaths (config)
-  "Iterate the file paths in the configuration in order to discard invalid paths."
-  (let ((valid-fp '()))
-    (dolist (f (gethash :filepaths config))
-      (let ((fp (and (file-exists-p f)
-		     (expand-file-name f))))
-	(and fp
-	     (push fp valid-fp))))
-    (and valid-fp
-	 (puthash :filepaths valid-fp config))))
 
 (defun prj-export-data (filename data)
   "Export `data' to `filename' file. The saved data can be imported with `prj-import-data'."
