@@ -91,14 +91,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;;;###autoload
-(defun prj-preference ()
-  "Customize document types."
-  (interactive)
-  (customize-group 'prj-group))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 (defun prj-config-path ()
   (expand-file-name (format "%s/%s/%s" prj-workspace-path (prj-project-name) prj-config-name)))
 
@@ -199,6 +191,12 @@
 (defun prj-build-tags ()
   ;; TODO: implemnt it.
   )
+
+;;;###autoload
+(defun prj-preference ()
+  "Customize document types."
+  (interactive)
+  (customize-group 'prj-group))
 
 ;;;###autoload
 (defun prj-create-project ()
