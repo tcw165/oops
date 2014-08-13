@@ -271,8 +271,8 @@
   (unless (file-exists-p (prj-filedb-path))
     (prj-build-database))
   ;; Find file.
-  (let* ((filedb (prj-import-data (prj-filedb-path)))
-	 (filelist '()))
+  (let ((filedb (prj-import-data (prj-filedb-path)))
+	(filelist '()))
     (dolist (elm (prj-project-doctypes))
       (setq filelist (append filelist (gethash elm filedb))))
     (find-file (ido-completing-read (format "[%s] Find file: " (prj-project-name)) filelist)))

@@ -22,10 +22,14 @@
 (require 'widget)
 (require 'wid-edit)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defvar prj-tmp-string nil)
 (defvar prj-tmp-list1 nil)
 (defvar prj-tmp-list2 nil)
 (defvar prj-tmp-list3 nil)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defmacro prj-widget-common-notify (place)
   "(Widget) Notify function for 'editable-field and 'editable-list."
@@ -91,19 +95,18 @@
   `(let (orderlist)
      (dolist (i ,references)
        (and (memq i ,choices)
-	    (push i orderlist))
-       )
+	    (push i orderlist)))
      (setq orderlist (reverse orderlist)
 	   ,choices orderlist)))
 
 (defmacro prj-with-file (name file &rest body)
   (declare (indent 1) (debug t))
-  `(let ((temp-buffer (get-buffer-create ,name)))
-     (switch-to-buffer temp-buffer)
+  `(progn
+     (find-file ,file)
      (goto-char (point-max))
      (progn ,@body)
-     (setq buffer-file-name ,file)
-     (write-region nil nil ,file nil 0)))
+     (rename-buffer ,name)
+     (save-buffer)))
 
 (defun prj-serialize-doctype (doctype)
   (format "%s (%s)" (car doctype) (cdr doctype)))
@@ -140,7 +143,6 @@
 
     ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     (widget-insert "=== Create New Project ===\n\n")
-    ;; (macroexpand '(prj-widget-common-notify prj-tmp-string))
     (widget-create 'editable-field
 		   :format "Project Name: %v"
 		   :notify (prj-widget-common-notify prj-tmp-string))
@@ -224,8 +226,8 @@
       (kill-buffer))
 
     ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    (setq prj-tmp-list1 (gethash :doctypes prj-config))
-    (setq prj-tmp-list2 (gethash :filepaths prj-config))
+    (setq prj-tmp-list1 (prj-project-doctypes))
+    (setq prj-tmp-list2 (prj-project-filepaths))
     (widget-insert "=== Edit Project ===\n\n")
     (widget-insert (format "Project Name: %s\n\n" (prj-project-name)))
     (widget-insert "Document Types (Edit) ") ;; TODO: add customizable link
@@ -261,7 +263,7 @@
     (widget-insert "Include Path:\n")
     (widget-create 'editable-list
 		   :entry-format "%i %d %v"
-		   :value (gethash :filepaths prj-config)
+		   :value (prj-project-filepaths)
 		   :notify (prj-widget-common-notify prj-tmp-list2)
 		   '(editable-field))))
 
@@ -274,16 +276,20 @@
       (unless (> (length prj-tmp-list1) 0)
 	(error (format "[%s] Please select document types for searching!" (prj-project-name))))
       (kill-buffer)
-      ;; Sort the order of doctypes.
-      (prj-sort-doctypes prj-tmp-list1 prj-document-types)
-      ;; Search.
-      (prj-with-file "*Search*" (prj-searchdb-path)
-	(insert (format ">>> %s\n" prj-tmp-string))
-	(dolist (f (prj-import-data (prj-filedb-path)))
-	  (message "[%s] Searching ...%s" (prj-project-name) f)
-	  (goto-char (point-max))
-	  (call-process "grep" nil (list (current-buffer) nil) t "-nH" prj-tmp-string f))
-	(insert "<<<\n\n"))
+      (prj-with-file "*Search*"
+	;; File ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	(prj-searchdb-path)
+	;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	(insert (format ">>>>> %s\n" prj-tmp-string))
+	(let ((db (prj-import-data (prj-filedb-path)))
+	      (files '()))
+	  ;; Prepare file list.
+	  (dolist (elm prj-tmp-list1)
+	    (dolist (f (gethash elm db))
+	      (message "[%s] Searching ...%s" (prj-project-name) f)
+	      (goto-char (point-max))
+	      (call-process "grep" nil (list (current-buffer) nil) t "-nH" prj-tmp-string f)))
+	  (insert "<<<<<\n\n")))
       (message (format "[%s] Search ...done" (prj-project-name))))
 
     ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -299,7 +305,7 @@
 			     (setq prj-tmp-list1 nil)
 			     (dolist (box prj-tmp-list3)
 			       (widget-value-set box t))
-			     (dolist (type prj-document-types)
+			     (dolist (type (prj-project-doctypes))
 			       (push type prj-tmp-list1)))
 		   "Select All")
     (widget-insert " ")
