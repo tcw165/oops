@@ -87,6 +87,15 @@
      (and valid-fp
 	  (setq ,paths valid-fp))))
 
+(defmacro prj-sort-doctypes (choices references)
+  `(let (orderlist)
+     (dolist (i ,references)
+       (and (memq i ,choices)
+	    (push i orderlist))
+       )
+     (setq orderlist (reverse orderlist)
+	   ,choices orderlist)))
+
 (defmacro prj-with-file (name file &rest body)
   (declare (indent 1) (debug t))
   `(let ((temp-buffer (get-buffer-create ,name)))
@@ -95,6 +104,9 @@
      (progn ,@body)
      (setq buffer-file-name ,file)
      (write-region nil nil ,file nil 0)))
+
+(defun prj-serialize-doctype (doctype)
+  (format "%s (%s)" (car doctype) (cdr doctype)))
 
 (defun prj-setup-create-project-widget ()
   (prj-with-widget "*Create Project*"
@@ -112,6 +124,8 @@
 		     (> (length prj-tmp-list1) 0)
 		     (> (length prj-tmp-list2) 0))
 	  (error "[Prj] Can't create new project due to invalid information."))
+	;; Sort the order of doctypes.
+	(prj-sort-doctypes prj-tmp-list1 prj-document-types)
 	;; Prepare directory. Directory name is also the project name.
 	(unless (file-directory-p dir)
 	  (make-directory dir))
@@ -151,9 +165,9 @@
     (dolist (type prj-document-types)
       (let (wid)
 	(setq wid (widget-create 'checkbox
-				 :format (concat "%[%v%] " (car type) " (" (cdr type) ")\n")
-				 :notify (prj-widget-checkbox-notify :doctypes prj-tmp-list1)))
-	(widget-put wid :doctypes type)
+				 :format (concat "%[%v%] " (prj-serialize-doctype type) "\n")
+				 :notify (prj-widget-checkbox-notify :doctype prj-tmp-list1)))
+	(widget-put wid :doctype type)
 	(push wid prj-tmp-list3)))
     (widget-insert "\n")
     (widget-insert "Include Path:\n")
@@ -200,7 +214,10 @@
     (lambda (&rest ignore)
       ;; Validate file paths.
       (prj-validate-filepaths prj-tmp-list2)
+      ;; Sort the order of doctypes.
+      (prj-sort-doctypes prj-tmp-list1 prj-document-types)
       ;; Export configuration.
+      (puthash :version (current-time) prj-config)
       (puthash :doctypes prj-tmp-list1 prj-config)
       (puthash :filepaths prj-tmp-list2 prj-config)
       (prj-export-data (prj-config-path) prj-config)
@@ -231,7 +248,7 @@
     (dolist (type prj-document-types)
       (let (wid)
 	(setq wid (widget-create 'checkbox
-				 :format (concat "%[%v%] " (car type) " (" (cdr type) ")\n")
+				 :format (concat "%[%v%] " (prj-serialize-doctype type) "\n")
 				 :value (let (res)
 					  (dolist (currtype (gethash :doctypes prj-config))
 					    (if (string-equal (car currtype) (car type))
@@ -257,6 +274,9 @@
       (unless (> (length prj-tmp-list1) 0)
 	(error (format "[%s] Please select document types for searching!" (prj-project-name))))
       (kill-buffer)
+      ;; Sort the order of doctypes.
+      (prj-sort-doctypes prj-tmp-list1 prj-document-types)
+      ;; Search.
       (prj-with-file "*Search*" (prj-searchdb-path)
 	(insert (format ">>> %s\n" prj-tmp-string))
 	(dolist (f (prj-import-data (prj-filedb-path)))
@@ -293,7 +313,7 @@
     (dolist (type (prj-project-doctypes))
       (let (wid)
 	(setq wid (widget-create 'checkbox
-				 :format (concat "%[%v%] " (car type) " (" (cdr type) ")\n")
+				 :format (concat "%[%v%] " (prj-serialize-doctype type) "\n")
 				 :value t
 				 :notify (prj-widget-checkbox-notify :doctypes prj-tmp-list1)))
 	(widget-put wid :doctypes type)
