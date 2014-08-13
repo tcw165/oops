@@ -42,7 +42,7 @@
 (require 'search-list)
 
 (defgroup prj-group nil
-  "A Project management utility.")
+  "A Project management utility. This utility provides you a workspace and many projects concept. It also provide you a way to easily find file without knowing its full path; Add different directories with specific document types in a project; Powerful selective grep string or regular expression in a project, etc.")
 
 (defun prj-cus-set-workspace (symbol value)
   "Make sure the directory is present."

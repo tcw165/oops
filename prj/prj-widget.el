@@ -101,11 +101,15 @@
 
 (defmacro prj-with-file (name file &rest body)
   (declare (indent 1) (debug t))
-  `(progn
+  `(let (pt)
      (find-file ,file)
+     (kill-all-local-variables)
+     (remove-overlays)
      (goto-char (point-max))
-     (progn ,@body)
+     (setq pt (point))
      (rename-buffer ,name)
+     (progn ,@body)
+     (goto-char pt)
      (save-buffer)))
 
 (defun prj-serialize-doctype (doctype)
@@ -302,6 +306,10 @@
 	;; File ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	(prj-searchdb-path)
 	;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;; Change major mode.
+	(search-list-mode)
+	;; Enable minor modes.
+	(hl-line-mode)
 	(insert (format ">>>>> %s\n" prj-tmp-string))
 	(let ((db (prj-import-data (prj-filedb-path)))
 	      (files '()))

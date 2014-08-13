@@ -28,11 +28,13 @@
 ;; 2014-08-01 (0.0.1)
 ;;    Initial release.
 
+(defgroup search-list-group nil
+  "")
+
 ;;;###autoload
-(define-derived-mode search-list-mode special-mode "search-list"
+(define-derived-mode search-list-mode nil "search-list"
   "Major mode for search buffers."
-  :group 'search-list
-  (message "search list~~~")
+  :group 'search-list-group
   )
 ;; (define-derived-mode emacs-lisp-mode prog-mode "Emacs-Lisp"
 ;;   "Major mode for editing Lisp code to run in Emacs.
