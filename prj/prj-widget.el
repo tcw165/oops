@@ -94,7 +94,7 @@
 (defmacro prj-sort-doctypes (choices references)
   `(let (orderlist)
      (dolist (i ,references)
-       (and (memq i ,choices)
+       (and (member i ,choices)
 	    (push i orderlist)))
      (setq orderlist (reverse orderlist)
 	   ,choices orderlist)))
@@ -139,7 +139,11 @@
 	  (puthash :filepaths prj-tmp-list2 config)
 	  (prj-export-data config-file-path config))
 	(kill-buffer)
-	(prj-load-project)))
+	;; Load project.
+	(prj-load-project)
+	;; Build database if the prject which was just created is present.
+	(and (equal (prj-project-name) prj-tmp-string)
+	     (prj-build-database))))
 
     ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     (widget-insert "=== Create New Project ===\n\n")
@@ -214,20 +218,39 @@
   (prj-with-widget "*Edit Project*"
     ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     (lambda (&rest ignore)
-      ;; Validate file paths.
-      (prj-validate-filepaths prj-tmp-list2)
       ;; Sort the order of doctypes.
       (prj-sort-doctypes prj-tmp-list1 prj-document-types)
-      ;; Export configuration.
-      (puthash :version (current-time) prj-config)
-      (puthash :doctypes prj-tmp-list1 prj-config)
-      (puthash :filepaths prj-tmp-list2 prj-config)
-      (prj-export-data (prj-config-path) prj-config)
-      (kill-buffer))
+      ;; Validate file paths.
+      (prj-validate-filepaths prj-tmp-list2)
+      (let (updatefiledb)
+	;; Check if update is necessary.
+	(catch 'loop
+	  (unless (and (= (length prj-tmp-list1) (length (prj-project-doctypes)))
+		       (= (length prj-tmp-list2) (length (prj-project-filepaths))))
+	    (setq updatefiledb t)
+	    (throw 'loop t))
+	  (dolist (elm prj-tmp-list1)
+	    (unless (member elm (prj-project-doctypes))
+	      (setq updatefiledb t)
+	      (throw 'loop t)))
+	  (dolist (elm prj-tmp-list2)
+	    (unless (member elm (prj-project-filepaths))
+	      (setq updatefiledb t)
+	      (throw 'loop t))))
+	;; Export configuration.
+	(puthash :version (current-time) prj-config)
+	(puthash :doctypes prj-tmp-list1 prj-config)
+	(puthash :filepaths prj-tmp-list2 prj-config)
+	(prj-export-data (prj-config-path) prj-config)
+	;; Update file database.
+	(and updatefiledb
+	     (prj-build-filedb))
+	(kill-buffer)))
 
     ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    (setq prj-tmp-list1 (prj-project-doctypes))
-    (setq prj-tmp-list2 (prj-project-filepaths))
+    (setq prj-tmp-list1 (copy-list (prj-project-doctypes)))
+    (setq prj-tmp-list2 (copy-list (prj-project-filepaths)))
+
     (widget-insert "=== Edit Project ===\n\n")
     (widget-insert (format "Project Name: %s\n\n" (prj-project-name)))
     (widget-insert "Document Types (Edit) ") ;; TODO: add customizable link
@@ -251,13 +274,12 @@
       (let (wid)
 	(setq wid (widget-create 'checkbox
 				 :format (concat "%[%v%] " (prj-serialize-doctype type) "\n")
-				 :value (let (res)
-					  (dolist (currtype (gethash :doctypes prj-config))
-					    (if (string-equal (car currtype) (car type))
-						(setq res t)))
-					  res)
-				 :notify (prj-widget-checkbox-notify :doctypes prj-tmp-list1)))
-	(widget-put wid :doctypes type)
+				 :value  (catch 'loop
+					   (dolist (currtype (prj-project-doctypes))
+					     (and (equal (car currtype) (car type))
+						  (throw 'loop t))))
+				 :notify (prj-widget-checkbox-notify :doctype prj-tmp-list1)))
+	(widget-put wid :doctype type)
 	(push wid prj-tmp-list3)))
     (widget-insert "\n")
     (widget-insert "Include Path:\n")
@@ -293,7 +315,8 @@
       (message (format "[%s] Search ...done" (prj-project-name))))
 
     ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    (setq prj-tmp-list1 (prj-project-doctypes))
+    (setq prj-tmp-list1 (copy-list (prj-project-doctypes)))
+
     (widget-insert "=== Search Project ===\n\n")
     (widget-create 'editable-field
 		   :format "Search: %v"
