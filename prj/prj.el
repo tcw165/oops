@@ -71,7 +71,7 @@
   :type '(repeat (cons string string))
   :group 'prj-group)
 
-(defcustom prj-exclude-types ".git;.svn;.#*"
+(defcustom prj-exclude-types ".git;.svn"
   "Those kinds of file should be excluded in the project. Each matches should be delimit with ';'."
   ;; TODO: give GUI a pretty appearance.
   :type '(string)
@@ -126,6 +126,7 @@
 (defun prj-new-config ()
   "Return a new config (hash map)."
   (let ((config (make-hash-table :test 'equal)))
+    (puthash :version (current-time) config)
     (puthash :name nil config)
     (puthash :doctypes '() config)
     (puthash :filepaths '() config)
@@ -137,7 +138,8 @@
   (when (file-writable-p filename)
     (with-temp-file filename
       (insert (let (print-length)
-		(prin1-to-string data))))))
+		(prin1-to-string data))))
+    (garbage-collect)))
 
 (defun prj-import-data (filename)
   "Read data exported by `prj-export-data' from file `filename'."
@@ -146,45 +148,48 @@
       (insert-file-contents filename)
       (read (buffer-string)))))
 
-(defun prj-build-filedb-internal (path match)
-  "Return a list that is made by recursively scan `dir' with file name which matches the regexp `match'."
+(defun prj-build-filedb-internal (path matches exclude db)
+  "Return a list that is made by recursively scan `dir' with file name which matches the regexp `matches'."
   (let* ((fs (and (file-directory-p path)
-		  (directory-files path t "[^.]$" t)))
-	 res)
+		  (directory-files path t "[^.]$" t))))
     (if fs
 	;; A directory.
-	(dolist (f fs)
-	  (setq res (append res (prj-build-filedb-internal f match))))
+	(unless (string-match exclude path)
+	  (dolist (f fs)
+	    (prj-build-filedb-internal f matches exclude db)))
       ;; A file.
       (message "Building database and may take a moment.\nScan ...%s" path)
-      (and (string-match match path)
-	   (setq res (append res (list path)))))
-    res))
+      (dolist (elm matches)
+	(let* ((doctype (car elm))
+	       (match (cdr elm))
+	       (files (gethash doctype db)))
+	  (and (string-match match path)
+	       (puthash doctype (push path files) db)))))))
 
 (defun prj-build-filedb ()
   "Create a list that contains all the files which should be included in the current project. Export the list to a file."
-  (let (match db)
-    ;; Prepare regexp for filtering file names.
-    (setq match (concat
-		 ;; Skip file name that starts with '.', '~' and '#'.
-		 "^[^.~#].*\\("
-		 (let (reg)
-		   (dolist (doctype (prj-project-doctypes))
-		     (let ((type (cdr doctype)))
-		       ;; Replace ';' with "\\|"; "*." or '.' with "\\."
-		       (setq reg (concat
-				  reg
-				  (replace-regexp-in-string "\\(\\.\\|\\*\\.\\)" "\\\\."
-							    (replace-regexp-in-string ";" "\\\\|" type t) t)
-				  "\\|"))))
-		   reg)
-		 "\\)$")
-	  ;; Replace redundant syntax, "\\|\\)" with "\\)".
-	  match (replace-regexp-in-string "\\\\|\\\\)" "\\\\)" match))
-    ;; Search recursively in the project.
+  (let ((db (make-hash-table :test 'equal))
+	exclude
+	match
+	matches)
+    ;; Prepare regexp.
+    (setq exclude (replace-regexp-in-string "\\(\\.\\|\\*\\.\\)" "\\\\." prj-exclude-types)
+	  exclude (replace-regexp-in-string ";" "\\\\|" exclude)
+	  exclude (concat "\\(" exclude "\\)"))
+    (dolist (doctype (prj-project-doctypes))
+      ;; ";"        => "\\|"
+      ;; "*." "."   => "\\."
+      (setq match (replace-regexp-in-string "\\(\\.\\|\\*\\.\\)" "\\\\." (cdr doctype))
+	    match (replace-regexp-in-string ";" "\\\\|" match)
+	    match (concat "\\(" match "\\)$"))
+      (puthash doctype nil db)
+      (push (cons doctype match) matches))
+    (setq matches (reverse matches))
+    ;; Search directories and files.
     (dolist (f (prj-project-filepaths))
-      (setq db (append db (prj-build-filedb-internal f match))))
+      (prj-build-filedb-internal f matches exclude db))
     ;; Export database.
+    (puthash :version (current-time) db)
     (prj-export-data (prj-filedb-path) db)
     (message (format "[%s] Database is updated!" (prj-project-name)))))
 
@@ -267,10 +272,10 @@
     (prj-build-database))
   ;; Find file.
   (let* ((filedb (prj-import-data (prj-filedb-path)))
-	 (file (ido-completing-read (format "[%s] Find file: " (prj-project-name)) filedb)))
-    (unless (member file filedb)
-      (error (format "[%s] Can't find %s!" (prj-project-name) file)))
-    (find-file file))
+	 (filelist '()))
+    (dolist (elm (prj-project-doctypes))
+      (setq filelist (append filelist (gethash elm filedb))))
+    (find-file (ido-completing-read (format "[%s] Find file: " (prj-project-name)) filelist)))
   (garbage-collect))
 
 ;;;###autoload
