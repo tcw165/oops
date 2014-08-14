@@ -193,6 +193,83 @@
   ;; TODO: implemnt it.
   )
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmacro prj-with-search-buffer (&rest body)
+  "Switch to search buffer and setup specific major mode and minor modes. Create a new one if it doesn't exist."
+  `(let (pt)
+     (find-file (prj-searchdb-path))
+     (kill-all-local-variables)
+     (remove-overlays)
+     (goto-char (point-max))
+     (setq pt (point))
+     (rename-buffer "*Search*")
+     (progn ,@body)
+     (goto-char pt)
+     ;; Change major mode.
+     (search-list-mode)
+     ;; Enable minor modes.
+     (hl-line-mode)
+     (save-buffer)))
+
+(defun prj-create-project-internal (name doctypes filepaths)
+  "Internal function to create project. It might be called by widget or other GUI framework."
+  (let* ((path (format "%s/%s/%s" prj-workspace-path name prj-config-name))
+	 (fullpath (expand-file-name path))
+	 (dir (file-name-directory fullpath))
+	 (config (prj-new-config)))
+    ;; Prepare project directory.
+    (unless (file-directory-p dir)
+      (make-directory dir))
+    ;; Export configuration.
+    (puthash :name name config)
+    (puthash :doctypes doctypes config)
+    (puthash :filepaths filepaths config)
+    (prj-export-data path config)
+    ;; Load project.
+    (prj-load-project)
+    ;; Build database if the prject which was just created is present.
+    (and (equal (prj-project-name) prj-tmp-string)
+	 (prj-build-database))))
+
+(defun prj-edit-project-internal (doctypes filepaths updatedb)
+  "Internal function to edit project. It might be called by widget or other GUI framework."
+  (puthash :version (current-time) prj-config)
+  (puthash :doctypes doctypes prj-config)
+  (puthash :filepaths filepaths prj-config)
+  (prj-export-data (prj-config-path) prj-config)
+  ;; Update file database.
+  (and updatedb
+       (prj-build-filedb)))
+
+(defun prj-delete-project-internal (projects)
+  "Internal function to delete project. It might be called by widget or other GUI framework."
+  (dolist (c projects)
+    ;; Unload current project if it is selected.
+    (when (and (prj-project-p)
+	       (equal c (prj-project-name)))
+      (prj-unload-project))
+    ;; Delete directory
+    (delete-directory (format "%s/%s" prj-workspace-path c) t t))
+  (message "[Prj] Delet project ...done"))
+
+(defun prj-search-project-internal (match projects)
+  "Internal function to search project. It might be called by widget or other GUI framework."
+  (prj-with-search-buffer
+    (let ((db (prj-import-data (prj-filedb-path)))
+	  (files '()))
+      (insert (format ">>>>> %s\n" match))
+      ;; Prepare file list.
+      (dolist (elm projects)
+	(dolist (f (gethash elm db))
+	  (message "[%s] Searching ...%s" (prj-project-name) f)
+	  (goto-char (point-max))
+	  (call-process "grep" nil (list (current-buffer) nil) t "-nH" match f)))
+      (insert "<<<<<\n\n")
+      (message (format "[%s] Search ...done" (prj-project-name))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 ;;;###autoload
 (defun prj-preference ()
   "Customize document types."
@@ -290,14 +367,6 @@
       ;; Back to previous buffer of current window.
       (switch-to-buffer (caar (window-prev-buffers)))
     ;; Go to search buffer.
-    (let ((search (get-buffer "*Search*"))
-	  (path (prj-searchdb-path)))
-      (if search
-	  (switch-to-buffer search)
-	(if (file-exists-p path)
-	    (progn
-	      (find-file path)
-	      (rename-buffer "*Search*"))
-	  (message "[%s] There's no search cache!"))))))
+    (prj-with-search-buffer)))
 
 (provide 'prj)

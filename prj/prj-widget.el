@@ -99,19 +99,6 @@
      (setq orderlist (reverse orderlist)
 	   ,choices orderlist)))
 
-(defmacro prj-with-file (name file &rest body)
-  (declare (indent 1) (debug t))
-  `(let (pt)
-     (find-file ,file)
-     (kill-all-local-variables)
-     (remove-overlays)
-     (goto-char (point-max))
-     (setq pt (point))
-     (rename-buffer ,name)
-     (progn ,@body)
-     (goto-char pt)
-     (save-buffer)))
-
 (defun prj-serialize-doctype (doctype)
   (format "%s (%s)" (car doctype) (cdr doctype)))
 
@@ -119,35 +106,18 @@
   (prj-with-widget "*Create Project*"
     ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     (lambda (&rest ignore)
-      (let* ((config-file-path (expand-file-name (format "%s/%s/%s"
-							 prj-workspace-path
-							 prj-tmp-string
-							 prj-config-name)))
-	     (dir (file-name-directory config-file-path)))
-	;; Validate file paths.
-	(prj-validate-filepaths prj-tmp-list2)
-	;; Return if there is an invalid info.
-	(unless (and prj-tmp-string
-		     (> (length prj-tmp-list1) 0)
-		     (> (length prj-tmp-list2) 0))
-	  (error "[Prj] Can't create new project due to invalid information."))
-	;; Sort the order of doctypes.
-	(prj-sort-doctypes prj-tmp-list1 prj-document-types)
-	;; Prepare directory. Directory name is also the project name.
-	(unless (file-directory-p dir)
-	  (make-directory dir))
-	;; Export configuration.
-	(let ((config (prj-new-config)))
-	  (puthash :name prj-tmp-string config)
-	  (puthash :doctypes prj-tmp-list1 config)
-	  (puthash :filepaths prj-tmp-list2 config)
-	  (prj-export-data config-file-path config))
-	(kill-buffer)
-	;; Load project.
-	(prj-load-project)
-	;; Build database if the prject which was just created is present.
-	(and (equal (prj-project-name) prj-tmp-string)
-	     (prj-build-database))))
+      ;; Validate file paths.
+      (prj-validate-filepaths prj-tmp-list2)
+      ;; Return if there is an invalid info.
+      (unless (and prj-tmp-string
+		   (> (length prj-tmp-list1) 0)
+		   (> (length prj-tmp-list2) 0))
+	(error "[Prj] Can't create new project due to invalid information."))
+      ;; Sort the order of doctypes.
+      (prj-sort-doctypes prj-tmp-list1 prj-document-types)
+      ;; Export configuration.
+      (prj-create-project-internal prj-tmp-string prj-tmp-list1 prj-tmp-list2)
+      (kill-buffer))
 
     ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     (widget-insert "=== Create New Project ===\n\n")
@@ -191,15 +161,8 @@
   (prj-with-widget "*Delete Project*"
     ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     (lambda (&rest ignore)
-      (dolist (c prj-tmp-list1)
-	;; Unload current project if it is selected.
-	(when (and (prj-project-p)
-		   (string-equal (prj-project-name) c))
-	  (prj-unload-project))
-	;; Delete directory
-	(delete-directory (format "%s/%s" prj-workspace-path c) t t))
-      (kill-buffer)
-      (message "[Prj] Delet project ...done"))
+      (prj-delete-project-internal prj-tmp-list1)
+      (kill-buffer))
 
     ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     (widget-insert "=== Delete Project ===\n\n")
@@ -242,13 +205,7 @@
 	      (setq updatefiledb t)
 	      (throw 'loop t))))
 	;; Export configuration.
-	(puthash :version (current-time) prj-config)
-	(puthash :doctypes prj-tmp-list1 prj-config)
-	(puthash :filepaths prj-tmp-list2 prj-config)
-	(prj-export-data (prj-config-path) prj-config)
-	;; Update file database.
-	(and updatefiledb
-	     (prj-build-filedb))
+	(prj-edit-project-internal prj-tmp-list1 prj-tmp-list2 updatefiledb)
 	(kill-buffer)))
 
     ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -302,30 +259,13 @@
       (unless (> (length prj-tmp-list1) 0)
 	(error (format "[%s] Please select document types for searching!" (prj-project-name))))
       (kill-buffer)
-      (prj-with-file "*Search*"
-	;; File ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	(prj-searchdb-path)
-	;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	;; Change major mode.
-	(search-list-mode)
-	;; Enable minor modes.
-	(hl-line-mode)
-	(insert (format ">>>>> %s\n" prj-tmp-string))
-	(let ((db (prj-import-data (prj-filedb-path)))
-	      (files '()))
-	  ;; Prepare file list.
-	  (dolist (elm prj-tmp-list1)
-	    (dolist (f (gethash elm db))
-	      (message "[%s] Searching ...%s" (prj-project-name) f)
-	      (goto-char (point-max))
-	      (call-process "grep" nil (list (current-buffer) nil) t "-nH" prj-tmp-string f)))
-	  (insert "<<<<<\n\n")))
-      (message (format "[%s] Search ...done" (prj-project-name))))
+      (prj-search-project-internal prj-tmp-string prj-tmp-list1))
 
     ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     (setq prj-tmp-list1 (copy-list (prj-project-doctypes)))
 
     (widget-insert "=== Search Project ===\n\n")
+    (widget-insert (format "Project Name: %s\n\n" (prj-project-name)))
     (widget-create 'editable-field
 		   :format "Search: %v"
 		   :notify (prj-widget-common-notify prj-tmp-string))
