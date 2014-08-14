@@ -136,24 +136,15 @@ The `base' should be a directory string and the `exclude' should be a list that 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; (require 'helm-mode)
-;; (require 'helm-projectile)
-;; (require 'widget-mvc)
 
 (require 'company)
 (add-hook 'emacs-lisp-mode-hook 'company-mode)
 
 (require 'history)
-
 (require 'prj)
-
 (require 'oops)
 (oops-mode 1)
 
 (require 'semantic)
 (semantic-mode)
 
-(require 'projectile)
-
-;; (projectile-global-mode 1)
-;; (setq projectile-enable-caching t)
-;; (setq projectile-require-project-root nil)

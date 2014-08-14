@@ -146,8 +146,8 @@
 
 (defun prj-build-filedb-internal (path matches exclude db)
   "Return a list that is made by recursively scan `dir' with file name which matches the regexp `matches'."
-  (let* ((fs (and (file-directory-p path)
-		  (directory-files path t "[^.]$" t))))
+  (let ((fs (and (file-directory-p path)
+		 (directory-files path t "[^.]$" t))))
     (if fs
 	;; A directory.
 	(unless (string-match exclude path)
@@ -310,6 +310,12 @@
     (let ((c (ido-completing-read "[Prj] Load project: " choices)))
       (unless (member c choices)
 	(error (format "[Prj] Can't load project invalid project, %s" c)))
+      ;; Kill search buffer.
+      (let ((search (get-buffer "*Search*")))
+	(and search
+	     (with-current-buffer search
+	       (save-buffer)
+	       (kill-buffer))))
       ;; Read configuration.
       (setq prj-config (prj-import-data (format "%s/%s/%s" prj-workspace-path c prj-config-name)))
       (message "[%s] Load project ...done" (prj-project-name)))))
