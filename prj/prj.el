@@ -112,10 +112,6 @@
   "The current project's file path value."
   (gethash :filepaths prj-config))
 
-(defun prj-project-searchdb ()
-  "The current project's search value."
-  (gethash :search prj-config))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun prj-project-p ()
@@ -289,6 +285,19 @@
 
 ;;;###autoload
 (defun prj-toggle-search-buffer ()
-  (interactive))
+  (interactive)
+  (if (equal (buffer-name (current-buffer)) "*Search*")
+      ;; Back to previous buffer of current window.
+      (switch-to-buffer (caar (window-prev-buffers)))
+    ;; Go to search buffer.
+    (let ((search (get-buffer "*Search*"))
+	  (path (prj-searchdb-path)))
+      (if search
+	  (switch-to-buffer search)
+	(if (file-exists-p path)
+	    (progn
+	      (find-file path)
+	      (rename-buffer "*Search*"))
+	  (message "[%s] There's no search cache!"))))))
 
 (provide 'prj)
