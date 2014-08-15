@@ -215,9 +215,9 @@
 (defun prj-create-project-internal (name doctypes filepaths)
   "Internal function to create project. It might be called by widget or other GUI framework."
   (let* ((path (format "%s/%s/%s" prj-workspace-path name prj-config-name))
-	 (fullpath (expand-file-name path))
-	 (dir (file-name-directory fullpath))
-	 (config (prj-new-config)))
+         (fullpath (expand-file-name path))
+         (dir (file-name-directory fullpath))
+         (config (prj-new-config)))
     ;; Prepare project directory.
     (unless (file-directory-p dir)
       (make-directory dir))

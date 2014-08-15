@@ -15,6 +15,7 @@
  '(hl-line-sticky-flag nil)
  '(ido-mode (quote both) nil (ido))
  '(imenu-sort-function (quote imenu--sort-by-name))
+ '(indent-tabs-mode nil)
  '(make-backup-files nil)
  '(mouse-wheel-follow-mouse t)
  '(mouse-wheel-scroll-amount (quote (1 ((shift) . 1))))

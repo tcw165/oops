@@ -311,8 +311,7 @@
           ;; including: "begining of line"", "end of line"", "space"", "("
           (looking-at "\\(^\\|$\\|\(\\|\\s-+\\)"))
       (indent-for-tab-command)
-    (company-complete-common))
-  )
+    (company-complete)))
 
 ;;; Navigation =================================================================
 
