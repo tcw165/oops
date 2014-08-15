@@ -46,39 +46,44 @@
 (defmacro prj-with-widget (name ok &rest body)
   (declare (indent 1) (debug t))
   `(progn
-     (switch-to-buffer ,name)
-     (kill-all-local-variables)
-     (let ((inhibit-read-only t))
-       (erase-buffer))
-     (remove-overlays)
-     ;; Face
-     ;; (setq-local widget-documentation-face custom-documentation)
-     (setq-local widget-button-face custom-button)
-     (setq-local widget-button-pressed-face custom-button-pressed)
-     (setq-local widget-mouse-face custom-button-mouse)
-     ;; When possible, use relief for buttons, not bracketing.
-     (when custom-raised-buttons
-       (setq-local widget-push-button-prefix " ")
-       (setq-local widget-push-button-suffix " ")
-       (setq-local widget-link-prefix "")
-       (setq-local widget-link-suffix ""))
-     (setq show-trailing-whitespace nil)
-     (setq prj-tmp-string nil)
-     (setq prj-tmp-list1 nil)
-     (setq prj-tmp-list2 nil)
-     (setq prj-tmp-list3 nil)
-     ,@body ;; <== body
-     (widget-insert "\n")
-     (widget-create 'push-button
-		    :notify ,ok
-		    "ok")
-     (widget-insert " ")
-     (widget-create 'push-button
-		    :notify (lambda (&rest ignore)
-			      (kill-buffer))
-		    "cancel")
-     (use-local-map widget-keymap)
-     (widget-setup)))
+     (let ((buffer (get-buffer ,name)))
+       (if buffer
+	   ;; Kill it if exist.
+	   (kill-buffer buffer)
+	 ;; Create one if doesn't exist.
+	 (switch-to-buffer ,name)
+	 (kill-all-local-variables)
+	 (let ((inhibit-read-only t))
+	   (erase-buffer))
+	 (remove-overlays)
+	 ;; Face
+	 ;; (setq-local widget-documentation-face custom-documentation)
+	 (setq-local widget-button-face custom-button)
+	 (setq-local widget-button-pressed-face custom-button-pressed)
+	 (setq-local widget-mouse-face custom-button-mouse)
+	 ;; When possible, use relief for buttons, not bracketing.
+	 (when custom-raised-buttons
+	   (setq-local widget-push-button-prefix " ")
+	   (setq-local widget-push-button-suffix " ")
+	   (setq-local widget-link-prefix "")
+	   (setq-local widget-link-suffix ""))
+	 (setq show-trailing-whitespace nil)
+	 (setq prj-tmp-string nil)
+	 (setq prj-tmp-list1 nil)
+	 (setq prj-tmp-list2 nil)
+	 (setq prj-tmp-list3 nil)
+	 ,@body ;; <== body
+	 (widget-insert "\n")
+	 (widget-create 'push-button
+			:notify ,ok
+			"ok")
+	 (widget-insert " ")
+	 (widget-create 'push-button
+			:notify (lambda (&rest ignore)
+				  (kill-buffer))
+			"cancel")
+	 (use-local-map widget-keymap)
+	 (widget-setup)))))
 
 (defmacro prj-validate-filepaths (paths)
   "Iterate the file paths in the configuration in order to discard invalid paths."

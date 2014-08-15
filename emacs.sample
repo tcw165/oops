@@ -20,7 +20,6 @@
  '(mouse-wheel-scroll-amount (quote (1 ((shift) . 1))))
  '(package-archives (quote (("gnu" . "http://elpa.gnu.org/packages/") ("elpa" . "http://melpa.milkbox.net/packages/") ("marmalade" . "http://marmalade-repo.org/packages/"))))
  '(scroll-step 1)
- '(shell-file-name "D:/cygwin/bin/sh.exe")
  '(show-paren-mode nil)
  '(standard-indent 2)
  '(vc-handled-backends nil)
@@ -109,6 +108,8 @@ The `base' should be a directory string and the `exclude' should be a list that 
 (global-set-key "\t" 'oops-indent-or-company)
 
 ;; F1
+(global-set-key (kbd "S-<f1>") 'prj-search-project)
+(global-set-key (kbd "M-<f1>") 'prj-toggle-search-buffer)
 ;; F2
 (global-set-key (kbd "<f2>") 'hl-thing-at-point)
 ;; F3
