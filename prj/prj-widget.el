@@ -21,6 +21,8 @@
 (require 'cus-edit)
 (require 'widget)
 (require 'wid-edit)
+(require 'company)
+(require 'company-files)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -48,42 +50,46 @@
   `(progn
      (let ((buffer (get-buffer ,name)))
        (if buffer
-	   ;; Kill it if exist.
-	   (kill-buffer buffer)
-	 ;; Create one if doesn't exist.
-	 (switch-to-buffer ,name)
-	 (kill-all-local-variables)
-	 (let ((inhibit-read-only t))
-	   (erase-buffer))
-	 (remove-overlays)
-	 ;; Face
-	 ;; (setq-local widget-documentation-face custom-documentation)
-	 (setq-local widget-button-face custom-button)
-	 (setq-local widget-button-pressed-face custom-button-pressed)
-	 (setq-local widget-mouse-face custom-button-mouse)
-	 ;; When possible, use relief for buttons, not bracketing.
-	 (when custom-raised-buttons
-	   (setq-local widget-push-button-prefix " ")
-	   (setq-local widget-push-button-suffix " ")
-	   (setq-local widget-link-prefix "")
-	   (setq-local widget-link-suffix ""))
-	 (setq show-trailing-whitespace nil)
-	 (setq prj-tmp-string nil)
-	 (setq prj-tmp-list1 nil)
-	 (setq prj-tmp-list2 nil)
-	 (setq prj-tmp-list3 nil)
-	 ,@body ;; <== body
-	 (widget-insert "\n")
-	 (widget-create 'push-button
-			:notify ,ok
-			"ok")
-	 (widget-insert " ")
-	 (widget-create 'push-button
-			:notify (lambda (&rest ignore)
-				  (kill-buffer))
-			"cancel")
-	 (use-local-map widget-keymap)
-	 (widget-setup)))))
+           ;; Kill it if exist.
+           (kill-buffer buffer)
+         ;; Create one if doesn't exist.
+         (switch-to-buffer ,name)
+         (kill-all-local-variables)
+         (let ((inhibit-read-only t))
+           (erase-buffer))
+         (remove-overlays)
+         ;; Face
+         (setq-local widget-button-face custom-button)
+         (setq-local widget-button-pressed-face custom-button-pressed)
+         (setq-local widget-mouse-face custom-button-mouse)
+         ;; When possible, use relief for buttons, not bracketing.
+         (when custom-raised-buttons
+           (setq-local widget-push-button-prefix " ")
+           (setq-local widget-push-button-suffix " ")
+           (setq-local widget-link-prefix "")
+           (setq-local widget-link-suffix ""))
+         (setq show-trailing-whitespace nil)
+         (setq prj-tmp-string nil)
+         (setq prj-tmp-list1 nil)
+         (setq prj-tmp-list2 nil)
+         (setq prj-tmp-list3 nil)
+         ,@body ;; <== body
+         (widget-insert "\n")
+         (widget-create 'push-button
+                        :notify ,ok
+                        "ok")
+         (widget-insert " ")
+         (widget-create 'push-button
+                        :notify (lambda (&rest ignore)
+                                  (kill-buffer))
+                        "cancel")
+         (use-local-map widget-keymap)
+         (widget-setup)
+         ;; Enable specific mode.
+         (company-mode)
+         (make-local-variable 'company-backends)
+         (add-hook 'widget-forward-hook 'prj-widget-forward-or-company t t)
+         (add-to-list 'company-backends 'prj-browse-file-backend)))))
 
 (defmacro prj-validate-filepaths (paths)
   "Iterate the file paths in the configuration in order to discard invalid paths."
@@ -103,6 +109,38 @@
 	    (push i orderlist)))
      (setq orderlist (reverse orderlist)
 	   ,choices orderlist)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun prj-widget-forward-or-company ()
+  "It is for `widget-forward-hook' to continue forward to next widget or show company prompt."
+  (interactive)
+  (and (prj-browse-file-prefix)
+       (company-complete)
+       (top-level)))
+
+(defun prj-browse-file-prefix ()
+  "The function respond 'prefix for `prj-browse-file-backend'. Return nil means skip this backend function; Any string means there're candidates should be prompt. Only the editable-field with :file-browse property is allowed."
+  (let* ((field (widget-field-at (point)))
+         (supported (widget-get field :file-browse)))
+    (if (and field supported)
+        (let ((start (widget-field-start field))
+              (end (widget-field-end field)))
+          (buffer-substring-no-properties start end))
+      nil)))
+
+(defun prj-browse-file-backend (command &optional arg &rest ign)
+  "The backend based on `company' to provide convenience when browsing files."
+  (interactive (list 'interactive))
+  (case command
+    (interactive (company-begin-backend 'prj-browse-file-backend))
+    (prefix (prj-browse-file-prefix))
+    ;; (no-cache t)
+    (require-match t)
+    (ignore-case t)
+    (candidates (company-files command arg ign))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun prj-serialize-doctype (doctype)
   (format "%s (%s)" (car doctype) (cdr doctype)))
@@ -160,7 +198,8 @@
 		   :entry-format "%i %d %v"
 		   :value '("")
 		   :notify (prj-widget-common-notify prj-tmp-list2)
-		   '(editable-field :value ""))))
+                   ;; Put :file-browse to make company work for it.
+		   '(editable-field :value "" :file-browse t))))
 
 (defun prj-setup-delete-project-widget ()
   (prj-with-widget "*Delete Project*"
