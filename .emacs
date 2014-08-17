@@ -141,6 +141,10 @@ The `base' should be a directory string and the `exclude' should be a list that 
 
 (require 'company)
 (add-hook 'emacs-lisp-mode-hook 'company-mode)
+(add-hook 'c-mode-hook 'company-mode)
+(add-hook 'c++-mode-hook 'company-mode)
+(setq company-idle-delay t)
+(setq company-minimum-prefix-length 0)
 
 (require 'history)
 (require 'prj)
