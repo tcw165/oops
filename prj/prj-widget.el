@@ -292,7 +292,7 @@
 		   :entry-format "%i %d %v"
 		   :value (prj-project-filepaths)
 		   :notify (prj-widget-common-notify prj-tmp-list2)
-		   '(editable-field))))
+		   '(editable-field :file-browse t))))
 
 (defun prj-setup-search-project-widget ()
   (prj-with-widget "*Search Project*"
