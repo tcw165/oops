@@ -111,6 +111,11 @@
 	   ,choices orderlist)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Following are for `company' when browsing files or directories.
+
+(defvar prj-browse-file-cache nil
+  "Storing (DIR . (CANDIDATES...)) for completion.")
+(make-variable-buffer-local 'prj-browse-file-cache)
 
 (defun prj-widget-forward-or-company ()
   "It is for `widget-forward-hook' to continue forward to next widget or show company prompt."
@@ -120,14 +125,41 @@
        (top-level)))
 
 (defun prj-browse-file-prefix ()
-  "The function respond 'prefix for `prj-browse-file-backend'. Return nil means skip this backend function; Any string means there're candidates should be prompt. Only the editable-field with :file-browse property is allowed."
+  "The function responds 'prefix for `prj-browse-file-backend'. Return nil means skip this backend function; Any string means there're candidates should be prompt. Only the editable-field with :file-browse property is allowed."
   (let* ((field (widget-field-at (point)))
          (supported (widget-get field :file-browse)))
     (if (and field supported)
-        (let ((start (widget-field-start field))
-              (end (widget-field-end field)))
-          (buffer-substring-no-properties start end))
+        (let* ((start (widget-field-start field))
+               (end (widget-field-end field))
+               (prefix (buffer-substring-no-properties start end)))
+          prefix)
       nil)))
+
+(defun prj-directory-files (dir)
+  "Return a list containing file names under `dir'. Exlcude file names refer to `prj-exclude-types'."
+  ;; TODO: get exclude from `prj-exclude-types'.
+  (directory-files dir nil ".*[^\\(.git\\|.svn\\)].*[^.]$"))
+
+(defun prj-browse-file-complete (prefix)
+  "The function responds 'candiates for `prj-browse-file-backend'."
+  (let* ((dir (file-name-directory prefix))
+         path
+         candidates
+         directories)
+    (unless (equal dir (car prj-browse-file-cache))
+      (dolist (file (prj-directory-files dir))
+        (setq path (concat dir file))
+        (push path candidates)
+        ;; Add one level of children.
+        (when (file-directory-p path)
+          (push path directories)))
+      (dolist (directory (reverse directories))
+        (dolist (child (prj-directory-files dir))
+          (setq path (concat directory "/" child))
+          (push path candidates)))
+      (setq prj-browse-file-cache (cons dir (nreverse candidates))))
+    (all-completions prefix
+                     (cdr prj-browse-file-cache))))
 
 (defun prj-browse-file-backend (command &optional arg &rest ign)
   "The backend based on `company' to provide convenience when browsing files."
@@ -135,10 +167,10 @@
   (case command
     (interactive (company-begin-backend 'prj-browse-file-backend))
     (prefix (prj-browse-file-prefix))
-    ;; (no-cache t)
+    (candidates (prj-browse-file-complete arg))
+    (no-cache t)
     (require-match t)
-    (ignore-case t)
-    (candidates (company-files command arg ign))))
+    (ignore-case t)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -163,7 +195,8 @@
       (kill-buffer))
 
     ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    (widget-insert "=== Create New Project ===\n\n")
+    (widget-insert "=== Create New Project ===\n")
+    (widget-insert "Use TAB to jump to forward widget; Shift-Tab to jump to backward widget.\n\n")
     (widget-create 'editable-field
 		   :format "Project Name: %v"
 		   :notify (prj-widget-common-notify prj-tmp-string))
@@ -194,6 +227,8 @@
 	(push wid prj-tmp-list3)))
     (widget-insert "\n")
     (widget-insert "Include Path:\n")
+    (widget-insert "Button INS to insert a new path item; Button DEL to delete one.\n")
+    (widget-insert "Use TAB to jump to forward path item or popup a path prompt.\n")
     (widget-create 'editable-list
 		   :entry-format "%i %d %v"
 		   :value '("")
@@ -209,7 +244,8 @@
       (kill-buffer))
 
     ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    (widget-insert "=== Delete Project ===\n\n")
+    (widget-insert "=== Delete Project ===\n")
+    (widget-insert "Use TAB to jump to forward widget; Shift-Tab to jump to backward widget.\n\n")
     (widget-insert "Select projects to be deleted:\n")
     (let (choices)
       (dolist (f (directory-files prj-workspace-path))
@@ -256,7 +292,8 @@
     (setq prj-tmp-list1 (copy-list (prj-project-doctypes)))
     (setq prj-tmp-list2 (copy-list (prj-project-filepaths)))
 
-    (widget-insert "=== Edit Project ===\n\n")
+    (widget-insert "=== Edit Project ===\n")
+    (widget-insert "Use TAB to jump to forward widget; Shift-Tab to jump to backward widget.\n\n")
     (widget-insert (format "Project Name: %s\n\n" (prj-project-name)))
     (widget-insert "Document Types (Edit) ") ;; TODO: add customizable link
     (widget-create 'push-button
