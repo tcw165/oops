@@ -84,11 +84,14 @@
                         :notify (lambda (&rest ignore)
                                   (kill-buffer))
                         "cancel")
-         ;; TODO: move point to 1st editable-field.
          ;; Make some TAB do something before its original task.
          (add-hook 'widget-forward-hook 'prj-widget-forward-or-company t t)
          (use-local-map widget-keymap)
          (widget-setup)
+         ;; Move point to 1st editable-field.
+         (let ((field (car widget-field-list)))
+           (when field
+             (goto-char (widget-field-end field))))
          ;; Enable specific feature.
          (company-mode)
          (make-local-variable 'company-backends)
