@@ -375,30 +375,22 @@ cancel the use of the current buffer (for special-purpose buffers),
 or go back to just one window (by deleting all but the selected window)."
   (interactive)
   (cond
-   ((eq last-command 'mode-exited) nil
-    )
+   ((eq last-command 'mode-exited)
+    nil)
    ((region-active-p)
-    (deactivate-mark)
-    )
+    (deactivate-mark))
    ((> (minibuffer-depth) 0)
-    (abort-recursive-edit)
-    )
+    (abort-recursive-edit))
    (current-prefix-arg
     nil)
    ((> (recursion-depth) 0)
-    (exit-recursive-edit)
-    )
+    (exit-recursive-edit))
    (buffer-quit-function
-    (funcall buffer-quit-function)
-    )
-   ;; ((not (one-window-p t))
-   ;;  (delete-other-windows)
-   ;;  )
+    (funcall buffer-quit-function))
    ((string-match "^ \\*" (buffer-name (current-buffer)))
-    (bury-buffer)
-    )
-   )
-  )
+    (bury-buffer))
+   ((featurep 'company)
+    (company-cancel))))
 
 ;;; Others =====================================================================
 

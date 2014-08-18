@@ -193,6 +193,14 @@
   ;; TODO: implemnt it.
   )
 
+(defun prj-thingatpt ()
+  "Return a list, (REGEXP_STRING BEG END), on which the point is or just string of selection."
+  (if mark-active
+      (buffer-substring-no-properties (region-beginning) (region-end))
+    (let ((bound (bounds-of-thing-at-point 'symbol)))
+      (and bound
+           (buffer-substring-no-properties (car bound) (cdr bound))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defmacro prj-with-search-buffer (&rest body)
@@ -364,7 +372,7 @@
   ;; Load project if no project was loaded.
   (unless (prj-project-p)
     (prj-load-project))
-  (prj-setup-search-project-widget))
+  (prj-setup-search-project-widget (prj-thingatpt)))
 
 ;;;###autoload
 (defun prj-toggle-search-buffer ()

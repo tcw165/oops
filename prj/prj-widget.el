@@ -26,6 +26,9 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defvar prj-search-cache nil
+  "Cache for search history.")
+
 (defvar prj-tmp-string nil)
 (defvar prj-tmp-list1 nil)
 (defvar prj-tmp-list2 nil)
@@ -83,6 +86,7 @@
                         :notify (lambda (&rest ignore)
                                   (kill-buffer))
                         "cancel")
+         ;; TODO: move point to 1st editable-field.
          (use-local-map widget-keymap)
          (widget-setup)
          ;; Enable specific mode.
@@ -138,7 +142,7 @@
 (defun prj-directory-files (dir)
   "Return a list containing file names under `dir'. Exlcude file names refer to `prj-exclude-types'."
   ;; TODO: get exclude from `prj-exclude-types'.
-  (directory-files dir nil ".*[^\\(.git\\|.svn\\)].*[^.]$"))
+  (directory-files dir nil ".*[^\\(\\.git\\|\\.svn\\)].*[^.]$"))
 
 (defun prj-browse-file-complete (prefix)
   "The function responds 'candiates for `prj-browse-file-backend'."
@@ -154,7 +158,7 @@
         (when (file-directory-p path)
           (push path directories)))
       (dolist (directory (reverse directories))
-        (dolist (child (prj-directory-files dir))
+        (dolist (child (prj-directory-files directory))
           (setq path (concat directory "/" child))
           (push path candidates)))
       (setq prj-browse-file-cache (cons dir (nreverse candidates))))
@@ -331,7 +335,7 @@
 		   :notify (prj-widget-common-notify prj-tmp-list2)
 		   '(editable-field :file-browse t))))
 
-(defun prj-setup-search-project-widget ()
+(defun prj-setup-search-project-widget (search)
   (prj-with-widget "*Search Project*"
     ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     (lambda (&rest ignore)
@@ -349,7 +353,9 @@
     (widget-insert (format "Project Name: %s\n\n" (prj-project-name)))
     (widget-create 'editable-field
 		   :format "Search: %v"
-		   :notify (prj-widget-common-notify prj-tmp-string))
+                   :value (or search "")
+		   :notify (prj-widget-common-notify prj-tmp-string)
+                   :search t)
     (widget-insert "\n")
     (widget-insert "Document Types ")
     (widget-create 'push-button
