@@ -181,6 +181,15 @@
 (defun prj-serialize-doctype (doctype)
   (format "%s (%s)" (car doctype) (cdr doctype)))
 
+(defun prj-widget-clean ()
+  (dolist (name '("*Create Project*"
+                  "*Edit Project*"
+                  "*Delete Project*"
+                  "*Search Project*"))
+    (let ((search (get-buffer name)))
+      (and search
+           (kill-buffer search)))))
+
 (defun prj-setup-create-project-widget ()
   (prj-with-widget "*Create Project*"
     ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -348,6 +357,8 @@
 
     ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     (setq prj-tmp-list1 (copy-list (prj-project-doctypes)))
+    (and search
+         (setq prj-tmp-string search))
 
     (widget-insert "=== Search Project ===\n\n")
     (widget-insert (format "Project Name: %s\n\n" (prj-project-name)))

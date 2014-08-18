@@ -201,6 +201,17 @@
       (and bound
            (buffer-substring-no-properties (car bound) (cdr bound))))))
 
+(defun prj-clean ()
+  "Clean search buffer or widget buffers which belongs to other project when user loads a project or unload a project."
+  ;; Clean widgets.
+  (prj-widget-clean)
+  ;; Kill search buffer.
+  (let ((search (get-buffer "*Search*")))
+    (and search
+         (with-current-buffer search
+           (save-buffer)
+           (kill-buffer)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defmacro prj-with-search-buffer (&rest body)
@@ -300,8 +311,9 @@
 (defun prj-edit-project ()
   "Show configuration for editing project's setting."
   (interactive)
+  ;; Load project if wasn't loaded.
   (unless (prj-project-p)
-    (error "[Prj] There's no project was loaded."))
+    (prj-load-project))
   (prj-setup-edit-project-widget))
 
 ;;;###autoload
@@ -318,12 +330,7 @@
     (let ((c (ido-completing-read "[Prj] Load project: " choices)))
       (unless (member c choices)
 	(error (format "[Prj] Can't load project invalid project, %s" c)))
-      ;; Kill search buffer.
-      (let ((search (get-buffer "*Search*")))
-	(and search
-	     (with-current-buffer search
-	       (save-buffer)
-	       (kill-buffer))))
+      (prj-clean)
       ;; Read configuration.
       (setq prj-config (prj-import-data (format "%s/%s/%s" prj-workspace-path c prj-config-name)))
       (message "[%s] Load project ...done" (prj-project-name)))))
@@ -333,6 +340,7 @@
   "Unload current project."
   (interactive)
   (when (prj-project-p)
+    (prj-clean)
     (message "[%s] Unload project ...done" (prj-project-name))
     (setq prj-config (prj-new-config))))
 
