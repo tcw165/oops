@@ -86,6 +86,9 @@
 (defconst prj-searchdb-name "search.db"
   "The simple text file which caches the search result that users have done in the last session.")
 
+(defconst prj-search-cache-max 16
+  "Maximin elements count in the searh history cache.")
+
 (defvar prj-config nil
   "A hash map which represent project's configuration.")
 
@@ -112,6 +115,9 @@
   "The current project's file path value."
   (gethash :filepaths prj-config))
 
+(defun prj-search-cache ()
+  (gethash :search-cache prj-config))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun prj-project-p ()
@@ -124,8 +130,9 @@
   (let ((config (make-hash-table :test 'equal)))
     (puthash :version (current-time) config)
     (puthash :name nil config)
-    (puthash :doctypes '() config)
-    (puthash :filepaths '() config)
+    (puthash :doctypes nil config)
+    (puthash :filepaths nil config)
+    (puthash :search-cache nil config)
     (garbage-collect)
     config))
 
@@ -274,6 +281,14 @@
 
 (defun prj-search-project-internal (match projects)
   "Internal function to search project. It might be called by widget or other GUI framework."
+  ;; Cache search string.
+  (let ((cache (prj-search-cache)))
+    (push match cache)
+    (and (> (length cache) prj-search-cache-max)
+         (setcdr (nthcdr (1- prj-search-cache-max) cache) nil))
+    (puthash :search-cache cache prj-config)
+    (prj-export-data (prj-config-path) prj-config))
+  ;; Create search buffer.
   (prj-with-search-buffer
     (let ((db (prj-import-data (prj-filedb-path)))
 	  (files '()))

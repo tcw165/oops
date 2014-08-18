@@ -26,9 +26,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defvar prj-search-cache nil
-  "Cache for search history.")
-
 (defvar prj-tmp-string nil)
 (defvar prj-tmp-list1 nil)
 (defvar prj-tmp-list2 nil)
@@ -150,22 +147,30 @@
 
 (defun prj-browse-file-complete (prefix)
   "The function responds 'candiates for `prj-browse-file-backend'."
-  (let* ((dir (file-name-directory prefix))
+  (let* ((dir (or (and (file-directory-p prefix)
+                       prefix)
+                  (file-name-directory prefix)))
          path
          candidates
          directories)
-    (unless (equal dir (car prj-browse-file-cache))
-      (dolist (file (prj-directory-files dir))
-        (setq path (concat dir file))
-        (push path candidates)
-        ;; Add one level of children.
-        (when (file-directory-p path)
-          (push path directories)))
-      (dolist (directory (reverse directories))
-        (dolist (child (prj-directory-files directory))
-          (setq path (concat directory "/" child))
-          (push path candidates)))
-      (setq prj-browse-file-cache (cons dir (nreverse candidates))))
+    (and dir
+         (unless (equal dir (car prj-browse-file-cache))
+           (dolist (file (prj-directory-files dir))
+             (setq path (concat dir
+                                (unless (eq (aref dir (1- (length dir))) ?/) "/")
+                                file))
+             (push path candidates)
+             ;; Add one level of children.
+             (when (file-directory-p path)
+               (push path directories)))
+           (dolist (directory (reverse directories))
+             (ignore-errors
+               (dolist (child (prj-directory-files directory))
+                 (setq path (concat directory
+                                    (unless (eq (aref directory (1- (length directory))) ?/) "/")
+                                    child))
+                 (push path candidates))))
+           (setq prj-browse-file-cache (cons dir (nreverse candidates)))))
     (all-completions prefix
                      (cdr prj-browse-file-cache))))
 
@@ -181,7 +186,7 @@
 (defun prj-search-complete (prefix)
   "The function responds 'candiates for `prj-search-backend'."
   ;; TODO: use `prj-search-cache'.
-  (list "111" "222" "333" "444"))
+  (all-completions prefix (prj-search-cache)))
 
 (defun prj-search-backend (command &optional arg &rest ign)
   "Following are for `company' when searching project."

@@ -50,8 +50,7 @@
 
    (:position  MARKER)
              - MARKER            Marker for a position.
-"
-  )
+")
 
 (defvar his--history-index 0)
 
@@ -62,17 +61,13 @@
   (if mark-active
       ;; return the selection.
       (let ((str (buffer-substring-no-properties (region-beginning) (region-end))))
-        (list str (region-beginning) (region-end))
-        )
+        (list str (region-beginning) (region-end)))
     ;; else.
     (let* ((bound (bounds-of-thing-at-point 'symbol))
            (str (and bound
                      (buffer-substring-no-properties (car bound) (cdr bound)))))
       (and str
-           (list str (car bound) (cdr bound)))
-      )
-    )
-  )
+           (list str (car bound) (cdr bound))))))
 
 (defun his--same-line-p (pos1 pos2)
   (let ((line-pos1 (save-excursion
@@ -85,9 +80,7 @@
                      (beginning-of-line)
                      (point)
                      )))
-    (= line-pos1 line-pos2)
-    )
-  )
+    (= line-pos1 line-pos2)))
 
 (defun his--add-history (history)
   (when history
@@ -95,16 +88,13 @@
     (and his--history-list
          (> his--history-index 0)
          (let ((current (nthcdr his--history-index his--history-list)))
-           (setq his--history-list (cdr current))
-           ))
+           (setq his--history-list (cdr current))))
     ;; Add new record.
     (push history his--history-list)
     (setq his--history-index 0)
     ;; Keep total amount of history is less than `his-history-max'.
     (and (> (length his--history-list) his-history-max)
-         (setcdr (nthcdr (1- his-history-max) his--history-list) nil))
-    )
-  )
+         (setcdr (nthcdr (1- his-history-max) his--history-list) nil))))
 
 (defun his--move-to-valid-history (step)
   (when (> (length his--history-list) 0)
@@ -129,29 +119,20 @@
                    (end (marker-position (nth 3 history)))
                    (str1 (nth 1 history))
                    (str2 (with-current-buffer buffer
-                           (buffer-substring-no-properties beg end)
-                           )))
+                           (buffer-substring-no-properties beg end))))
               (and (not (string-equal str1 str2))
-                   (setq is-discard t))
-              )
+                   (setq is-discard t)))
           ;; Buffer is invalid.
-          (setq is-discard t)
-          )
-        )
+          (setq is-discard t)))
        ;;; :position type ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        ((eq type :position)
         (setq buffer (marker-buffer (nth 1 history)))
         (and (not (buffer-live-p buffer))
-             (setq is-discard t))
-        )
-       )
+             (setq is-discard t))))
       ;; Discard history.
       (and is-discard
            (setq his--history-list (delq history his--history-list))
-           (his--move-to-valid-history step))
-      )
-    )
-  )
+           (his--move-to-valid-history step)))))
 
 (defun his--use-history-at-index ()
   (if (= (length his--history-list) 0)
@@ -172,8 +153,7 @@
         ;; Update region.
         (set-marker (mark-marker) pos1)
         (goto-char pos2)
-        (setq mark-active t)
-        )
+        (setq mark-active t))
        ;;; :position type ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        ((eq type :position)
         (setq buffer (marker-buffer (nth 1 history))
@@ -182,16 +162,11 @@
         (switch-to-buffer buffer)
         ;; Update point.
         (goto-char pos1)
-        (setq mark-active nil)
-        )
-       )
-      )
+        (setq mark-active nil))))
     (message "[History] navigate to %s/%s."
              (if (> (length his--history-list) 0)
                  (- (length his--history-list) his--history-index) 0)
-             (length his--history-list))
-    )
-  )
+             (length his--history-list))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Public Functions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -206,9 +181,7 @@
          (marker1 (copy-marker beg t))
          (marker2 (copy-marker end t))
          (history (list :region str marker1 marker2)))
-    (his--add-history history)
-    )
-  )
+    (his--add-history history)))
 
 ;;;###autoload
 (defun his-add-position-type-history (&optional position)
@@ -217,9 +190,7 @@
   (let* ((pos (or position
 		  (point)))
 	 (history (list :position (copy-marker pos t))))
-    (his--add-history history)
-    )
-  )
+    (his--add-history history)))
 
 ;;;###autoload
 (defun his-show-history ()
@@ -229,8 +200,7 @@
            (if (> (length his--history-list) 0)
                (1+ his--history-index) 0)
            (length his--history-list)
-           his--history-list)
-  )
+           his--history-list))
 
 ;;;###autoload
 (defun his-add-history ()
@@ -243,18 +213,14 @@
         ;;; :region type ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
         (his-add-region-type-history (nth 1 thing) (nth 2 thing))
       ;;; :position type ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-      (his-add-position-type-history (point))
-      )
-    )
-  )
+      (his-add-position-type-history (point)))))
 
 ;;;###autoload
 (defun his-discard-all-history ()
   "Discard all the history."
   (interactive)
   (setq his--history-index 0
-        his--history-list nil)
-  )
+        his--history-list nil))
 
 ;;;###autoload
 (defun his-prev-history ()
@@ -265,20 +231,15 @@
 	   (type (nth 0 history))
 	   (n (cond
 	       ((eq type :region) 2)
-	       ((eq type :position) 1)
-	       ))
+	       ((eq type :position) 1)))
 	   (marker (nth n history))
 	   (pos (marker-position marker)))
       ;; If point is far away from current history, use current history.
       ;; If point is close from current history, use next/previous history.
       (if (or (null pos)
 	      (his--same-line-p (point) pos))
-	  (his--move-to-valid-history 1)
-	  )
-      )
-    )
-    (his--use-history-at-index)
-  )
+	  (his--move-to-valid-history 1))))
+  (his--use-history-at-index))
 
 ;;;###autoload
 (defun his-next-history ()
@@ -289,20 +250,15 @@
 	   (type (nth 0 history))
 	   (n (cond
 	       ((eq type :region) 2)
-	       ((eq type :position) 1)
-	       ))
+	       ((eq type :position) 1)))
 	   (marker (nth n history))
 	   (pos (marker-position marker)))
       ;; If point is far away from current history, use current history.
       ;; If point is close from current history, use next/previous history.
       (if (or (null pos)
 	      (his--same-line-p (point) pos))
-	  (his--move-to-valid-history -1)
-	  )
-      )
-    )
-    (his--use-history-at-index)
-  )
+	  (his--move-to-valid-history -1))))
+    (his--use-history-at-index))
 
 ;;;###autoload
 (defun his-add-menu-and-toolbar-item ()
@@ -365,8 +321,7 @@
     '(menu-item "Previous History" his-prev-history
 		:image (find-image '((:type xpm :file "prev-history.xpm")))
 		:enable (> (length his--history-list) 0)
-		:help "Go to previous history"))
-  )
+		:help "Go to previous history")))
 ;; Automatically add menu items of this feature.
 (his-add-menu-and-toolbar-item)
 
@@ -380,8 +335,7 @@
   ;; tool bar
   (define-key global-map [tool-bar prev-history] nil)
   (define-key global-map [tool-bar next-history] nil)
-  (define-key global-map [tool-bar set-history] nil)
-  )
+  (define-key global-map [tool-bar set-history] nil))
 ;; (his-remove-menu-and-toolbar-item)
 
 (provide 'history)
