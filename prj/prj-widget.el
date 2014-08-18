@@ -61,6 +61,7 @@
          (let ((inhibit-read-only t))
            (erase-buffer))
          (remove-overlays)
+         ;; TODO: fix compatibility with `company'.
          ;; Face
          (setq-local widget-button-face custom-button)
          (setq-local widget-button-pressed-face custom-button-pressed)
@@ -87,13 +88,15 @@
                                   (kill-buffer))
                         "cancel")
          ;; TODO: move point to 1st editable-field.
+         ;; Make some TAB do something before its original task.
+         (add-hook 'widget-forward-hook 'prj-widget-forward-or-company t t)
          (use-local-map widget-keymap)
          (widget-setup)
-         ;; Enable specific mode.
+         ;; Enable specific feature.
          (company-mode)
          (make-local-variable 'company-backends)
-         (add-hook 'widget-forward-hook 'prj-widget-forward-or-company t t)
-         (add-to-list 'company-backends 'prj-browse-file-backend)))))
+         (add-to-list 'company-backends 'prj-browse-file-backend)
+         (add-to-list 'company-backends 'prj-search-backend)))))
 
 (defmacro prj-validate-filepaths (paths)
   "Iterate the file paths in the configuration in order to discard invalid paths."
@@ -115,7 +118,6 @@
 	   ,choices orderlist)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Following are for `company' when browsing files or directories.
 
 (defvar prj-browse-file-cache nil
   "Storing (DIR . (CANDIDATES...)) for completion.")
@@ -124,15 +126,17 @@
 (defun prj-widget-forward-or-company ()
   "It is for `widget-forward-hook' to continue forward to next widget or show company prompt."
   (interactive)
-  (and (prj-browse-file-prefix)
+  (and (or (prj-common-prefix 'prj-browse-file-backend)
+           (prj-common-prefix 'prj-search-backend))
        (company-complete)
        (top-level)))
 
-(defun prj-browse-file-prefix ()
+(defun prj-common-prefix (backend)
   "The function responds 'prefix for `prj-browse-file-backend'. Return nil means skip this backend function; Any string means there're candidates should be prompt. Only the editable-field with :file-browse property is allowed."
   (let* ((field (widget-field-at (point)))
-         (supported (widget-get field :file-browse)))
-    (if (and field supported)
+         (field-backend (widget-get field :company)))
+    (if (and field field-backend
+             (eq field-backend backend))
         (let* ((start (widget-field-start field))
                (end (widget-field-end field))
                (prefix (buffer-substring-no-properties start end)))
@@ -167,13 +171,23 @@
 
 (defun prj-browse-file-backend (command &optional arg &rest ign)
   "The backend based on `company' to provide convenience when browsing files."
-  (interactive (list 'interactive))
   (case command
-    (interactive (company-begin-backend 'prj-browse-file-backend))
-    (prefix (prj-browse-file-prefix))
+    (prefix (prj-common-prefix 'prj-browse-file-backend))
     (candidates (prj-browse-file-complete arg))
     (no-cache t)
     (require-match t)
+    (ignore-case t)))
+
+(defun prj-search-complete (prefix)
+  "The function responds 'candiates for `prj-search-backend'."
+  ;; TODO: use `prj-search-cache'.
+  (list "111" "222" "333" "444"))
+
+(defun prj-search-backend (command &optional arg &rest ign)
+  "Following are for `company' when searching project."
+  (case command
+    (prefix (prj-common-prefix 'prj-search-backend))
+    (candidates (prj-search-complete arg))
     (ignore-case t)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -246,8 +260,8 @@
 		   :entry-format "%i %d %v"
 		   :value '("")
 		   :notify (prj-widget-common-notify prj-tmp-list2)
-                   ;; Put :file-browse to make company work for it.
-		   '(editable-field :value "" :file-browse t))))
+                   ;; Put :company to make company work for it.
+		   '(editable-field :value "" :company prj-browse-file-backend))))
 
 (defun prj-setup-delete-project-widget ()
   (prj-with-widget "*Delete Project*"
@@ -342,7 +356,7 @@
 		   :entry-format "%i %d %v"
 		   :value (prj-project-filepaths)
 		   :notify (prj-widget-common-notify prj-tmp-list2)
-		   '(editable-field :file-browse t))))
+		   '(editable-field :company prj-browse-file-backend))))
 
 (defun prj-setup-search-project-widget (search)
   (prj-with-widget "*Search Project*"
@@ -366,7 +380,7 @@
 		   :format "Search: %v"
                    :value (or search "")
 		   :notify (prj-widget-common-notify prj-tmp-string)
-                   :search t)
+                   :company 'prj-search-backend)
     (widget-insert "\n")
     (widget-insert "Document Types ")
     (widget-create 'push-button
