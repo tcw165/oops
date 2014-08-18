@@ -43,12 +43,8 @@ The `base' should be a directory string and the `exclude' should be a list that 
     (let ((name (concat base "/" f)))
       (when (and (file-directory-p name)
                  (not (member f exclude)))
-        (update-loadpath name exclude)
-        )
-      )
-    )
-  (add-to-list 'load-path base)
-  )
+        (update-loadpath name exclude))))
+  (add-to-list 'load-path base))
 (update-loadpath "~/.emacs.d" '("." ".." ".svn" ".git"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -137,20 +133,19 @@ The `base' should be a directory string and the `exclude' should be a list that 
 ;;                                   3rd-party                                ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; (require 'helm-mode)
+(require 'semantic)
+(semantic-mode 1)
 
 (require 'company)
 (add-hook 'emacs-lisp-mode-hook 'company-mode)
 (add-hook 'c-mode-hook 'company-mode)
 (add-hook 'c++-mode-hook 'company-mode)
+(add-hook 'python-mode-hook 'company-mode)
 (setq company-idle-delay t)
-(setq company-minimum-prefix-length 0)
+(setq company-minimum-prefix-length 1)
 
 (require 'history)
 (require 'prj)
 (require 'oops)
 (oops-mode 1)
-
-(require 'semantic)
-(semantic-mode)
 
