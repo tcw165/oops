@@ -25,10 +25,8 @@
 ;;           `prj-create-project', `prj-delete-project',
 ;;           `prj-load-project', `prj-unload-project',
 ;;           `prj-build-database', `prj-find-file'.
-;; - Support database using more efficient way (e.g. hash map).
-;; - Support category search.
+;; - Divide complex computation into piece, let user can interrupt it and save the result before the cancellation.
 ;; - Support project's local variable.
-;; - Modulize widget function.
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -445,5 +443,11 @@
       (switch-to-buffer (caar (window-prev-buffers)))
     ;; Go to search buffer.
     (prj-with-search-buffer)))
+
+;;;###autoload
+(define-minor-mode prj-mode
+  "Provide convenient menu items and tool-bar items for project feature."
+  :global t
+  )
 
 (provide 'prj)
