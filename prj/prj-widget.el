@@ -143,11 +143,6 @@
           prefix)
       nil)))
 
-(defun prj-directory-files (dir)
-  "Return a list containing file names under `dir'. Exlcude file names refer to `prj-exclude-types'."
-  ;; TODO: seems bug.
-  (directory-files dir nil (concat "[^" (prj-wildcardexp-to-regexp prj-exclude-types) "]")))
-
 (defun prj-browse-file-complete (prefix)
   "The function responds 'candiates for `prj-browse-file-backend'."
   (let* ((dir (or (and (file-directory-p prefix)
@@ -158,7 +153,7 @@
          directories)
     (and dir
          (unless (equal dir (car prj-browse-file-cache))
-           (dolist (file (prj-directory-files dir))
+           (dolist (file (prj-directory-files dir (prj-wildcardexp-to-regexp prj-exclude-types)))
              (setq path (prj-concat-filepath dir file))
              (push path candidates)
              ;; Add one level of children.
@@ -166,7 +161,7 @@
                (push path directories)))
            (dolist (directory (reverse directories))
              (ignore-errors
-               (dolist (child (prj-directory-files directory))
+               (dolist (child (prj-directory-files directory (prj-wildcardexp-to-regexp prj-exclude-types)))
                  (setq path (prj-concat-filepath directory child))
                  (push path candidates))))
            (setq prj-browse-file-cache (cons dir (nreverse candidates)))))

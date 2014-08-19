@@ -94,13 +94,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defmacro prj-concat-filepath (dir file)
-  `(concat ,dir
-           (unless (eq (aref ,dir (1- (length ,dir))) ?/) "/")
-           ,file))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 (defun prj-config-path ()
   (expand-file-name (format "%s/%s/%s" prj-workspace-path (prj-project-name) prj-config-name)))
 
@@ -183,27 +176,38 @@
     (setq regexp (replace-regexp-in-string "\\\\|$" "" regexp)
           regexp (concat "\\(" regexp "\\)"))))
 
+(defun prj-concat-filepath (dir file)
+  "Return a full path combined with `dir' and `file'. It saves you the worry of whether to append '/' or not."
+  (concat dir
+          (unless (eq (aref dir (1- (length dir))) ?/) "/")
+          file))
+
+(defun prj-directory-files (dir &optional exclude)
+  "Return a list containing file names under `dir' but exlcudes files that match `exclude'."
+  ;; TODO: seems bug.
+  (let (files)
+    (dolist (file (directory-files dir))
+      (and (not (member file '("." "..")))
+           (not (string-match exclude file))
+           (setq files (cons file files))))
+    (setq files (reverse files))))
+
 (defun prj-build-filedb-internal (path matches exclude db)
   "Return a list that is made by recursively scan `dir' with file name which matches the regexp `matches'."
-  ;; TODO: fine tune this algorithm, use relative path seems more efficient.
-  (unless (or (string-match "\\.$" path)
-              (string-match "\\.\\.$" path))
-    (let ((fs (and (file-directory-p path)
-                   (directory-files path t))))
-      (unless (string-match exclude path)
-        (if fs
-            ;; A directory.
-            (dolist (f fs)
-              (prj-build-filedb-internal f matches exclude db))
-          ;; A file.
-          (message "Building database and may take a moment.\nScan ...%s" path)
-          (dolist (elm matches)
-            (let* ((doctype (car elm))
-                   (match (cdr elm))
-                   (files (gethash doctype db))
-                   (purepath (file-name-nondirectory path)))
-              (and (string-match match purepath)
-                   (puthash doctype (push path files) db)))))))))
+  (let* ((dir (file-name-directory path))
+         (file (file-name-nondirectory path)))
+    (if (file-directory-p path)
+        ;; A directory.
+        (dolist (file (prj-directory-files path exclude))
+          (prj-build-filedb-internal (prj-concat-filepath path file) matches exclude db))
+      ;; A file.
+      (message "Building database and may take a moment.\nScan ...%s" path)
+      (dolist (match matches)
+        (let* ((doctype (car match))
+               (match (cdr match))
+               (files (gethash doctype db)))
+          (and (string-match match file)
+               (puthash doctype (push (prj-concat-filepath dir file) files) db)))))))
 
 (defun prj-build-filedb ()
   "Create a list that contains all the files which should be included in the current project. Export the list to a file."
@@ -215,11 +219,12 @@
     (setq exclude (prj-wildcardexp-to-regexp prj-exclude-types))
     ;; Initialize file database:
     ;; ex: (hashmap ... ((doctypes1) (files set 1...)
-    ;;                   (doctypes2) (files set 2...))
+    ;;                   (doctypes2) (files set 2...)))
     (dolist (doctype (prj-project-doctypes))
       (setq match (prj-wildcardexp-to-regexp (cdr doctype)))
       ;; Create hash key with nil value.
       (puthash doctype nil db)
+      ;; Create match sets (matches).
       (push (cons doctype match) matches))
     (setq matches (reverse matches))
     ;; Search directories and files.
