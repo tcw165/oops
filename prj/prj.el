@@ -58,20 +58,20 @@
   :set 'prj-cus-set-workspace
   :group 'prj-group)
 
-(defcustom prj-document-types '(("Text" . "*.txt")
+(defcustom prj-document-types '(("Text" . "*.txt;*.md")
 				("Lisp" . ".emacs;*.el")
 				("Python" . "*.py")
 				("Java" . "*.java")
 				("C/C++" . "*.h;*.c;*.hpp;*.cpp")
 				("Makfile" . "Makefile;makefile;Configure.ac;configure.ac;*.mk")
-				("UEFI metafile" . "*.dsc;*.fdf;*.inf;*.env")
-				("UEFI HII metafile" . "*.vfr;*.uni"))
+				("UEFI Build Metafile" . "*.dsc;*.fdf;*.inf;*.env")
+				("UEFI HII Metafile" . "*.vfr;*.uni"))
   "Categorize file names refer to specific matches and give them type names. It is a list of (DOC_NAME . MATCHES). Each matches in MATCHES should be delimit with ';'."
   ;; TODO: give GUI a pretty appearance.
   :type '(repeat (cons string string))
   :group 'prj-group)
 
-(defcustom prj-exclude-types ".git;.svn"
+(defcustom prj-exclude-types ".git;.svn;auto-save-list;*.cache;*.db;.save*;~#*;#*#"
   "Those kinds of file should be excluded in the project. Each matches should be delimit with ';'."
   ;; TODO: give GUI a pretty appearance.
   :type '(string)
@@ -91,6 +91,13 @@
 
 (defvar prj-config nil
   "A hash map which represent project's configuration.")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmacro prj-concat-filepath (dir file)
+  `(concat ,dir
+           (unless (eq (aref ,dir (1- (length ,dir))) ?/) "/")
+           ,file))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -151,23 +158,52 @@
       (insert-file-contents filename)
       (read (buffer-string)))))
 
+(defun prj-wildcardexp-to-regexp (wildcardexp)
+  "Translate wildcard expression to Emacs regular expression."
+  (let (regexp)
+    (dolist (el (split-string wildcardexp ";"))
+      (cond
+       ;; ex: *.el
+       ((string-match "^\\*\\..+" el)
+        (setq el (replace-regexp-in-string "^\\*\\." ".*\\\\." el)
+              el (concat el "$")))
+       ;; ex: cache-*
+       ((string-match ".+\\*$" el)
+        (setq el (concat "^" el)
+              el (replace-regexp-in-string "\\*" ".*" el)))
+       ;; ex: ABC*DEF
+       ((string-match ".+\\*.+" el)
+        (setq el (concat "^" el)
+              el (replace-regexp-in-string "\\*" ".*" el)
+              el (concat el "$")))
+       ;; ex: .git or .svn
+       ((string-match "\\." el)
+        (setq el (replace-regexp-in-string "\\." "\\\\." el))))
+      (setq regexp (concat regexp el "\\|")))
+    (setq regexp (replace-regexp-in-string "\\\\|$" "" regexp)
+          regexp (concat "\\(" regexp "\\)"))))
+
 (defun prj-build-filedb-internal (path matches exclude db)
   "Return a list that is made by recursively scan `dir' with file name which matches the regexp `matches'."
-  (let ((fs (and (file-directory-p path)
-		 (directory-files path t "[^.]$" t))))
-    (if fs
-	;; A directory.
-	(unless (string-match exclude path)
-	  (dolist (f fs)
-	    (prj-build-filedb-internal f matches exclude db)))
-      ;; A file.
-      (message "Building database and may take a moment.\nScan ...%s" path)
-      (dolist (elm matches)
-	(let* ((doctype (car elm))
-	       (match (cdr elm))
-	       (files (gethash doctype db)))
-	  (and (string-match match path)
-	       (puthash doctype (push path files) db)))))))
+  ;; TODO: fine tune this algorithm, use relative path seems more efficient.
+  (unless (or (string-match "\\.$" path)
+              (string-match "\\.\\.$" path))
+    (let ((fs (and (file-directory-p path)
+                   (directory-files path t))))
+      (unless (string-match exclude path)
+        (if fs
+            ;; A directory.
+            (dolist (f fs)
+              (prj-build-filedb-internal f matches exclude db))
+          ;; A file.
+          (message "Building database and may take a moment.\nScan ...%s" path)
+          (dolist (elm matches)
+            (let* ((doctype (car elm))
+                   (match (cdr elm))
+                   (files (gethash doctype db))
+                   (purepath (file-name-nondirectory path)))
+              (and (string-match match purepath)
+                   (puthash doctype (push path files) db)))))))))
 
 (defun prj-build-filedb ()
   "Create a list that contains all the files which should be included in the current project. Export the list to a file."
@@ -176,15 +212,13 @@
 	match
 	matches)
     ;; Prepare regexp.
-    (setq exclude (replace-regexp-in-string "\\(\\.\\|\\*\\.\\)" "\\\\." prj-exclude-types)
-	  exclude (replace-regexp-in-string ";" "\\\\|" exclude)
-	  exclude (concat "\\(" exclude "\\)"))
+    (setq exclude (prj-wildcardexp-to-regexp prj-exclude-types))
+    ;; Initialize file database:
+    ;; ex: (hashmap ... ((doctypes1) (files set 1...)
+    ;;                   (doctypes2) (files set 2...))
     (dolist (doctype (prj-project-doctypes))
-      ;; ";"        => "\\|"
-      ;; "*." "."   => "\\."
-      (setq match (replace-regexp-in-string "\\(\\.\\|\\*\\.\\)" "\\\\." (cdr doctype))
-	    match (replace-regexp-in-string ";" "\\\\|" match)
-	    match (concat "\\(" match "\\)$"))
+      (setq match (prj-wildcardexp-to-regexp (cdr doctype)))
+      ;; Create hash key with nil value.
       (puthash doctype nil db)
       (push (cons doctype match) matches))
     (setq matches (reverse matches))
