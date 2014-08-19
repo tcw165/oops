@@ -65,7 +65,8 @@
 				("C/C++" . "*.h;*.c;*.hpp;*.cpp")
 				("Makfile" . "Makefile;makefile;Configure.ac;configure.ac;*.mk")
 				("UEFI Build Metafile" . "*.dsc;*.fdf;*.inf;*.env")
-				("UEFI HII Metafile" . "*.vfr;*.uni"))
+				("UEFI HII Metafile" . "*.vfr;*.uni")
+                                ("ACPI" . "*.asl;*.asi"))
   "Categorize file names refer to specific matches and give them type names. It is a list of (DOC_NAME . MATCHES). Each matches in MATCHES should be delimit with ';'."
   ;; TODO: give GUI a pretty appearance.
   :type '(repeat (cons string string))
