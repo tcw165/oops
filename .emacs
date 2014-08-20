@@ -141,7 +141,7 @@ The `base' should be a directory string and the `exclude' should be a list that 
 (add-hook 'c-mode-hook 'company-mode)
 (add-hook 'c++-mode-hook 'company-mode)
 (add-hook 'python-mode-hook 'company-mode)
-(setq company-idle-delay t)
+(setq company-idle-delay 0)
 (setq company-minimum-prefix-length 1)
 
 (require 'history)
