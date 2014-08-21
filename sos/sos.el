@@ -66,8 +66,31 @@ The visualized data is stored in `company-prefix', `company-candidates',
                          (function :tag "custom function" nil))))
 
 (defcustom sos-backends '(sos-elisp-backend
-                          (company-dabbrev-code company-gtags company-etags))
-  "The list of active back-ends (completion engines).
+                          sos-semantic-backend)
+  "The list of active back-ends in sos engines. The sos engine will iterate
+the back-ends and pass specific commands in order. Every command has its
+purpose, paremeter rule and return rule. By passing command and get return
+data from a back-end, the sos engine get information to show the result 
+to another window, a message in minibuffer or popup a GUI dialog, etc. The
+way of showing the information from the back-ends is handled by the front-
+ends.
+
+### The sample of a back-end:
+
+  (defun some-backend (cmd &optional arg &rest ign)
+    (if (equal major-mode 'xxx-mode)
+        (thing-at-point 'symbol)
+      nil))
+
+Each back-end is a function that takes a variable number of arguments. The
+first argument is the command requested from the sos enine.  It is one of
+the following:
+
+### The order of the commands, begins from top to down:
+
+`thing':
+
+`candidates':
 
 Only one back-end is used at a time.  The choice depends on the order of
 the items in this list, and on the values they return in response to the
@@ -179,14 +202,7 @@ even if the back-end uses the asynchronous calling convention."
            :tag "Back-end"
            ,@(mapcar (lambda (b) `(const :tag ,(cdr b) ,(car b)))
                      company-safe-backends)
-           (symbol :tag "User defined")
-           (repeat :tag "Merged Back-ends"
-                   (choice :tag "Back-end"
-                           ,@(mapcar (lambda (b)
-                                       `(const :tag ,(cdr b) ,(car b)))
-                                     company-safe-backends)
-                           (const :tag "With" :with)
-                           (symbol :tag "User defined"))))))
+           (symbol :tag "User defined"))))
 
 (defun sos-call-frontends (command)
   (dolist (frontend company-frontends)

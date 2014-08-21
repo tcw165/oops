@@ -40,7 +40,8 @@
 (require 'search-list)
 
 (defgroup prj-group nil
-  "A Project management utility. This utility provides you a workspace and many projects concept. It also provide you a way to easily find file without knowing its full path; Add different directories with specific document types in a project; Powerful selective grep string or regular expression in a project, etc.")
+  "A Project management utility. This utility provides you a workspace and many projects concept. It also provide you a way to easily find file without knowing its full path; Add different directories with specific document types in a project; Powerful selective grep string or regular expression in a project, etc."
+  :tag "Prj")
 
 (defun prj-cus-set-workspace (symbol value)
   "Make sure the directory is present."
@@ -52,28 +53,35 @@
 
 (defcustom prj-workspace-path "~/.emacs.d/.workspace"
   "The place storing all the projects' configurations."
+  :tag "Workspace Path"
   :type '(string)
   :set 'prj-cus-set-workspace
   :group 'prj-group)
 
 (defcustom prj-document-types '(("Text" . "*.txt;*.md")
-				("Lisp" . ".emacs;*.el")
-				("Python" . "*.py")
-				("Java" . "*.java")
-				("C/C++" . "*.h;*.c;*.hpp;*.cpp")
-				("Makfile" . "Makefile;makefile;Configure.ac;configure.ac;*.mk")
-				("UEFI Build Metafile" . "*.dsc;*.fdf;*.inf;*.env")
-				("UEFI HII Metafile" . "*.vfr;*.uni")
+                                ("Lisp" . ".emacs;*.el")
+                                ("Python" . "*.py")
+                                ("Java" . "*.java")
+                                ("Header" . "*.h;*.hxx;*.hpp")
+                                ("C/C++" . "*.c;*.cpp")
+                                ("Objective-C" . "*.h;*.m;*.mm")
+                                ("Swift" . "*.swift")
+                                ("Makfile" . "Makefile;makefile;Configure.ac;configure.ac;*.mk")
+                                ("UEFI Build Metafile" . "*.dsc;*.fdf;*.inf;*.env")
+                                ("UEFI HII Metafile" . "*.vfr;*.uni")
                                 ("ACPI" . "*.asl;*.asi"))
   "Categorize file names refer to specific matches and give them type names. It is a list of (DOC_NAME . MATCHES). Each matches in MATCHES should be delimit with ';'."
   ;; TODO: give GUI a pretty appearance.
-  :type '(repeat (cons string string))
+  :tag "Document Types"
+  :type '(repeat (cons (string :tag "Type")
+                       (string :tag "File")))
   :group 'prj-group)
 
 (defcustom prj-exclude-types ".git;.svn;auto-save-list;*.cache;*.db;.save*;~#*;#*#"
   "Those kinds of file should be excluded in the project. Each matches should be delimit with ';'."
   ;; TODO: give GUI a pretty appearance.
-  :type '(string)
+  :tag "Exclude Types"
+  :type '(string :tag "File")
   :group 'prj-group)
 
 (defconst prj-config-name "config.db"
