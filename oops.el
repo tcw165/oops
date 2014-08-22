@@ -50,6 +50,8 @@
 (require 'oops-cpp-lib)
 (require 'oops-lisp-lib)
 (require 'oops-python-lib)
+(require 'sos)
+(require 'prj)
 
 ;; TODO: customization.
 (defconst oops--hooks
