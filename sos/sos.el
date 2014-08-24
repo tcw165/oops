@@ -104,6 +104,10 @@ message log once, and the back-end will not be used for completion."
   :type '(repeat (symbol :tag "Back-end"))
   :group 'sos-group)
 
+(defcustom sos-idle-delay 0.5
+  "The idle delay in seconds until sos starts automatically."
+  :type '(number :tag "Seconds"))
+
 (defun sos-call-frontends (command)
   (dolist (frontend sos-frontends)
     (condition-case err
@@ -118,21 +122,52 @@ message log once, and the back-end will not be used for completion."
       (error (error "Company: Back-end %s error \"%s\" on command %s"
                     frontend (error-message-string err) command)))))
 
+(defun sos-pre-command ()
+  (unless (company-keep this-command)
+    (condition-case err
+        (when company-candidates
+          (company-call-frontends 'pre-command)
+          (unless (company--should-continue)
+            (company-abort)))
+      (error (message "Company: An error occurred in pre-command")
+             (message "%s" (error-message-string err))
+             (company-cancel))))
+  (when company-timer
+    (cancel-timer company-timer)
+    (setq company-timer nil))
+  (company-uninstall-map))
+
+(defun sos-post-command ()
+  (unless (company-keep this-command)
+    (condition-case err
+        (progn
+          (unless (equal (point) company-point)
+            (let (company-idle-delay) ; Against misbehavior while debugging.
+              (company--perform)))
+          (if company-candidates
+              (company-call-frontends 'post-command)
+            (and (numberp company-idle-delay)
+                 (company--should-begin)
+                 (setq company-timer
+                       (run-with-timer company-idle-delay nil
+                                       'company-idle-begin
+                                       (current-buffer) (selected-window)
+                                       (buffer-chars-modified-tick) (point))))))
+      (error (message "Company: An error occurred in post-command")
+             (message "%s" (error-message-string err))
+             (company-cancel))))
+  (company-install-map))
+
 ;;;###autoload
 (define-minor-mode sos-mode
   :lighter "sos"
   :keymap company-mode-map
   (if sos-mode
       (progn
-        (when (eq company-idle-delay t)
-          (setq company-idle-delay 0)
-          (warn "Setting `company-idle-delay' to t is deprecated.  Set it to 0 instead."))
-        (add-hook 'pre-command-hook 'company-pre-command nil t)
-        (add-hook 'post-command-hook 'company-post-command nil t)
-        (mapc 'company-init-backend company-backends))
-    (remove-hook 'pre-command-hook 'company-pre-command t)
-    (remove-hook 'post-command-hook 'company-post-command t)
-    (company-cancel)
-    (kill-local-variable 'company-point)))
+        (add-hook 'pre-command-hook 'sos-pre-command nil t)
+        (add-hook 'post-command-hook 'sos-post-command nil t)
+        (mapc 'company-init-backend sos-backends))
+    (remove-hook 'pre-command-hook 'sos-pre-command t)
+    (remove-hook 'post-command-hook 'sos-post-command t)))
 
 (provide 'sos)

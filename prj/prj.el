@@ -58,18 +58,14 @@
   :set 'prj-cus-set-workspace
   :group 'prj-group)
 
-(defcustom prj-document-types '(("Text" . "*.txt;*.md")
+(defcustom prj-document-types '(("Text" . "*.txt;*.md;*.xml")
                                 ("Lisp" . ".emacs;*.el")
                                 ("Python" . "*.py")
                                 ("Java" . "*.java")
-                                ("Header" . "*.h;*.hxx;*.hpp")
-                                ("C/C++" . "*.c;*.cpp")
-                                ("Objective-C" . "*.h;*.m;*.mm")
-                                ("Swift" . "*.swift")
-                                ("Makfile" . "Makefile;makefile;Configure.ac;configure.ac;*.mk")
-                                ("UEFI Build Metafile" . "*.dsc;*.fdf;*.inf;*.env")
-                                ("UEFI HII Metafile" . "*.vfr;*.uni")
-                                ("ACPI" . "*.asl;*.asi"))
+                                ("C/C++ Header" . "*.h;*.hxx;*.hpp")
+                                ("C/C++ Source" . "*.c;*.cpp")
+                                ("Objective-C/Swift" . "*.m;*.mm;*.swift")
+                                ("Makfile" . "Makefile;makefile;Configure.ac;configure.ac;*.mk"))
   "Categorize file names refer to specific matches and give them type names. It is a list of (DOC_NAME . MATCHES). Each matches in MATCHES should be delimit with ';'."
   ;; TODO: give GUI a pretty appearance.
   :tag "Document Types"
@@ -359,6 +355,12 @@
 ;;;###autoload
 (defun prj-create-project ()
   "Show configuration for creating new project."
+  ;; TODO:
+  ;; (let* ((json-object-type 'plist)
+  ;;      (json-key-type 'string)
+  ;;      (json-array-type 'list)
+  ;;      (config (json-read-from-string "{\"name\":\"Emacs\", \"filepath\":[\"~/.emacs\", \"~/.emacs.d/elpa\", \"~/.emacs.d/etc\"], \"doctypes\":[[\"Text\", \"*.txt;*.md\"], [\"Lisp\", \"*.el\"], [\"Python\", \"*.py\"]]}")))
+  ;; (format "%s" config))
   (interactive)
   (prj-setup-create-project-widget))
 
