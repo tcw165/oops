@@ -33,9 +33,7 @@
   :tag "Sos")
 
 (defcustom sos-frontends '()
-  "The list of active front-ends (visualizations).
-Each front-end is a function that takes one argument.  It is called with
-one of the following arguments:
+  "The list of front-ends for the purpose of visualization.
 
 `show': When the visualization should start.
 
@@ -47,23 +45,21 @@ one of the following arguments:
 visualization is active.
 
 `post-command': After every command that is executed while the
-visualization is active.
-
-The visualized data is stored in `company-prefix', `company-candidates',
-`company-common', `company-selection', `company-point' and
-`company-search-string'."
-  :set 'company-frontends-set
+visualization is active."
   :type '(repeat (symbol :tag "Front-end"))
   :group 'sos-group)
 
 (defcustom sos-backends '(sos-elisp-backend
                           sos-semantic-backend)
-  "The list of active back-ends in sos engines. The sos engine will iterate
-the back-ends and pass specific commands in order. Every command has its
-purpose, paremeter rule and return rule. By passing command and get return
-data from a back-end, the sos engine gets information to show the result 
-to another window, minibuffer or popup a GUI dialog, etc. The way of showing
-the information from the back-ends is handled by the front-ends.
+  "The list of back-ends for the purpose of collecting candidates. The sos 
+engine will dispatch all the back-ends and pass specific commands in order. 
+Every command has its purpose, paremeter rule and return rule (get meaningful 
+symbol name around the point, find candidates refer to a symbol name). By 
+passing command and get return data from a back-end, the sos engine gets 
+information to show the result to another window, minibuffer or popup a GUI 
+dialog, etc. Be aware, not every back-ends will be dispatched. If a back-end 
+return candidates to sos engine, it inform the sos engine that there's no need 
+to dispatch remaining back-ends.
 
 ### The sample of a back-end:
 
@@ -108,55 +104,38 @@ message log once, and the back-end will not be used for completion."
   "The idle delay in seconds until sos starts automatically."
   :type '(number :tag "Seconds"))
 
+(defvar sos-timer nil)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun sos-idle-begin (buf win tick pos)
+  (and (eq buf (current-buffer))
+       (eq win (selected-window))
+       (eq tick (buffer-chars-modified-tick))
+       (eq pos (point))
+       (when (company-auto-begin)
+         (company-input-noop)
+         (company-post-command))))
+
 (defun sos-call-frontends (command)
   (dolist (frontend sos-frontends)
     (condition-case err
         (funcall frontend command)
-      (error (error "Company: Front-end %s error \"%s\" on command %s"
-                    frontend (error-message-string err) command)))))
-
-(defun sos-call-backends (command)
-  (dolist (backtend sos-frontends)
-    (condition-case err
-        (funcall backtend command)
-      (error (error "Company: Back-end %s error \"%s\" on command %s"
-                    frontend (error-message-string err) command)))))
+      (error "[sos] Front-end %s error \"%s\" on command %s"
+             frontend (error-message-string err) command))))
 
 (defun sos-pre-command ()
-  (unless (company-keep this-command)
-    (condition-case err
-        (when company-candidates
-          (company-call-frontends 'pre-command)
-          (unless (company--should-continue)
-            (company-abort)))
-      (error (message "Company: An error occurred in pre-command")
-             (message "%s" (error-message-string err))
-             (company-cancel))))
-  (when company-timer
-    (cancel-timer company-timer)
-    (setq company-timer nil))
-  (company-uninstall-map))
+  "It will do main task as below:
+- Cancel idle timer."
+  (sos-call-frontends 'pre-command)
+  (when sos-timer
+    (cancel-timer sos-timer)
+    (setq sos-timer nil)))
 
 (defun sos-post-command ()
-  (unless (company-keep this-command)
-    (condition-case err
-        (progn
-          (unless (equal (point) company-point)
-            (let (company-idle-delay) ; Against misbehavior while debugging.
-              (company--perform)))
-          (if company-candidates
-              (company-call-frontends 'post-command)
-            (and (numberp company-idle-delay)
-                 (company--should-begin)
-                 (setq company-timer
-                       (run-with-timer company-idle-delay nil
-                                       'company-idle-begin
-                                       (current-buffer) (selected-window)
-                                       (buffer-chars-modified-tick) (point))))))
-      (error (message "Company: An error occurred in post-command")
-             (message "%s" (error-message-string err))
-             (company-cancel))))
-  (company-install-map))
+  "It will do main task as below:
+- Initialize idle timer."
+  (setq sos-timer (run-with-timer sos-idle-delay nil 'company-idle-begin)))
 
 ;;;###autoload
 (define-minor-mode sos-mode
