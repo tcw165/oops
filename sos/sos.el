@@ -28,8 +28,12 @@
 ;; 2014-10-01 (0.0.1)
 ;;    Initial release.
 
+(require 'sos-elisp)
+(require 'sos-semantic)
+
 (defgroup sos-group nil
-  "A utility to show you documentation by finding some meaningful information around the point."
+  "A utility to show you documentation at button window by finding some 
+meaningful information around the point."
   :tag "Sos")
 
 (defcustom sos-frontends '()
@@ -74,6 +78,11 @@ the following:
 
 ### The order of the commands to be called by sos engine, begins from top to down:
 
+`init': Called once for each buffer. The back-end can check for external
+programs and files and load any required libraries.  Raising an error here
+will show up in message log once, and the back-end will not be used for
+completion.
+
 `thing': The back-end should return a string, nil or 'stop.
 Return a string which represents a symbol name tells sos engine that the back
 -end will take charge current task. The back-end collect the string around the
@@ -89,14 +98,9 @@ following back-ends.
 Return nil tells sos engine it cannot find any definition and stop iterating
 the following back-ends.
 
-Optional commands:
-
-`meta': The second argument is a completion candidate. Return a documentation
-string for it.
-
-`init': Called once for each buffer. The back-end can check for external programs
-and files and load any required libraries. Raising an error here will show up in
-message log once, and the back-end will not be used for completion."
+`meta': The back-end should return a string or nil. The return string represents 
+a documentation for a completion candidate. The second argument is a candidate. 
+The sos engine will iterate the candidates and ask for each candidate its `meta'."
   :type '(repeat (symbol :tag "Back-end"))
   :group 'sos-group)
 
@@ -113,9 +117,8 @@ message log once, and the back-end will not be used for completion."
        (eq win (selected-window))
        (eq tick (buffer-chars-modified-tick))
        (eq pos (point))
-       (when (company-auto-begin)
-         (company-input-noop)
-         (company-post-command))))
+       ;; TODO: call `sos-begin' to do the job.
+       ))
 
 (defun sos-call-frontends (command)
   (dolist (frontend sos-frontends)
@@ -124,29 +127,39 @@ message log once, and the back-end will not be used for completion."
       (error "[sos] Front-end %s error \"%s\" on command %s"
              frontend (error-message-string err) command))))
 
+(defun sos-init-backend (backend)
+  (condition-case err
+      (progn
+        (funcall backend 'init)
+        (put backend 'sos-init t))
+    (put backend 'sos-init 'failed)
+    (error "[sos] Back-end %s error \"%s\" on command %s"
+           backend (error-message-string err) 'init)))
+
 (defun sos-pre-command ()
-  "It will do main task as below:
-- Cancel idle timer."
   (sos-call-frontends 'pre-command)
   (when sos-timer
     (cancel-timer sos-timer)
     (setq sos-timer nil)))
 
 (defun sos-post-command ()
-  "It will do main task as below:
-- Initialize idle timer."
-  (setq sos-timer (run-with-timer sos-idle-delay nil 'company-idle-begin)))
+  (setq sos-timer (run-with-timer sos-idle-delay nil
+                                  'sos-idle-begin
+                                  (current-buffer) (selected-window)
+                                  (buffer-chars-modified-tick) (point))))
 
 ;;;###autoload
 (define-minor-mode sos-mode
   :lighter "sos"
-  :keymap company-mode-map
   (if sos-mode
       (progn
         (add-hook 'pre-command-hook 'sos-pre-command nil t)
         (add-hook 'post-command-hook 'sos-post-command nil t)
-        (mapc 'company-init-backend sos-backends))
+        ;; TODO: create sos window.
+        (mapc 'sos-init-backend sos-backends))
     (remove-hook 'pre-command-hook 'sos-pre-command t)
-    (remove-hook 'post-command-hook 'sos-post-command t)))
+    (remove-hook 'post-command-hook 'sos-post-command t)
+    ;; TODO: delete sos window.
+    ))
 
 (provide 'sos)
