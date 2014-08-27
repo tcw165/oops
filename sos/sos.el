@@ -110,15 +110,14 @@ The sos engine will iterate the candidates and ask for each candidate its `meta'
 
 (defvar sos-timer nil)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defvar sos-window nil)
 
-(defun sos-idle-begin (buf win tick pos)
-  (and (eq buf (current-buffer))
-       (eq win (selected-window))
-       (eq tick (buffer-chars-modified-tick))
-       (eq pos (point))
-       ;; TODO: call `sos-begin' to do the job.
-       ))
+(defvar sos-buffer nil)
+
+(defvar sos-candidates nil)
+(make-variable-buffer-local 'sos-candidates)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun sos-call-frontends (command)
   (dolist (frontend sos-frontends)
@@ -148,6 +147,44 @@ The sos engine will iterate the candidates and ask for each candidate its `meta'
                                   (current-buffer) (selected-window)
                                   (buffer-chars-modified-tick) (point))))
 
+(defun sos-idle-begin (buf win tick pos)
+  (and (eq buf (current-buffer))
+       (eq win (selected-window))
+       (eq tick (buffer-chars-modified-tick))
+       (eq pos (point))
+       ;; TODO: call `sos-begin' to do the job.
+       (message "%s" 'sos-idle-begin)
+       ;; (when (company-auto-begin)
+       ;;   (company-input-noop)
+       ;;   (company-post-command))
+       ))
+
+(defun sos-toggle-candidates-window (toggle)
+  (let ((enabled (if toggle
+                     ;; toggle == t or numeric number.
+                     (or (booleanp toggle)
+                         (> toggle 0))
+                   ;; toggle == nil.
+                   nil))
+        (win (cond
+              ;; Only one window.
+              ((window-live-p (frame-root-window))
+               (selected-window))
+              ;; Clean v-split windows.
+              ((and oops--is-hsplit-perspective
+                    (= (length (window-list)) 2))
+               (window-parent oops--edit-win))
+              ;; Default
+              (t oops--edit-win)))
+        (h (/ (window-total-height) -3.5)))
+    (if enabled
+        (progn
+          (if (null oops--help-win)
+              (setq oops--help-win (split-window win h 'below))))
+      (when (window-valid-p oops--help-win)
+        (delete-window oops--help-win))
+      (setq oops--help-win nil))))
+
 ;;;###autoload
 (define-minor-mode sos-mode
   :lighter "sos"
@@ -155,11 +192,12 @@ The sos engine will iterate the candidates and ask for each candidate its `meta'
       (progn
         (add-hook 'pre-command-hook 'sos-pre-command nil t)
         (add-hook 'post-command-hook 'sos-post-command nil t)
+        (mapc 'sos-init-backend sos-backends)
         ;; TODO: create sos window.
-        (mapc 'sos-init-backend sos-backends))
+        (sos-toggle-candidates-window 1))
     (remove-hook 'pre-command-hook 'sos-pre-command t)
     (remove-hook 'post-command-hook 'sos-post-command t)
     ;; TODO: delete sos window.
-    ))
+    (sos-toggle-candidates-window -1)))
 
 (provide 'sos)
