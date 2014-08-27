@@ -160,44 +160,34 @@ The sos engine will iterate the candidates and ask for each candidate its `meta'
        ))
 
 (defun sos-toggle-candidates-window (toggle)
-  (let ((enabled (if toggle
-                     ;; toggle == t or numeric number.
-                     (or (booleanp toggle)
-                         (> toggle 0))
-                   ;; toggle == nil.
-                   nil))
+  ;; TODO: create sos buffer and sos candidates buffer.
+  (let ((enabled (or (and (booleanp toggle) toggle)
+                     (and (numberp toggle)
+                          (> toggle 0))))
         (win (cond
               ;; Only one window.
               ((window-live-p (frame-root-window))
-               (selected-window))
-              ;; Clean v-split windows.
-              ((and oops--is-hsplit-perspective
-                    (= (length (window-list)) 2))
-               (window-parent oops--edit-win))
-              ;; Default
-              (t oops--edit-win)))
-        (h (/ (window-total-height) -3.5)))
+               (selected-window))))
+        (h (/ (window-total-height) -3)))
     (if enabled
-        (progn
-          (if (null oops--help-win)
-              (setq oops--help-win (split-window win h 'below))))
-      (when (window-valid-p oops--help-win)
-        (delete-window oops--help-win))
-      (setq oops--help-win nil))))
+        (unless sos-window
+          (setq sos-window (split-window win h 'below)))
+      (and (window-valid-p sos-window)
+           (delete-window sos-window))
+      (setq sos-window nil))))
 
 ;;;###autoload
 (define-minor-mode sos-mode
-  :lighter "sos"
+  ""
+  :lighter " sos"
   (if sos-mode
       (progn
         (add-hook 'pre-command-hook 'sos-pre-command nil t)
         (add-hook 'post-command-hook 'sos-post-command nil t)
         (mapc 'sos-init-backend sos-backends)
-        ;; TODO: create sos window.
         (sos-toggle-candidates-window 1))
     (remove-hook 'pre-command-hook 'sos-pre-command t)
     (remove-hook 'post-command-hook 'sos-post-command t)
-    ;; TODO: delete sos window.
     (sos-toggle-candidates-window -1)))
 
 (provide 'sos)
