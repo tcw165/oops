@@ -108,21 +108,70 @@ The sos engine will iterate the candidates and ask for each candidate its `meta'
   "The idle delay in seconds until sos starts automatically."
   :type '(number :tag "Seconds"))
 
+(defconst sos-buffer-name "*Reference*")
+
 (defvar sos-timer nil)
+
+(defvar sos-buffer nil)
 
 (defvar sos-window nil)
 
-(defvar sos-buffer nil)
-(defconst sos-buffer-name "*Reference*")
+(defvar sos-window-height 0)
 
 (defvar sos-candidates nil)
 (make-variable-buffer-local 'sos-candidates)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; (defun sos-recover-buffer ()
-;;   (when (eq sos-buffer (current-buffer))
-;;     (sos-mode -1)))
+(defun sos-toggle-buffer-window (toggle)
+  "A buffer window which is at the button of source window."
+  (let ((enabled (or (and (booleanp toggle) toggle)
+                     (and (numberp toggle)
+                          (> toggle 0)))))
+    (if enabled
+        (progn
+          (setq sos-buffer (get-buffer-create sos-buffer-name))
+          (when (or (not sos-window)
+                    (not (window-live-p sos-window)))
+            (let* ((win (cond
+                         ;; Only one window.
+                         ((window-live-p (frame-root-window))
+                          (selected-window))))
+                   (height (or (and (> sos-window-height 0)
+                                    (- 0 sos-window-height))
+                               (and win
+                                    (/ (window-height win) -3)))))
+              (and win height
+                   (setq sos-window (split-window win height 'below)))))
+          ;; Force to apply `sos-buffer' to `sos-window'.
+          (set-window-buffer sos-window sos-buffer))
+      (when (window-valid-p sos-window)
+        (delete-window sos-window))
+      (when (buffer-live-p sos-buffer)
+        (kill-buffer sos-buffer))
+      (setq sos-buffer nil
+            sos-window nil))))
+
+(defun sos-watchdog-post-command ()
+  (when (and (not (eq (selected-window) sos-window))
+             (not (active-minibuffer-window)))
+    (if sos-mode
+        (progn
+          (sos-toggle-buffer-window 1)
+          ;; Save `sos-window' height.
+          (setq sos-window-height (window-height sos-window)))
+      (sos-toggle-buffer-window -1))))
+
+;;;###autoload
+(define-minor-mode sos-watchdog-mode
+  "A global minor mode which refers to buffer's `sos-mode' to show the `sos-buffer'
+ and `sos-window' or not. Show them if `sos-mode' is t; Hide for nil."
+  :global t
+  (if sos-watchdog-mode
+      (add-hook 'post-command-hook 'sos-watchdog-post-command t)
+    (remove-hook 'post-command-hook 'sos-watchdog-post-command t)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun sos-call-frontends (command)
   (dolist (frontend sos-frontends)
@@ -147,6 +196,7 @@ The sos engine will iterate the candidates and ask for each candidate its `meta'
     (setq sos-timer nil)))
 
 (defun sos-post-command ()
+  ;; Call `sos-idle-begin'.
   (and (sos-post-command-check)
        (setq sos-timer (run-with-timer sos-idle-delay nil
                                        'sos-idle-begin
@@ -154,15 +204,7 @@ The sos engine will iterate the candidates and ask for each candidate its `meta'
                                        (buffer-chars-modified-tick) (point)))))
 
 (defun sos-post-command-check ()
-  ;; TODO: check `sos-window' and `sos-buffer'.
-  (if (eq this-command 'kill-buffer)
-      (message "%s" (current-buffer)))
-  (memq this-command '(self-insert-command))
-  ;; (if (eq t company-begin-commands)
-  ;;     (not (memq this-command company--begin-inhibit-commands))
-  ;;   (or
-  ;;    (memq this-command '(self-insert-command))))
-  )
+  t)
 
 (defun sos-idle-begin (buf win tick pos)
   (and (eq buf (current-buffer))
@@ -176,46 +218,18 @@ The sos engine will iterate the candidates and ask for each candidate its `meta'
        ;;   (company-post-command))
        ))
 
-(defun sos-toggle-buffer-window (toggle)
-  (let ((enabled (or (and (booleanp toggle) toggle)
-                     (and (numberp toggle)
-                          (> toggle 0))))
-        (win (cond
-              ;; Only one window.
-              ((window-live-p (frame-root-window))
-               (selected-window))))
-        (h (/ (window-total-height) -3)))
-    (if enabled
-        (progn
-          (unless sos-buffer
-            (setq sos-buffer (get-buffer-create sos-buffer-name)))
-          (unless sos-window
-            (setq sos-window (and win
-                                  (split-window win h 'below))))
-          (set-window-buffer sos-window sos-buffer))
-      (when (window-valid-p sos-window)
-        (delete-window sos-window)
-        (setq sos-window nil))
-      (when (buffer-live-p sos-buffer)
-        (kill-buffer sos-buffer)
-        (setq sos-buffer nil)))))
-
 ;;;###autoload
 (define-minor-mode sos-mode
   ""
   :lighter " SOS"
   (if sos-mode
       (progn
+        (unless sos-watchdog-mode
+          (sos-watchdog-mode 1))
         (mapc 'sos-init-backend sos-backends)
         (add-hook 'pre-command-hook 'sos-pre-command nil t)
-        (add-hook 'post-command-hook 'sos-post-command nil t)
-        ;; (add-hook 'kill-buffer-hook 'sos-recover-buffer nil t)
-        ;; TODO: create sos window.
-        (sos-toggle-buffer-window 1))
+        (add-hook 'post-command-hook 'sos-post-command nil t))
     (remove-hook 'pre-command-hook 'sos-pre-command t)
-    (remove-hook 'post-command-hook 'sos-post-command t)
-    ;; (remove-hook 'kill-buffer-hook 'sos-recover-buffer t)
-    ;; TODO: delete sos window.
-    (sos-toggle-buffer-window -1)))
+    (remove-hook 'post-command-hook 'sos-post-command t)))
 
 (provide 'sos)
