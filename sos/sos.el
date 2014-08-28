@@ -83,7 +83,7 @@ programs and files and load any required libraries.  Raising an error here
 will show up in message log once, and the back-end will not be used for
 completion.
 
-`thing': The back-end should return a string, nil or 'stop.
+`symbol': The back-end should return a string, nil or 'stop.
 Return a string which represents a symbol name tells sos engine that the back
 -end will take charge current task. The back-end collect the string around the
 point and produce a meaningful symbol name. It also tells sos engine don't
@@ -98,9 +98,18 @@ following back-ends.
 Return nil tells sos engine it cannot find any definition and stop iterating
 the following back-ends.
 
+sample:
+  TODO: sample
+
+### Optional commands (no sequent order):
+
 `meta': The back-end should return a string or nil. The return string represents 
 a documentation for a completion candidate. The second argument is a candidate. 
-The sos engine will iterate the candidates and ask for each candidate its `meta'."
+The sos engine will iterate the candidates and ask for each candidate its `meta'.
+
+`no-cache': Usually sos engine doesn't ask for candidates again as referencing
+progresses, unless the back-end returns t for this command.  The second argument 
+is the latest `symbol'."
   :type '(repeat (symbol :tag "Back-end"))
   :group 'sos-group)
 
@@ -118,13 +127,19 @@ The sos engine will iterate the candidates and ask for each candidate its `meta'
 
 (defvar sos-window-height 0)
 
-(defvar sos-candidates nil)
+(defvar sos-symbol nil
+  "Cache the return value from back-end with `symbol' command.")
+(make-variable-buffer-local 'sos-symbol)
+
+(defvar sos-candidates nil
+  "Cache the return value from back-end with `candidates' command.")
 (make-variable-buffer-local 'sos-candidates)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun sos-toggle-buffer-window (toggle)
-  "A buffer window which is at the button of source window."
+  "Display or hide the `sos-buffer' and `sos-window'."
+  ;; TODO: modify mode line.
   (let ((enabled (or (and (booleanp toggle) toggle)
                      (and (numberp toggle)
                           (> toggle 0)))))
@@ -157,37 +172,23 @@ The sos engine will iterate the candidates and ask for each candidate its `meta'
              (not (active-minibuffer-window)))
     (if sos-mode
         (progn
+          ;; Show them.
           (sos-toggle-buffer-window 1)
           ;; Save `sos-window' height.
           (setq sos-window-height (window-height sos-window)))
+      ;; Hide them.
       (sos-toggle-buffer-window -1))))
 
 ;;;###autoload
 (define-minor-mode sos-watchdog-mode
   "A global minor mode which refers to buffer's `sos-mode' to show the `sos-buffer'
- and `sos-window' or not. Show them if `sos-mode' is t; Hide for nil."
+ and `sos-window' or hide them. Show them if `sos-mode' is t; Hide if nil."
   :global t
   (if sos-watchdog-mode
       (add-hook 'post-command-hook 'sos-watchdog-post-command t)
     (remove-hook 'post-command-hook 'sos-watchdog-post-command t)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defun sos-call-frontends (command)
-  (dolist (frontend sos-frontends)
-    (condition-case err
-        (funcall frontend command)
-      (error "[sos] Front-end %s error \"%s\" on command %s"
-             frontend (error-message-string err) command))))
-
-(defun sos-init-backend (backend)
-  (condition-case err
-      (progn
-        (funcall backend 'init)
-        (put backend 'sos-init t))
-    (put backend 'sos-init 'failed)
-    (error "[sos] Back-end %s error \"%s\" on command %s"
-           backend (error-message-string err) 'init)))
 
 (defun sos-pre-command ()
   (sos-call-frontends 'pre-command)
@@ -211,16 +212,38 @@ The sos engine will iterate the candidates and ask for each candidate its `meta'
        (eq win (selected-window))
        (eq tick (buffer-chars-modified-tick))
        (eq pos (point))
-       ;; TODO: call `sos-begin' to do the job.
-       ;; (message "%s" 'sos-idle-begin)
-       ;; (when (company-auto-begin)
-       ;;   (company-input-noop)
-       ;;   (company-post-command))
+       ;; TODO: what situation is to call `sos-begin-new-process'.
+       ;; TODO: what situation is to call `sos-continue-process'.
        ))
+
+(defun sos-begin-new-process ()
+  )
+
+(defun sos-continue-process ()
+  )
+
+(defun sos-call-frontends (command)
+  (dolist (frontend sos-frontends)
+    (condition-case err
+        (funcall frontend command)
+      (error "[sos] Front-end %s error \"%s\" on command %s"
+             frontend (error-message-string err) command))))
+
+(defun sos-init-backend (backend)
+  (condition-case err
+      (progn
+        (funcall backend 'init)
+        (put backend 'sos-init t))
+    (put backend 'sos-init 'failed)
+    (error "[sos] Back-end %s error \"%s\" on command %s"
+           backend (error-message-string err) 'init)))
 
 ;;;###autoload
 (define-minor-mode sos-mode
-  ""
+  "This local minor mode gethers symbol returned from backends around the point 
+and show the reference visually through frontends. Usually frontends output the 
+result to the `sos-buffer' displayed in the `sos-window'. Show or hide these 
+buffer and window are controlled by `sos-watchdog-mode'."
   :lighter " SOS"
   (if sos-mode
       (progn

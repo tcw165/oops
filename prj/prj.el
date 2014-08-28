@@ -135,6 +135,8 @@
     (puthash :name nil config)
     (puthash :doctypes nil config)
     (puthash :filepaths nil config)
+    ;; TODO: implement opened files.
+    (puthash :opened-files nil config)
     (puthash :search-cache nil config)
     (garbage-collect)
     config))
