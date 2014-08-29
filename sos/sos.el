@@ -93,7 +93,7 @@ Return a string which represents a symbol name tells sos engine that the back
 point and produce a meaningful symbol name. It also tells sos engine don't
 iterate the following back-ends.
 Return nil tells sos engine to skip the back-end.
-Return 'stop tells sos engine to stop iterating the following back-ends.
+Return `:stop' tells sos engine to stop iterating the following back-ends.
 
 `:candidates': The back-end should return a CANDIDATES list or nil.
 Return a list tells sos engine where the definition is and it must be a list
@@ -102,8 +102,14 @@ following back-ends.
 Return nil tells sos engine it cannot find any definition and stop iterating
 the following back-ends.
 
- CANDIDATES format:
- ()
+ CANDIDATES format (alist):
+ ((:file FILE
+   :offset OFFSET
+   :highlight HIGHLIGHT) ...)
+
+ FILE: A string which indicates the absolute path of the source file.
+
+ OFFSET: A integer which indicates the location of the symbol in the source file.
 
 sample:
   TODO: sample
@@ -133,6 +139,10 @@ is the latest `symbol'."
 (defvar sos-window nil)
 
 (defvar sos-window-height 0)
+
+(defvar sos-backend nil
+  "The backend which takes the task in the `sos-backends' in the current buffer.")
+(make-variable-buffer-local 'sos-backend)
 
 (defvar sos-symbol nil
   "Cache the return value from back-end with `symbol' command.")
@@ -221,14 +231,30 @@ is the latest `symbol'."
        (eq pos (point))
        ;; TODO: what situation is to call `sos-begin-new-process'.
        ;; TODO: what situation is to call `sos-continue-process'.
-       (or (and sos-candidates (sos-continue-process))
+       (or (and sos-backend (sos-continue-process))
            (sos-begin-new-process))))
 
 (defun sos-continue-process ()
-  )
+  ;; TODO: check :no-cache
+  ;; TODO: check :tips
+  nil)
 
 (defun sos-begin-new-process ()
-  )
+  (dolist (backend sos-backends)
+    (let ((symb (sos-call-backend backend :symbol)))
+      (cond
+       ((and symb (stringp symb))
+        ;; Set `sos-backend'.
+        (setq sos-backend backend)
+        ;; Get candidates.
+        (let ((candidates (sos-call-backend backend :candidates symb)))
+          (when (and candidates (listp candidates))
+            (setq sos-candidates candidates)))
+        (return t))
+       ((eq symb :stop)
+        ;; Set `sos-backend' but stop iterating following backends.
+        (setq sos-backend backend)
+        (return t))))))
 
 (defun sos-call-frontends (command)
   (dolist (frontend sos-frontends)
@@ -237,7 +263,7 @@ is the latest `symbol'."
       (error "[sos] Front-end %s error \"%s\" on command %s"
              frontend (error-message-string err) command))))
 
-(defun sos-call-backend (backend command)
+(defun sos-call-backend (backend command &rest rest)
   (condition-case err
       (funcall backend command)
     (error "[sos] Back-end %s error \"%s\" on command %s"
