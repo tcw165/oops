@@ -67,10 +67,14 @@ to dispatch remaining back-ends.
 
 ### The sample of a back-end:
 
-  (defun some-backend (cmd &optional arg &rest ign)
-    (if (equal major-mode 'xxx-mode)
-        (thing-at-point 'symbol)
-      nil))
+  (defun some-backend (command &optional arg &rest ign)
+    (case command
+      (:init t)
+      (:symbol (and (member major-mode MAJOR_MODE_CANDIDATES)
+                    (thing-at-point 'symbol))))
+      (:candidates (list STRING01 STRING02 STRING03 ...))
+      (:tips TIPS)
+      (:no-cache t))
 
 Each back-end is a function that takes a variable number of arguments. The
 first argument is the command requested from the sos enine.  It is one of
@@ -78,12 +82,12 @@ the following:
 
 ### The order of the commands to be called by sos engine, begins from top to down:
 
-`init': Called once for each buffer. The back-end can check for external
+`:init': Called once for each buffer. The back-end can check for external
 programs and files and load any required libraries.  Raising an error here
 will show up in message log once, and the back-end will not be used for
 completion.
 
-`symbol': The back-end should return a string, nil or 'stop.
+`:symbol': The back-end should return a string, nil or 'stop.
 Return a string which represents a symbol name tells sos engine that the back
 -end will take charge current task. The back-end collect the string around the
 point and produce a meaningful symbol name. It also tells sos engine don't
@@ -91,23 +95,26 @@ iterate the following back-ends.
 Return nil tells sos engine to skip the back-end.
 Return 'stop tells sos engine to stop iterating the following back-ends.
 
-`candidates': The back-end should return a list or nil.
+`:candidates': The back-end should return a CANDIDATES list or nil.
 Return a list tells sos engine where the definition is and it must be a list
 even if there's only one candidate. It also tells sos engine don't iterate the
 following back-ends.
 Return nil tells sos engine it cannot find any definition and stop iterating
 the following back-ends.
 
+ CANDIDATES format:
+ ()
+
 sample:
   TODO: sample
 
 ### Optional commands (no sequent order):
 
-`meta': The back-end should return a string or nil. The return string represents 
+`:tips': The back-end should return a string or nil. The return string represents 
 a documentation for a completion candidate. The second argument is a candidate. 
-The sos engine will iterate the candidates and ask for each candidate its `meta'.
+The sos engine will iterate the candidates and ask for each candidate its `tips'.
 
-`no-cache': Usually sos engine doesn't ask for candidates again as referencing
+`:no-cache': Usually sos engine doesn't ask for candidates again as referencing
 progresses, unless the back-end returns t for this command.  The second argument 
 is the latest `symbol'."
   :type '(repeat (symbol :tag "Back-end"))
@@ -214,12 +221,13 @@ is the latest `symbol'."
        (eq pos (point))
        ;; TODO: what situation is to call `sos-begin-new-process'.
        ;; TODO: what situation is to call `sos-continue-process'.
-       ))
-
-(defun sos-begin-new-process ()
-  )
+       (or (and sos-candidates (sos-continue-process))
+           (sos-begin-new-process))))
 
 (defun sos-continue-process ()
+  )
+
+(defun sos-begin-new-process ()
   )
 
 (defun sos-call-frontends (command)
@@ -229,14 +237,20 @@ is the latest `symbol'."
       (error "[sos] Front-end %s error \"%s\" on command %s"
              frontend (error-message-string err) command))))
 
+(defun sos-call-backend (backend command)
+  (condition-case err
+      (funcall backend command)
+    (error "[sos] Back-end %s error \"%s\" on command %s"
+           backend (error-message-string err) command)))
+
 (defun sos-init-backend (backend)
   (condition-case err
       (progn
-        (funcall backend 'init)
-        (put backend 'sos-init t))
-    (put backend 'sos-init 'failed)
+        (funcall backend :init)
+        (put backend :init t))
+    (put backend :init nil)
     (error "[sos] Back-end %s error \"%s\" on command %s"
-           backend (error-message-string err) 'init)))
+           backend (error-message-string err) :init)))
 
 ;;;###autoload
 (define-minor-mode sos-mode

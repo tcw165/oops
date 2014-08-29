@@ -28,7 +28,14 @@
 ;; 2014-10-01 (0.0.1)
 ;;    Initial release.
 
-(defun sos-elisp-backend (cmd &optional arg &rest ign)
-  )
+(defun sos-elisp-backend (command &optional arg &rest ign)
+  (case command
+    (:init t)
+    (:symbol (when (member major-mode '(emacs-lisp-mode lisp-interaction-mode))
+               "test-symbol"))
+    (:candidates (case arg
+                   ("test-symbol" (list 1 2 3 4 5))))
+    (:tips "Test tips.")
+    (:no-cache t)))
 
 (provide 'sos-elisp)
