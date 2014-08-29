@@ -44,7 +44,9 @@ meaningful information around the point."
 
 `:show': When the visualization should start.
 
-`:hide': When the visualization should end."
+`:hide': When the visualization should end.
+
+`:update': When the data has been updated."
   :type '(repeat (symbol :tag "Front-end"))
   :group 'sos-group)
 
@@ -156,15 +158,29 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
     (:show
      (let ((file (plist-get sos-candidate :file))
            (offset (plist-get sos-candidate :offset)))
-       (when (and (file-exists-p file))
+       (when (file-exists-p file)
          (with-current-buffer sos-reference-buffer
-           (insert-file-contents file t nil nil t)
-           (goto-char offset)))))))
+           (insert-file-contents file nil nil nil t)
+           ;; setup major-mode , auto-mode-alist
+           )
+         (with-selected-window sos-reference-window
+           (goto-char offset)
+           (recenter 1)))))
+    (:hide nil)
+    (:update nil)))
 
 (defun sos-tips-frontend (command &rest args)
-  (and sos-tips
-       (message "%s" sos-tips)))
+  (case command
+    (:show
+     (when sos-tips
+       ;; TODO: draw a overlay.
+       ;; (message "%s" sos-tips)
+       ))
+    (:hide nil)
+    (:update nil)))
 
+;; (sos-toggle-buffer-window 1)
+;; (sos-toggle-buffer-window -1)
 (defun sos-toggle-buffer-window (toggle)
   "Display or hide the `sos-reference-buffer' and `sos-reference-window'."
   ;; TODO: modify mode line.
@@ -174,12 +190,12 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
     (if enabled
         (progn
           (setq sos-reference-buffer (get-buffer-create "*Reference*"))
-          (when (or (not sos-reference-window)
-                    (not (window-live-p sos-reference-window)))
+          (unless (window-live-p sos-reference-window)
             (let* ((win (cond
                          ;; Only one window.
                          ((window-live-p (frame-root-window))
-                          (selected-window))))
+                          (selected-window))
+                         (t (selected-window))))
                    (height (or (and (> sos-reference-window-height 0)
                                     (- 0 sos-reference-window-height))
                                (and win
@@ -188,30 +204,46 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
                    (setq sos-reference-window (split-window win height 'below)))))
           ;; Force to apply `sos-reference-buffer' to `sos-reference-window'.
           (set-window-buffer sos-reference-window sos-reference-buffer))
-      (when (window-valid-p sos-reference-window)
-        (delete-window sos-reference-window))
-      (when (buffer-live-p sos-reference-buffer)
-        (kill-buffer sos-reference-buffer))
+      (and (windowp sos-reference-window)
+           (delete-window sos-reference-window))
+      (and (bufferp sos-reference-buffer)
+           (kill-buffer sos-reference-buffer))
       (setq sos-reference-buffer nil
             sos-reference-window nil))))
 
 (defun sos-watchdog-post-command ()
-  (when (and (not (eq (current-buffer) sos-reference-buffer))
-             (not (eq (selected-window) sos-reference-window))
-             (not (active-minibuffer-window)))
-    (if sos-mode
-        (progn
-          ;; Show them.
-          (sos-toggle-buffer-window 1)
-          ;; Save `sos-reference-window' height.
-          (setq sos-reference-window-height (window-height sos-reference-window)))
-      ;; Hide them.
-      (sos-toggle-buffer-window -1))))
+  (condition-case err
+      (progn
+        (unless (or (member this-command '(self-insert-command
+                                           previous-line
+                                           next-line
+                                           left-char
+                                           right-char
+                                           save-buffer))
+                    (active-minibuffer-window))
+          (if sos-reference-mode
+              ;; Show them.
+              (progn
+                (sos-toggle-buffer-window 1)
+                (setq sos-reference-window-height (window-height sos-reference-window)))
+            ;; Hide them or not.
+            (cond
+             ((and (eq (selected-window) sos-reference-window)
+                   (eq (current-buffer) sos-reference-buffer)) t)
+             ;; If selected window is `sos-reference-window' but its buffer is not
+             ;; `sos-reference-buffer'.
+             ((and (eq (selected-window) sos-reference-window)
+                   (not (eq (window-buffer) sos-reference-buffer)))
+              (sos-toggle-buffer-window 1))
+             (t (sos-toggle-buffer-window -1))))))
+    (error "[sos] sos-watchdog-post-command error \"%s\""
+           (error-message-string err))))
 
 ;;;###autoload
 (define-minor-mode sos-watchdog-mode
-  "A global minor mode which refers to buffer's `sos-mode' to show the `sos-reference-buffer'
- and `sos-reference-window' or hide them. Show them if `sos-mode' is t; Hide if nil."
+  "A global minor mode which refers to buffer's `sos-reference-mode' to show the 
+`sos-reference-buffer' and `sos-reference-window' or hide them. Show them if 
+`sos-reference-mode' is t; Hide if nil."
   :global t
   (if sos-watchdog-mode
       (add-hook 'post-command-hook 'sos-watchdog-post-command t)
@@ -312,19 +344,20 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
            backend (error-message-string err) :init)))
 
 ;;;###autoload
-(define-minor-mode sos-mode
+(define-minor-mode sos-reference-mode
   "This local minor mode gethers symbol returned from backends around the point 
 and show the reference visually through frontends. Usually frontends output the 
 result to the `sos-reference-buffer' displayed in the `sos-reference-window'. 
 Show or hide these buffer and window are controlled by `sos-watchdog-mode'."
   :lighter " SOS"
-  (if sos-mode
+  (if sos-reference-mode
       (progn
-        (unless sos-watchdog-mode
-          (sos-watchdog-mode 1))
-        (mapc 'sos-init-backend sos-backends)
-        (add-hook 'pre-command-hook 'sos-pre-command nil t)
-        (add-hook 'post-command-hook 'sos-post-command nil t))
+        (unless (eq (current-buffer) sos-reference-buffer)
+          (unless sos-watchdog-mode
+            (sos-watchdog-mode 1))
+          (mapc 'sos-init-backend sos-backends)
+          (add-hook 'pre-command-hook 'sos-pre-command nil t)
+          (add-hook 'post-command-hook 'sos-post-command nil t)))
     (sos-kill-local-variables)
     (remove-hook 'pre-command-hook 'sos-pre-command t)
     (remove-hook 'post-command-hook 'sos-post-command t)))
