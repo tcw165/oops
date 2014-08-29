@@ -158,9 +158,8 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
            (offset (plist-get sos-candidate :offset)))
        (when (and (file-exists-p file))
          (with-current-buffer sos-reference-buffer
-           (insert-file-contents file nil nil nil t)
-           (goto-char offset)
-           ))))))
+           (insert-file-contents file t nil nil t)
+           (goto-char offset)))))))
 
 (defun sos-tips-frontend (command &rest args)
   (and sos-tips
@@ -197,7 +196,8 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
             sos-reference-window nil))))
 
 (defun sos-watchdog-post-command ()
-  (when (and (not (eq (selected-window) sos-reference-window))
+  (when (and (not (eq (current-buffer) sos-reference-buffer))
+             (not (eq (selected-window) sos-reference-window))
              (not (active-minibuffer-window)))
     (if sos-mode
         (progn

@@ -56,4 +56,4 @@
 ;; a b c d
 ;; (with-current-buffer sos-reference-buffer (goto-char 14))
 
-(provide 'sos-elisp)
+(provide 'sos-grep)
