@@ -141,6 +141,10 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
 
 (defvar sos-reference-window-height 0)
 
+(defvar sos-backend nil
+  "The back-end which takes control of current session in the back-ends list.")
+(make-variable-buffer-local 'sos-backend)
+
 (defvar sos-symbol nil
   "Cache the return value from back-end with `:symbol' command.")
 (make-variable-buffer-local 'sos-symbol)
@@ -149,42 +153,44 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
   "Cache the return value from back-end with `:candidates' command.")
 (make-variable-buffer-local 'sos-candidates)
 
-(defvar sos-candidate nil
-  "The currently selected candidate for multiple candidates case.")
-(make-variable-buffer-local 'sos-candidate)
-
 (defvar sos-tips nil
   "Cache the return value from back-end with `:tips' command.")
 (make-variable-buffer-local 'sos-tips)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defun sos-is-single-candidate ()
+  (= (length sos-candidates) 1))
+
 (defun sos-reference-buffer-frontend (command &rest args)
   (case command
     (:show
-     (let ((file (plist-get sos-candidate :file))
-           (offset (plist-get sos-candidate :offset))
-           (linum (plist-get sos-candidate :linum))
-           (hl-line (plist-get sos-candidate :hl-line))
-           (hl-word (plist-get sos-candidate :hl-word)))
-       (garbage-collect)
-       (when (file-exists-p file)
-         (with-current-buffer sos-reference-buffer
-           (insert-file-contents file nil nil nil t)
-           ;; Find a appropriate major-mode for it.
-           (dolist (mode auto-mode-alist)
-             (and (not (null (cdr mode)))
-                  (string-match (car mode) file)
-                  (funcall (cdr mode))))
-           ;; TODO: hl-line
-           ;; TODO: hl-word
-           ;; TODO: modify mode line.
-           )
-         (with-selected-window sos-reference-window
-           (or (and offset (goto-char offset))
-               (and linum (goto-char (point-min))
-                    (forward-line (- linum 1))))
-           (recenter 3)))))
+     ;; TODO: multiple candidates `sos-is-single-candidate'.
+     (if (sos-is-single-candidate)
+         (let* ((candidate (car sos-candidates))
+                (file (plist-get candidate :file))
+                (offset (plist-get candidate :offset))
+                (linum (plist-get candidate :linum))
+                (hl-line (plist-get candidate :hl-line))
+                (hl-word (plist-get candidate :hl-word)))
+           (garbage-collect)
+           (when (file-exists-p file)
+             (with-current-buffer sos-reference-buffer
+               (insert-file-contents file nil nil nil t)
+               ;; Find a appropriate major-mode for it.
+               (dolist (mode auto-mode-alist)
+                 (and (not (null (cdr mode)))
+                      (string-match (car mode) file)
+                      (funcall (cdr mode))))
+               ;; TODO: hl-line
+               ;; TODO: hl-word
+               ;; TODO: modify mode line.
+               )
+             (with-selected-window sos-reference-window
+               (or (and offset (goto-char offset))
+                   (and linum (goto-char (point-min))
+                        (forward-line (- linum 1))))
+               (recenter 3))))))
     (:hide nil)
     (:update nil)))
 
@@ -271,9 +277,6 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun sos-pre-command ()
-  ;; Call front-ends.
-  (sos-call-frontends :hide)
-  ;; Cancel idle timer.
   (when sos-timer
     (cancel-timer sos-timer)
     (setq sos-timer nil)))
@@ -287,51 +290,55 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
                                        (buffer-chars-modified-tick) (point)))))
 
 (defun sos-idle-begin-check ()
-  (let ((pass t))
-    (and (eq (current-buffer) sos-reference-buffer)
-         (setq pass nil))
-    pass))
+  (not (or (eq (current-buffer) sos-reference-buffer)
+           (eq (selected-window) sos-reference-window))))
 
 (defun sos-idle-begin (buf win tick pos)
   (and (eq buf (current-buffer))
        (eq win (selected-window))
        (eq tick (buffer-chars-modified-tick))
        (eq pos (point))
-       (sos-begin-process)))
+       (if (null sos-backend)
+           (sos-1st-process-backends)
+         (sos-process-backend sos-backend))))
 
-(defun sos-begin-process ()
+(defun sos-1st-process-backends ()
   (dolist (backend sos-backends)
-    (let ((symb (sos-call-backend backend :symbol)))
-      (cond
-       ;; Return a string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-       ((stringp symb)
-        (setq sos-symbol symb)
+    (sos-process-backend backend)
+    (and sos-backend
+         (return t))))
+
+(defun sos-process-backend (backend)
+  (let ((symb (sos-call-backend backend :symbol)))
+    (cond
+     ;; Return a string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+     ((stringp symb)
+      (if (string-equal symb sos-symbol)
+          ;; If return symbol string is equal to `sos-symbol', ask front-ends
+          ;; just to do `:update' task.
+          (sos-call-frontends :update)
+        ;; Call front-ends: `:hide'.
+        (sos-call-frontends :hide)
+        (setq sos-backend backend
+              sos-symbol symb)
         ;; Call back-end: get `sos-candidates' and `sos-candidate'.
         (let ((candidates (sos-call-backend backend :candidates symb)))
           (when (and candidates (listp candidates))
-            (setq sos-candidates candidates
-                  sos-candidate (and (sos-is-single-candidate)
-                                     (car sos-candidates)))
-            ;; Call back-end: get `sos-tips'.
-            (setq sos-tips (sos-call-backend backend :tips sos-symbol sos-candidate))
-            ;; Call front-ends.
-            (sos-call-frontends :show)))
-        (return t))
+            (setq sos-candidates candidates)
+            ;; Call front-ends: `:show'.
+            (sos-call-frontends :show :update)))))
 
-       ;; Return nil ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-       ((null symb)
-        (sos-kill-local-variables))
+     ;; Return nil ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+     ((null symb)
+      (sos-kill-local-variables))
 
-       ;; Return `:stop' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-       ((eq symb :stop)
-        (sos-kill-local-variables)
-        (return t))))))
-
-(defun sos-is-single-candidate ()
-  (= (length sos-candidates) 1))
+     ;; Return `:stop' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+     ((eq symb :stop)
+      (setq sos-backend backend)))))
 
 (defun sos-kill-local-variables ()
-  (mapc 'kill-local-variable '(sos-symbol
+  (mapc 'kill-local-variable '(sos-backend
+                               sos-symbol
                                sos-candidates
                                sos-candidate
                                sos-tips)))
@@ -343,15 +350,15 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
       (dolist (cmd commands)
         (condition-case err
             (funcall frontend cmd)
-          (error "[sos] Front-end %s error \"%s\" on command %s"
-                 frontend (error-message-string err) commands))))))
+          (error (error "[sos] Front-end %s error \"%s\" on command %s"
+                        frontend (error-message-string err) commands)))))))
 
 (defmacro sos-call-backend (backend command &rest args)
   "Call certain backend `backend' and pass `command' to it."
   `(condition-case err
        (funcall ,backend ,command ,@args)
-     (error "[sos] Back-end %s error \"%s\" on command %s"
-            backend (error-message-string err) (cons command args))))
+     (error (error "[sos] Back-end %s error \"%s\" on command %s"
+                   ,backend (error-message-string err) (cons ,command ,@args)))))
 
 (defun sos-init-backend (backend)
   (condition-case err
@@ -359,8 +366,8 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
         (funcall backend :init)
         (put backend :init t))
     (put backend :init nil)
-    (error "[sos] Back-end %s error \"%s\" on command %s"
-           backend (error-message-string err) :init)))
+    (error (error "[sos] Back-end %s error \"%s\" on command %s"
+                  backend (error-message-string err) :init))))
 
 ;;;###autoload
 (define-minor-mode sos-reference-mode
@@ -368,7 +375,7 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
 and show the reference visually through frontends. Usually frontends output the 
 result to the `sos-reference-buffer' displayed in the `sos-reference-window'. 
 Show or hide these buffer and window are controlled by `sos-watchdog-mode'."
-  :lighter " SOS"
+  :lighter " SOS:Ref"
   ;; TODO: menu-bar and tool-bar keymap.
   (if sos-reference-mode
       (progn
@@ -381,5 +388,19 @@ Show or hide these buffer and window are controlled by `sos-watchdog-mode'."
     (sos-kill-local-variables)
     (remove-hook 'pre-command-hook 'sos-pre-command t)
     (remove-hook 'post-command-hook 'sos-post-command t)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;###autoload
+(define-minor-mode sos-tips-mode
+  "This local minor mode gethers symbol returned from backends around the point 
+and show the reference visually through frontends. Usually frontends output the 
+result to the `sos-reference-buffer' displayed in the `sos-reference-window'. 
+Show or hide these buffer and window are controlled by `sos-watchdog-mode'."
+  :lighter " SOS:Tips"
+  (if sos-tips-mode
+      (progn
+        )
+    ))
 
 (provide 'sos)

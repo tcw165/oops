@@ -457,8 +457,9 @@
     (prj-with-search-buffer)))
 
 ;;;###autoload
-(define-minor-mode prj-menu-mode
+(define-minor-mode prj-project-mode
   "Provide convenient menu items and tool-bar items for project feature."
+  :lighter " Project"
   :global t
   )
 

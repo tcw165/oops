@@ -148,8 +148,6 @@ The `base' should be a directory string and the `exclude' should be a list that 
 (require 'history)
 (require 'sos)
 (require 'prj)
-(prj-menu-mode 1)
-
 (require 'oops)
 (oops-mode 1)
 
