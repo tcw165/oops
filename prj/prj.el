@@ -53,7 +53,6 @@
 
 (defcustom prj-workspace-path "~/.emacs.d/.workspace"
   "The place storing all the projects' configurations."
-  :tag "Workspace Path"
   :type '(string)
   :set 'prj-cus-set-workspace
   :group 'prj-group)
@@ -68,7 +67,6 @@
                                 ("Makfile" . "Makefile;makefile;Configure.ac;configure.ac;*.mk"))
   "Categorize file names refer to specific matches and give them type names. It is a list of (DOC_NAME . MATCHES). Each matches in MATCHES should be delimit with ';'."
   ;; TODO: give GUI a pretty appearance.
-  :tag "Document Types"
   :type '(repeat (cons (string :tag "Type")
                        (string :tag "File")))
   :group 'prj-group)
@@ -76,7 +74,6 @@
 (defcustom prj-exclude-types ".git;.svn;auto-save-list;*.cache;*.db;.save*;~#*;#*#"
   "Those kinds of file should be excluded in the project. Each matches should be delimit with ';'."
   ;; TODO: give GUI a pretty appearance.
-  :tag "Exclude Types"
   :type '(string :tag "File")
   :group 'prj-group)
 

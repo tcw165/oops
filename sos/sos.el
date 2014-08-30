@@ -40,6 +40,11 @@
 meaningful information around the point."
   :tag "Sos")
 
+(defface sos-hl-line
+  '((t (:background "yellow")))
+  "Default face for highlighting the current line in Hl-Line mode."
+  :group 'sos-group)
+
 (defcustom sos-frontends '(sos-reference-buffer-frontend
                            sos-tips-frontend)
   "The list of front-ends for the purpose of visualization.
@@ -141,6 +146,11 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
 
 (defvar sos-reference-window-height 0)
 
+(defvar sos-hl-line-face 'sos-hl-line)
+
+(defvar sos-hl-line-overlay nil
+  "The overlay for `sos-reference-buffer'.")
+
 (defvar sos-backend nil
   "The back-end which takes control of current session in the back-ends list.")
 (make-variable-buffer-local 'sos-backend)
@@ -175,22 +185,24 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
                 (hl-word (plist-get candidate :hl-word)))
            (garbage-collect)
            (when (file-exists-p file)
-             (with-current-buffer sos-reference-buffer
-               (insert-file-contents file nil nil nil t)
-               ;; Find a appropriate major-mode for it.
-               (dolist (mode auto-mode-alist)
-                 (and (not (null (cdr mode)))
-                      (string-match (car mode) file)
-                      (funcall (cdr mode))))
-               ;; TODO: hl-line
-               ;; TODO: hl-word
-               ;; TODO: modify mode line.
-               )
              (with-selected-window sos-reference-window
-               (or (and offset (goto-char offset))
-                   (and linum (goto-char (point-min))
-                        (forward-line (- linum 1))))
-               (recenter 3))))))
+               (with-current-buffer sos-reference-buffer
+                 (insert-file-contents file nil nil nil t)
+                 ;; Find a appropriate major-mode for it.
+                 (dolist (mode auto-mode-alist)
+                   (and (not (null (cdr mode)))
+                        (string-match (car mode) file)
+                        (funcall (cdr mode))))
+                 ;; Move point and recenter.
+                 (or (and linum (goto-char (point-min))
+                          (forward-line (- linum 1)))
+                     (and offset (goto-char offset)))
+                 (recenter 3)
+                 ;; Highlight line.
+                 (move-overlay sos-hl-line-overlay (line-beginning-position) (+ 1 (line-end-position)))
+                 ;; TODO: hl-word
+                 ;; TODO: modify mode line.
+                 ))))))
     (:hide nil)
     (:update nil)))
 
@@ -204,6 +216,8 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
     (:hide nil)
     (:update nil)))
 
+;; (sos-toggle-buffer-window 1)
+;; (sos-toggle-buffer-window -1)
 (defun sos-toggle-buffer-window (toggle)
   "Display or hide the `sos-reference-buffer' and `sos-reference-window'."
   (let ((enabled (or (and (booleanp toggle) toggle)
@@ -225,13 +239,19 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
               (and win height
                    (setq sos-reference-window (split-window win height 'below)))))
           ;; Force to apply `sos-reference-buffer' to `sos-reference-window'.
-          (set-window-buffer sos-reference-window sos-reference-buffer))
+          (set-window-buffer sos-reference-window sos-reference-buffer)
+          (with-current-buffer sos-reference-buffer
+            ;; Highlight line overlay.
+            (unless sos-hl-line-overlay
+              (setq sos-hl-line-overlay (make-overlay 1 1))
+              (overlay-put sos-hl-line-overlay 'face sos-hl-line-face))))
       (and (windowp sos-reference-window)
            (delete-window sos-reference-window))
       (and (bufferp sos-reference-buffer)
            (kill-buffer sos-reference-buffer))
       (setq sos-reference-buffer nil
-            sos-reference-window nil))))
+            sos-reference-window nil
+            sos-hl-line-overlay nil))))
 
 (defun sos-watchdog-post-command ()
   (condition-case err
@@ -350,15 +370,15 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
       (dolist (cmd commands)
         (condition-case err
             (funcall frontend cmd)
-          (error (error "[sos] Front-end %s error \"%s\" on command %s"
-                        frontend (error-message-string err) commands)))))))
+          (error "[sos] Front-end %s error \"%s\" on command %s"
+                 frontend (error-message-string err) commands))))))
 
 (defmacro sos-call-backend (backend command &rest args)
   "Call certain backend `backend' and pass `command' to it."
   `(condition-case err
        (funcall ,backend ,command ,@args)
-     (error (error "[sos] Back-end %s error \"%s\" on command %s"
-                   ,backend (error-message-string err) (cons ,command ,@args)))))
+     (error "[sos] Back-end %s error \"%s\" on command %s"
+            ,backend (error-message-string err) (cons ,command ,@args))))
 
 (defun sos-init-backend (backend)
   (condition-case err
@@ -366,8 +386,8 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
         (funcall backend :init)
         (put backend :init t))
     (put backend :init nil)
-    (error (error "[sos] Back-end %s error \"%s\" on command %s"
-                  backend (error-message-string err) :init))))
+    (error "[sos] Back-end %s error \"%s\" on command %s"
+           backend (error-message-string err) :init)))
 
 ;;;###autoload
 (define-minor-mode sos-reference-mode
