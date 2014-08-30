@@ -9,6 +9,7 @@
  ;; If there is more than one, they won't work right.
  '(column-number-mode t)
  '(cua-mode t nil (cua-base))
+ '(cursor-in-non-selected-windows nil)
  '(electric-indent-mode t)
  '(electric-pair-mode t)
  '(emacs-lisp-mode-hook (quote (hl-paren-mode imenu-add-menubar-index linum-mode hl-line-mode)))

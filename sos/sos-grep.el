@@ -44,6 +44,7 @@
              (buffer-substring-no-properties (line-beginning-position) (- (point) 1))
            :stop))))
     (:candidates
+     ;; 1st argument is FILEPATH:LINENO string.
      (let* ((symb (car args))
             (strings (split-string symb ":"))
             (file (car strings))
@@ -51,6 +52,5 @@
        `((:file ,file :linum ,linum))))
     (:tips nil)
     (:no-cache t)))
-;; (string-to-int "167")
 
 (provide 'sos-grep)

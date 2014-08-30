@@ -105,9 +105,11 @@ the following back-ends.
 Return value will be cached to `sos-candidates'.
 
  $CANDIDATES format (alist):
- ((:file FILE
-   :offset OFFSET
-   :linum LINUM) ...)
+ ((:file STRING
+   :offset INTEGER
+   :linum INTEGER
+   :hl-line BOOLEAN
+   :hl-word STRING) ...)
 
  FILE: A string which indicates the absolute path of the source file.
 
@@ -162,21 +164,27 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
     (:show
      (let ((file (plist-get sos-candidate :file))
            (offset (plist-get sos-candidate :offset))
-           (linum (plist-get sos-candidate :linum)))
+           (linum (plist-get sos-candidate :linum))
+           (hl-line (plist-get sos-candidate :hl-line))
+           (hl-word (plist-get sos-candidate :hl-word)))
        (garbage-collect)
        (when (file-exists-p file)
          (with-current-buffer sos-reference-buffer
            (insert-file-contents file nil nil nil t)
-           ;; setup major-mode, auto-mode-alist
+           ;; Find a appropriate major-mode for it.
            (dolist (mode auto-mode-alist)
              (and (not (null (cdr mode)))
                   (string-match (car mode) file)
-                  (funcall (cdr mode)))))
+                  (funcall (cdr mode))))
+           ;; TODO: hl-line
+           ;; TODO: hl-word
+           ;; TODO: modify mode line.
+           )
          (with-selected-window sos-reference-window
            (or (and offset (goto-char offset))
                (and linum (goto-char (point-min))
                     (forward-line (- linum 1))))
-           (recenter 1)))))
+           (recenter 3)))))
     (:hide nil)
     (:update nil)))
 
@@ -190,11 +198,8 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
     (:hide nil)
     (:update nil)))
 
-;; (sos-toggle-buffer-window 1)
-;; (sos-toggle-buffer-window -1)
 (defun sos-toggle-buffer-window (toggle)
   "Display or hide the `sos-reference-buffer' and `sos-reference-window'."
-  ;; TODO: modify mode line.
   (let ((enabled (or (and (booleanp toggle) toggle)
                      (and (numberp toggle)
                           (> toggle 0)))))
@@ -239,13 +244,16 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
                 (setq sos-reference-window-height (window-height sos-reference-window)))
             ;; Hide them or not.
             (cond
+             ;; If selected window is `sos-reference-window' and current buffer is
+             ;; `sos-reference-buffer':
              ((and (eq (selected-window) sos-reference-window)
                    (eq (current-buffer) sos-reference-buffer)) t)
              ;; If selected window is `sos-reference-window' but its buffer is not
-             ;; `sos-reference-buffer'.
+             ;; `sos-reference-buffer':
              ((and (eq (selected-window) sos-reference-window)
                    (not (eq (window-buffer) sos-reference-buffer)))
               (sos-toggle-buffer-window 1))
+             ;; Hide by default:
              (t (sos-toggle-buffer-window -1))))))
     (error "[sos] sos-watchdog-post-command error \"%s\""
            (error-message-string err))))
@@ -361,6 +369,7 @@ and show the reference visually through frontends. Usually frontends output the
 result to the `sos-reference-buffer' displayed in the `sos-reference-window'. 
 Show or hide these buffer and window are controlled by `sos-watchdog-mode'."
   :lighter " SOS"
+  ;; TODO: menu-bar and tool-bar keymap.
   (if sos-reference-mode
       (progn
         (unless (eq (current-buffer) sos-reference-buffer)
