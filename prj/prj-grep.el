@@ -28,27 +28,22 @@
 ;; 2014-08-01 (0.0.1)
 ;;    Initial release.
 
-(defgroup search-list-group nil
-  "")
+(defgroup prj-grep-group nil
+  "A major mode for the text produced by GREP like applications."
+  :tag "Grep")
+
+(defcustom prj-grep-mode-hook `(linum-mode
+                                hl-line-mode
+                                ,(and (featurep 'sos)
+                                      'sos-reference-mode))
+  "Hook run when entering `prj-grep-mode' mode."
+  :type 'hook
+  :group 'prj-grep-group)
 
 ;;;###autoload
-(define-derived-mode search-list-mode nil "search-list"
+(define-derived-mode prj-grep-mode nil "Grep"
   "Major mode for search buffers."
   :group 'search-list-group
   )
-;; (define-derived-mode emacs-lisp-mode prog-mode "Emacs-Lisp"
-;;   "Major mode for editing Lisp code to run in Emacs.
-;; Commands:
-;; Delete converts tabs to spaces as it moves back.
-;; Blank lines separate paragraphs.  Semicolons start comments.
 
-;; \\{emacs-lisp-mode-map}
-;; Entry to this mode calls the value of `emacs-lisp-mode-hook'
-;; if that value is non-nil."
-;;   :group 'lisp
-;;   (lisp-mode-variables)
-;;   (setq imenu-case-fold-search nil)
-;;   (add-hook 'completion-at-point-functions
-;;             'lisp-completion-at-point nil 'local))
-
-(provide 'search-list)
+(provide 'prj-grep)

@@ -37,7 +37,7 @@
 
 (require 'ido)
 (require 'prj-widget)
-(require 'search-list)
+(require 'prj-grep)
 
 (defgroup prj-group nil
   "A Project management utility. This utility provides you a workspace and many projects concept. It also provide you a way to easily find file without knowing its full path; Add different directories with specific document types in a project; Powerful selective grep string or regular expression in a project, etc."
@@ -277,9 +277,7 @@
      (progn ,@body)
      (goto-char pt)
      ;; Change major mode.
-     (search-list-mode)
-     ;; Enable minor modes.
-     (hl-line-mode)
+     (prj-grep-mode)
      (save-buffer)))
 
 (defun prj-create-project-internal (name doctypes filepaths)
@@ -454,10 +452,12 @@
       ;; Back to previous buffer of current window.
       (switch-to-buffer (caar (window-prev-buffers)))
     ;; Go to search buffer.
+    (unless (prj-project-p)
+    (prj-load-project))
     (prj-with-search-buffer)))
 
 ;;;###autoload
-(define-minor-mode prj-mode
+(define-minor-mode prj-menu-mode
   "Provide convenient menu items and tool-bar items for project feature."
   :global t
   )

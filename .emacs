@@ -145,8 +145,10 @@ The `base' should be a directory string and the `exclude' should be a list that 
 (setq company-minimum-prefix-length 1)
 
 (require 'history)
+(require 'sos)
 (require 'prj)
-(prj-mode 1)
+(prj-menu-mode 1)
+
 (require 'oops)
 (oops-mode 1)
 

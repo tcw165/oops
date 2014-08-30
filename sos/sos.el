@@ -30,6 +30,8 @@
 ;; 2014-10-01 (0.0.1)
 ;;    Initial release.
 
+;; Default supported back-ends.
+(require 'sos-grep)
 (require 'sos-elisp)
 (require 'sos-semantic)
 
@@ -50,7 +52,8 @@ meaningful information around the point."
   :type '(repeat (symbol :tag "Front-end"))
   :group 'sos-group)
 
-(defcustom sos-backends '(sos-elisp-backend
+(defcustom sos-backends '(sos-grep-backend
+                          sos-elisp-backend
                           sos-semantic-backend)
   "The list of back-ends for the purpose of collecting candidates. The sos 
 engine will dispatch all the back-ends and pass specific commands in order. 
@@ -103,7 +106,8 @@ Return value will be cached to `sos-candidates'.
 
  $CANDIDATES format (alist):
  ((:file FILE
-   :offset OFFSET) ...)
+   :offset OFFSET
+   :linum LINUM) ...)
 
  FILE: A string which indicates the absolute path of the source file.
 
@@ -157,14 +161,21 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
   (case command
     (:show
      (let ((file (plist-get sos-candidate :file))
-           (offset (plist-get sos-candidate :offset)))
+           (offset (plist-get sos-candidate :offset))
+           (linum (plist-get sos-candidate :linum)))
+       (garbage-collect)
        (when (file-exists-p file)
          (with-current-buffer sos-reference-buffer
            (insert-file-contents file nil nil nil t)
-           ;; setup major-mode , auto-mode-alist
-           )
+           ;; setup major-mode, auto-mode-alist
+           (dolist (mode auto-mode-alist)
+             (and (not (null (cdr mode)))
+                  (string-match (car mode) file)
+                  (funcall (cdr mode)))))
          (with-selected-window sos-reference-window
-           (goto-char offset)
+           (or (and offset (goto-char offset))
+               (and linum (goto-char (point-min))
+                    (forward-line (- linum 1))))
            (recenter 1)))))
     (:hide nil)
     (:update nil)))
@@ -285,7 +296,7 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
     (let ((symb (sos-call-backend backend :symbol)))
       (cond
        ;; Return a string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-       ((and symb (stringp symb))
+       ((stringp symb)
         (setq sos-symbol symb)
         ;; Call back-end: get `sos-candidates' and `sos-candidate'.
         (let ((candidates (sos-call-backend backend :candidates symb)))
@@ -323,16 +334,16 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
     (dolist (frontend sos-frontends)
       (dolist (cmd commands)
         (condition-case err
-            (funcall frontend cmd args)
+            (funcall frontend cmd)
           (error "[sos] Front-end %s error \"%s\" on command %s"
-                 frontend (error-message-string err) (cons command args)))))))
+                 frontend (error-message-string err) commands))))))
 
-(defun sos-call-backend (backend command &rest args)
+(defmacro sos-call-backend (backend command &rest args)
   "Call certain backend `backend' and pass `command' to it."
-  (condition-case err
-      (funcall backend command args)
-    (error "[sos] Back-end %s error \"%s\" on command %s"
-           backend (error-message-string err) (cons command args))))
+  `(condition-case err
+       (funcall ,backend ,command ,@args)
+     (error "[sos] Back-end %s error \"%s\" on command %s"
+            backend (error-message-string err) (cons command args))))
 
 (defun sos-init-backend (backend)
   (condition-case err

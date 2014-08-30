@@ -28,32 +28,29 @@
 ;; 2014-10-01 (0.0.1)
 ;;    Initial release.
 
-(defun sos-elisp-backend (command &rest args)
+(defun sos-grep-backend (command &rest args)
   (case command
     (:init t)
     (:symbol
-     (when (member major-mode '(emacs-lisp-mode lisp-interaction-mode))
-       "test-symbol"))
+     (when (eq major-mode (or (and (featurep 'prj-grep)
+                                   'prj-grep-mode)
+                              (and (featurep 'compile)
+                                   'compilation-mode)))
+       (save-excursion
+         (beginning-of-line)
+         (if (search-forward-regexp "^[-a-zA-Z0-9._/\\ ]+:[0-9]+:"
+                                    (line-end-position) t)
+             ;; Return FILEPATH:LINENO string.
+             (buffer-substring-no-properties (line-beginning-position) (- (point) 1))
+           :stop))))
     (:candidates
-     ;; Single candidate case:
-     (let* ((num (random 1000))
-            (i (% num 10)))
-       (list (nth i '((:file "~/.emacs.d/oops/oops.el" :offset 111)
-                      (:file "~/.emacs.d/oops/prj/prj.el" :offset 1428)
-                      (:file "~/.emacs.d/elpa/projectile-20140811.855/projectile.el" :offset 555)
-                      (:file "~/.emacs.d/elpa/async-20140311.747/async.el" :offset 333)
-                      (:file "~/.emacs.d/elpa/company-20140817.1917/company.el" :offset 444)
-                      (:file "~/.emacs.d/elpa/helm-20140819.759/helm.el" :offset 5)
-                      (:file "~/.emacs.d/elpa/helm-20140819.759/helm-buffers.el" :offset 666)
-                      (:file "~/.emacs.d/oops/history/history.el" :offset 777)
-                      (:file "~/.emacs.d/oops/hl-anything/hl-anything.el" :offset 888)
-                      (:file "~/.emacs.d/elpa/company-20140817.1917/company-cmake.el" :offset 999)
-                      (:file "~/.emacs.d/elpa/company-20140817.1917/company-template.el" :offset 123))))))
-    (:tips
-     (format "Test tips %s" (current-time)))
+     (let* ((symb (car args))
+            (strings (split-string symb ":"))
+            (file (car strings))
+            (linum (string-to-int (cadr strings))))
+       `((:file ,file :linum ,linum))))
+    (:tips nil)
     (:no-cache t)))
-;; (sos-elisp-backend :candidates)
-;; a b c d
-;; (with-current-buffer sos-reference-buffer (goto-char 14))
+;; (string-to-int "167")
 
 (provide 'sos-grep)
