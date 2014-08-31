@@ -379,7 +379,7 @@ Show or hide these buffer and window are controlled by `sos-watchdog-mode'."
           ;; Force to apply `sos-reference-buffer' to `sos-reference-window'.
           (set-window-buffer sos-reference-window sos-reference-buffer)
           (sos-with-reference-buffer
-            ;; Highlight line overlay.
+            ;; Create highlight line overlay.
             (unless sos-hl-line-overlay
               (setq sos-hl-line-overlay (make-overlay 1 1))
               (overlay-put sos-hl-line-overlay 'face sos-hl-line-face))))
@@ -394,7 +394,6 @@ Show or hide these buffer and window are controlled by `sos-watchdog-mode'."
 (defun sos-watchdog-post-command ()
   (condition-case err
       (progn
-        (force-mode-line-update)
         (unless (or (sos-is-skip-command 'self-insert-command
                                          'previous-line
                                          'next-line
