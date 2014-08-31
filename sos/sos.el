@@ -30,7 +30,9 @@
 ;; 2014-10-01 (0.0.1)
 ;;    Initial release.
 
+;; Required modules.
 (require 'sos-nav)
+
 ;; Default supported back-ends.
 (require 'sos-grep)
 (require 'sos-elisp)
@@ -41,7 +43,7 @@
 meaningful information around the point."
   :tag "Sos")
 
-(defface sos-hl-line
+(defface sos-hl
   '((t (:background "yellow")))
   "Default face for highlighting the current line in Hl-Line mode."
   :group 'sos-group)
@@ -146,9 +148,9 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
 
 (defvar sos-reference-window-height 0)
 
-(defvar sos-hl-line-face 'sos-hl-line)
+(defvar sos-hl-face 'sos-hl)
 
-(defvar sos-hl-line-overlay nil
+(defvar sos-hl-overlay nil
   "The overlay for `sos-reference-buffer'.")
 
 (defvar sos-backend nil
@@ -217,11 +219,13 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
                         (forward-line (- linum 1)))
                    (and offset (goto-char offset)))
                (recenter 3)
-               ;; Highlight line.
-               (move-overlay sos-hl-line-overlay (line-beginning-position) (+ 1 (line-end-position)))
-               ;; TODO: hl-word
-               ;; TODO: modify mode line.
-               )))))
+               ;; Highlight word or line.
+               (or (and (stringp hl-word)
+                        ;; TODO: hl-word.
+                        ;; (move-overlay)
+                        )
+                   (and hl-line
+                        (move-overlay sos-hl-overlay (line-beginning-position) (+ 1 (line-end-position))))))))))
     (:hide nil)
     (:update nil)))
 
@@ -380,16 +384,16 @@ Show or hide these buffer and window are controlled by `sos-watchdog-mode'."
           (set-window-buffer sos-reference-window sos-reference-buffer)
           (sos-with-reference-buffer
             ;; Create highlight line overlay.
-            (unless sos-hl-line-overlay
-              (setq sos-hl-line-overlay (make-overlay 1 1))
-              (overlay-put sos-hl-line-overlay 'face sos-hl-line-face))))
+            (unless sos-hl-overlay
+              (setq sos-hl-overlay (make-overlay 1 1))
+              (overlay-put sos-hl-overlay 'face sos-hl-face))))
       (and (windowp sos-reference-window)
            (delete-window sos-reference-window))
       (and (bufferp sos-reference-buffer)
            (kill-buffer sos-reference-buffer))
       (setq sos-reference-buffer nil
             sos-reference-window nil
-            sos-hl-line-overlay nil))))
+            sos-hl-overlay nil))))
 
 (defun sos-watchdog-post-command ()
   (condition-case err

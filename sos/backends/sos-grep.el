@@ -48,7 +48,8 @@
      (let* ((strings (split-string arg ":"))
             (file (car strings))
             (linum (string-to-int (cadr strings))))
-       `((:file ,file :linum ,linum))))
+       ;; TODO: `:hl-line' to `:hl-word'.
+       `((:file ,file :linum ,linum :hl-line t))))
     (:tips nil)
     (:no-cache t)))
 

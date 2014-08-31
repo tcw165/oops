@@ -244,8 +244,6 @@
       )
     ;; Update flag.
     (setq oops--is-basic-perspective enable)
-
-    (message "[OOPS] basic perspective is %s." (if oops--is-basic-perspective "on" "off"))
     )
   )
 

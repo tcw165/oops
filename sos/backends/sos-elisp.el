@@ -28,6 +28,41 @@
 ;; 2014-10-01 (0.0.1)
 ;;    Initial release.
 
+;; (defun oops-lisp-show-help-atpt ()
+;;   (let* ((symbol (intern-soft (oops--lisp-thingatpt)))
+;;          search-result)
+;;     (when symbol
+;;       (cond
+;;        ;; TODO: Support feature.
+;;        ;; Library:
+;;        ;; ((featurep symbol)
+;;        ;;  nil
+;;        ;;  )
+;;        ;; Function:
+;;        ((fboundp symbol)
+;;         (setq search-result (oops--lisp-find-function symbol))
+;;         (if search-result
+;;             (oops-update-help search-result)
+;;           ;; Built-in function, show HELP.
+;;           (oops-update-help (oops--lisp-describe-function symbol))))
+;;        ;; Variable:
+;;        ((boundp symbol)
+;;         (setq search-result (oops--lisp-find-variable symbol))
+;;         (if search-result
+;;             (oops-update-help search-result)
+;;           ;; Built-in variable, show HELP.
+;;           (oops-update-help (oops--lisp-describe-variable symbol))))
+;;        ;; Face:
+;;        ((facep symbol)
+;;         (setq search-result (oops--lisp-find-face symbol))
+;;         (if search-result
+;;             (oops-update-help search-result)
+;;           ;; Built-in variable, show HELP.
+;;           (oops-update-help (oops--lisp-describe-variable symbol))))
+;;        ;; Keyword:
+;;        ((keywordp symbol)
+;;         (message "[Definition] It's a keyword, %s" symbol))))))
+
 (defun sos-elisp-backend (command &optional arg)
   (case command
     (:init t)
