@@ -28,22 +28,19 @@
 ;; 2014-08-01 (0.0.1)
 ;;    Initial release.
 
-(defgroup prj-grep-group nil
+(defgroup sos-jump-group nil
   "A major mode for the text produced by GREP like applications."
-  :tag "Prj Grep")
+  :tag "SOS Jump")
 
-(defcustom prj-grep-mode-hook `(linum-mode
-                                hl-line-mode
-                                ,(and (featurep 'sos)
-                                      'sos-reference-mode))
+(defcustom sos-jump-mode-hook '()
   "Hook run when entering `prj-grep-mode' mode."
   :type 'hook
-  :group 'prj-grep-group)
+  :group 'sos-jump-group)
 
 ;;;###autoload
-(define-derived-mode prj-grep-mode nil "Grep"
-  "Major mode for search buffers."
-  :group 'search-list-group
+(define-minor-mode sos-jump-mode
+  "Minor mode for *Reference* buffers."
+  :lighter " SOS:Jump"
   )
 
-(provide 'prj-grep)
+(provide 'sos-jump)

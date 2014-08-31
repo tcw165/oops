@@ -35,6 +35,8 @@
 (require 'sos-elisp)
 (require 'sos-semantic)
 
+(require 'sos-jump)
+
 (defgroup sos-group nil
   "A utility to show you documentation at button window by finding some 
 meaningful information around the point."
@@ -193,6 +195,8 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
                    (and (not (null (cdr mode)))
                         (string-match (car mode) file)
                         (funcall (cdr mode))))
+                 ;; Minor modes.
+                 (sos-jump-mode 1)
                  ;; Move point and recenter.
                  (or (and linum (goto-char (point-min))
                           (forward-line (- linum 1)))
@@ -202,7 +206,8 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
                  (move-overlay sos-hl-line-overlay (line-beginning-position) (+ 1 (line-end-position)))
                  ;; TODO: hl-word
                  ;; TODO: modify mode line.
-                 ))))))
+                 ))))
+       ))
     (:hide nil)
     (:update nil)))
 
@@ -216,8 +221,6 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
     (:hide nil)
     (:update nil)))
 
-;; (sos-toggle-buffer-window 1)
-;; (sos-toggle-buffer-window -1)
 (defun sos-toggle-buffer-window (toggle)
   "Display or hide the `sos-reference-buffer' and `sos-reference-window'."
   (let ((enabled (or (and (booleanp toggle) toggle)
