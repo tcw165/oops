@@ -28,7 +28,7 @@
 ;; 2014-10-01 (0.0.1)
 ;;    Initial release.
 
-(defun sos-semantic-backend (cmd &optional arg &rest ign)
+(defun sos-semantic-backend (cmd &optional arg)
   )
 
 (provide 'sos-semantic)

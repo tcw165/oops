@@ -28,19 +28,28 @@
 ;; 2014-08-01 (0.0.1)
 ;;    Initial release.
 
-(defgroup sos-jump-group nil
-  "A major mode for the text produced by GREP like applications."
-  :tag "SOS Jump")
-
-(defcustom sos-jump-mode-hook '()
+(defcustom sos-nav-mode-hook '()
   "Hook run when entering `prj-grep-mode' mode."
   :type 'hook
-  :group 'sos-jump-group)
+  :group 'sos-group)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun sos-nav-kill-local-variables ()
+  (mapc 'kill-local-variable '(mode-line-format)))
+
+;; (self-insert-command)
+(defun sos-nav-mode-line ()
+  nil)
 
 ;;;###autoload
-(define-minor-mode sos-jump-mode
+(define-minor-mode sos-nav-mode
   "Minor mode for *Reference* buffers."
-  :lighter " SOS:Jump"
-  )
+  :lighter " SOS:Navigation"
+  :group 'sos-group
+  (if sos-nav-mode
+      (progn
+        (setq mode-line-format (sos-nav-mode-line)))
+    (sos-nav-kill-local-variables)))
 
-(provide 'sos-jump)
+(provide 'sos-nav)

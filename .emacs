@@ -17,6 +17,7 @@
  '(ido-mode (quote both) nil (ido))
  '(imenu-sort-function (quote imenu--sort-by-name))
  '(indent-tabs-mode nil)
+ '(initial-buffer-choice t)
  '(make-backup-files nil)
  '(mouse-wheel-follow-mouse t)
  '(mouse-wheel-scroll-amount (quote (1 ((shift) . 1))))
@@ -150,4 +151,6 @@ The `base' should be a directory string and the `exclude' should be a list that 
 (require 'prj)
 (require 'oops)
 (oops-mode 1)
+(unless (prj-load-recent-project)
+  (prj-load-project))
 

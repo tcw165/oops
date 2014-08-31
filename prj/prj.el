@@ -186,7 +186,6 @@
 
 (defun prj-directory-files (dir &optional exclude)
   "Return a list containing file names under `dir' but exlcudes files that match `exclude'."
-  ;; TODO: seems bug.
   (let (files)
     (dolist (file (directory-files dir))
       (and (not (member file '("." "..")))
@@ -394,6 +393,13 @@
       ;; Read configuration.
       (setq prj-config (prj-import-data (format "%s/%s/%s" prj-workspace-path c prj-config-name)))
       (message "[%s] Load project ...done" (prj-project-name)))))
+
+;;;###autoload
+(defun prj-load-recent-project ()
+  "Load the project which user exits emacs last time."
+  (interactive)
+  ;; TODO:
+  nil)
 
 ;;;###autoload
 (defun prj-unload-project ()

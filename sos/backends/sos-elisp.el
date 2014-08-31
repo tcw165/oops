@@ -28,32 +28,28 @@
 ;; 2014-10-01 (0.0.1)
 ;;    Initial release.
 
-(defun sos-elisp-backend (command &rest args)
+(defun sos-elisp-backend (command &optional arg)
   (case command
     (:init t)
     (:symbol
      (when (member major-mode '(emacs-lisp-mode lisp-interaction-mode))
-       "test-symbol"))
+       (format "%s" (current-time))))
     (:candidates
      ;; Single candidate case:
      (let* ((num (random 1000))
             (i (% num 10)))
-       (list (nth i '((:file "~/.emacs.d/oops/sos/text1.el" :offset 5)
-                      (:file "~/.emacs.d/oops/sos/text2.el" :offset 10)
-                      (:file "~/.emacs.d/oops/sos/text3.el" :offset 15)
-                      (:file "~/.emacs.d/oops/sos/text4.java" :offset 20)
-                      (:file "~/.emacs.d/oops/sos/text5.el" :offset 25)
-                      (:file "~/.emacs.d/oops/sos/text6.c" :offset 30)
-                      (:file "~/.emacs.d/oops/sos/text7.el" :offset 35)
-                      (:file "~/.emacs.d/oops/sos/text8.java" :offset 40)
-                      (:file "~/.emacs.d/oops/sos/text9.c" :offset 45)
-                      (:file "~/.emacs.d/oops/sos/text10.txt" :offset 50)
+       (list (nth i '((:file "~/.emacs.d/oops/sos/text1.el" :line 5)
+                      (:file "~/.emacs.d/oops/sos/text2.el" :line 10)
+                      (:file "~/.emacs.d/oops/sos/text3.el" :line 15)
+                      (:file "~/.emacs.d/oops/sos/text4.java" :line 20)
+                      (:file "~/.emacs.d/oops/sos/text5.el" :line 25)
+                      (:file "~/.emacs.d/oops/sos/text6.c" :line 30)
+                      (:file "~/.emacs.d/oops/sos/text7.el" :line 35)
+                      (:file "~/.emacs.d/oops/sos/text8.java" :line 40)
+                      (:file "~/.emacs.d/oops/sos/text9.c" :line 45)
+                      (:file "~/.emacs.d/oops/sos/text10.txt" :line 5)
                       )))))
     (:tips
-     (format "Test tips %s" (current-time)))
-    (:no-cache t)))
-;; (sos-elisp-backend :candidates)
-;; a b c d
-;; (with-current-buffer sos-reference-buffer (goto-char 14))
+     (format "Test tips .... %s" (current-time)))))
 
 (provide 'sos-elisp)

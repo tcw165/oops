@@ -30,12 +30,11 @@
 ;; 2014-10-01 (0.0.1)
 ;;    Initial release.
 
+(require 'sos-nav)
 ;; Default supported back-ends.
 (require 'sos-grep)
 (require 'sos-elisp)
 (require 'sos-semantic)
-
-(require 'sos-jump)
 
 (defgroup sos-group nil
   "A utility to show you documentation at button window by finding some 
@@ -60,8 +59,7 @@ meaningful information around the point."
   :group 'sos-group)
 
 (defcustom sos-backends '(sos-grep-backend
-                          sos-elisp-backend
-                          sos-semantic-backend)
+                          sos-elisp-backend)
   "The list of back-ends for the purpose of collecting candidates. The sos 
 engine will dispatch all the back-ends and pass specific commands in order. 
 Every command has its purpose, paremeter rule and return rule (get meaningful 
@@ -118,11 +116,11 @@ Return value will be cached to `sos-candidates'.
    :hl-line BOOLEAN
    :hl-word STRING) ...)
 
- FILE: A string which indicates the absolute path of the source file.
+   FILE: A string which indicates the absolute path of the source file.
 
- OFFSET: A integer which indicates the location of the symbol in the source file.
+   OFFSET: A integer which indicates the location of the symbol in the source file.
 
- HIGHLIGHT: A boolean which indicate to highlight the symbol.
+   HIGHLIGHT: A boolean which indicate to highlight the symbol.
 
 sample:
   TODO: sample
@@ -136,7 +134,7 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
   :type '(repeat (symbol :tag "Back-end"))
   :group 'sos-group)
 
-(defcustom sos-idle-delay 0.5
+(defcustom sos-idle-delay 0.25
   "The idle delay in seconds until sos starts automatically."
   :type '(number :tag "Seconds"))
 
@@ -171,6 +169,27 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; (with-current-buffer)
+(defmacro sos-with-reference-buffer (&rest body)
+  (declare (indent 0) (debug t))
+  `(and (window-live-p sos-reference-window)
+        (buffer-live-p sos-reference-buffer)
+        (with-selected-window sos-reference-window
+          (with-current-buffer sos-reference-buffer
+            (progn ,@body)
+            ;; Minor modes.
+            (sos-nav-mode 1)))))
+
+;; (with-temp-buffer)
+
+(defun sos-is-skip-command (&rest commands)
+  (member this-command `(mwheel-scroll
+                         save-buffer
+                         eval-buffer
+                         eval-last-sexp
+                         ;; Additional commands.
+                         ,@commands)))
+
 (defun sos-is-single-candidate ()
   (= (length sos-candidates) 1))
 
@@ -185,41 +204,157 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
                 (linum (plist-get candidate :linum))
                 (hl-line (plist-get candidate :hl-line))
                 (hl-word (plist-get candidate :hl-word)))
-           (garbage-collect)
            (when (file-exists-p file)
-             (with-selected-window sos-reference-window
-               (with-current-buffer sos-reference-buffer
-                 (insert-file-contents file nil nil nil t)
-                 ;; Find a appropriate major-mode for it.
-                 (dolist (mode auto-mode-alist)
-                   (and (not (null (cdr mode)))
-                        (string-match (car mode) file)
-                        (funcall (cdr mode))))
-                 ;; Minor modes.
-                 (sos-jump-mode 1)
-                 ;; Move point and recenter.
-                 (or (and linum (goto-char (point-min))
-                          (forward-line (- linum 1)))
-                     (and offset (goto-char offset)))
-                 (recenter 3)
-                 ;; Highlight line.
-                 (move-overlay sos-hl-line-overlay (line-beginning-position) (+ 1 (line-end-position)))
-                 ;; TODO: hl-word
-                 ;; TODO: modify mode line.
-                 ))))
-       ))
+             (sos-with-reference-buffer
+               (insert-file-contents file nil nil nil t)
+               ;; Find a appropriate major-mode for it.
+               (dolist (mode auto-mode-alist)
+                 (and (not (null (cdr mode)))
+                      (string-match (car mode) file)
+                      (funcall (cdr mode))))
+               ;; Move point and recenter.
+               (or (and linum (goto-char (point-min))
+                        (forward-line (- linum 1)))
+                   (and offset (goto-char offset)))
+               (recenter 3)
+               ;; Highlight line.
+               (move-overlay sos-hl-line-overlay (line-beginning-position) (+ 1 (line-end-position)))
+               ;; TODO: hl-word
+               ;; TODO: modify mode line.
+               )))))
     (:hide nil)
     (:update nil)))
 
 (defun sos-tips-frontend (command &rest args)
   (case command
     (:show
-     (when sos-tips
+     (when (stringp sos-tips)
        ;; TODO: draw a overlay.
        ;; (message "%s" sos-tips)
        ))
     (:hide nil)
     (:update nil)))
+
+(defun sos-pre-command ()
+  (when sos-timer
+    (cancel-timer sos-timer)
+    (setq sos-timer nil)))
+
+(defun sos-post-command ()
+  (and (sos-is-idle-begin)
+       ;;;;;; Begin instantly.
+       (or nil
+           (and (= sos-idle-delay 0)
+                (sos-idle-begin (current-buffer) (point)))
+           ;; Begin with delay `sos-idle-delay'
+           (setq sos-timer (run-with-timer sos-idle-delay nil
+                                           'sos-idle-begin
+                                           (current-buffer) (point))))))
+
+(defun sos-is-idle-begin ()
+  (not (or (eq (current-buffer) sos-reference-buffer)
+           (eq (selected-window) sos-reference-window)
+           (sos-is-skip-command))))
+
+(defun sos-idle-begin (buf pt)
+  (and (eq buf (current-buffer))
+       (eq pt (point))
+       (if (null sos-backend)
+           (sos-1st-process-backends)
+         (sos-process-backend sos-backend))))
+
+(defun sos-1st-process-backends ()
+  (dolist (backend sos-backends)
+    (sos-process-backend backend)
+    (and sos-backend
+         (return t)))
+  t)
+
+(defun sos-process-backend (backend)
+  (let ((symb (sos-call-backend backend :symbol)))
+    (cond
+     ;; Return a string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+     ((stringp symb)
+      (if (string-equal symb sos-symbol)
+          (progn
+            ;; If return symbol string is equal to `sos-symbol', ask front-ends
+            ;; Renew the `:tips' and to do `:update' task.
+            (setq sos-tips (sos-call-backend backend :tips symb))
+            (sos-call-frontends :update))
+        ;; Call front-ends: `:hide'.
+        (sos-call-frontends :hide)
+        (setq sos-backend backend
+              sos-symbol symb)
+        ;; Call back-end: get `sos-candidates' and `sos-candidate'.
+        (setq sos-candidates (sos-call-backend backend :candidates symb)
+              sos-tips (sos-call-backend backend :tips symb))
+        ;; (sos-call-backend backend :tips symb)
+        (and sos-candidates (listp sos-candidates)
+             ;; Call front-ends: `:show'.
+             (sos-call-frontends :show :update))))
+
+     ;; Return nil ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+     ((null symb)
+      (sos-kill-local-variables))
+
+     ;; Return `:stop' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+     ((eq symb :stop)
+      (setq sos-backend backend))))
+  t)
+
+(defun sos-kill-local-variables ()
+  (mapc 'kill-local-variable '(sos-backend
+                               sos-symbol
+                               sos-candidates
+                               sos-candidate
+                               sos-tips)))
+
+(defun sos-call-frontends (command &rest args)
+  "Iterate all the `sos-backends' and pass `command' by order."
+  (let ((commands (cons command args)))
+    (dolist (frontend sos-frontends)
+      (dolist (cmd commands)
+        (condition-case err
+            (funcall frontend cmd)
+          (error "[sos] Front-end %s error \"%s\" on command %s"
+                 frontend (error-message-string err) commands))))))
+
+(defun sos-call-backend (backend command &optional arg)
+  "Call certain backend `backend' and pass `command' to it."
+  (condition-case err
+      (funcall backend command arg)
+    (error "[sos] Back-end %s error \"%s\" on command %s"
+           backend (error-message-string err) (cons command arg))))
+
+(defun sos-init-backend (backend)
+  (condition-case err
+      (progn
+        (funcall backend :init))
+    (error "[sos] Back-end %s error \"%s\" on command %s"
+           backend (error-message-string err) :init)))
+
+;;;###autoload
+(define-minor-mode sos-reference-window-mode
+  "This local minor mode gethers symbol returned from backends around the point 
+and show the reference visually through frontends. Usually frontends output the 
+result to the `sos-reference-buffer' displayed in the `sos-reference-window'. 
+Show or hide these buffer and window are controlled by `sos-watchdog-mode'."
+  :lighter " SOS:Ref"
+  :group 'sos-group
+  ;; TODO: menu-bar and tool-bar keymap.
+  (if sos-reference-window-mode
+      (progn
+        (unless (eq (current-buffer) sos-reference-buffer)
+          (unless sos-watchdog-mode
+            (sos-watchdog-mode 1))
+          (mapc 'sos-init-backend sos-backends)
+          (add-hook 'pre-command-hook 'sos-pre-command nil t)
+          (add-hook 'post-command-hook 'sos-post-command nil t)))
+    (sos-kill-local-variables)
+    (remove-hook 'pre-command-hook 'sos-pre-command t)
+    (remove-hook 'post-command-hook 'sos-post-command t)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun sos-toggle-buffer-window (toggle)
   "Display or hide the `sos-reference-buffer' and `sos-reference-window'."
@@ -243,7 +378,7 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
                    (setq sos-reference-window (split-window win height 'below)))))
           ;; Force to apply `sos-reference-buffer' to `sos-reference-window'.
           (set-window-buffer sos-reference-window sos-reference-buffer)
-          (with-current-buffer sos-reference-buffer
+          (sos-with-reference-buffer
             ;; Highlight line overlay.
             (unless sos-hl-line-overlay
               (setq sos-hl-line-overlay (make-overlay 1 1))
@@ -259,14 +394,14 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
 (defun sos-watchdog-post-command ()
   (condition-case err
       (progn
-        (unless (or (member this-command '(self-insert-command
-                                           previous-line
-                                           next-line
-                                           left-char
-                                           right-char
-                                           save-buffer))
+        (force-mode-line-update)
+        (unless (or (sos-is-skip-command 'self-insert-command
+                                         'previous-line
+                                         'next-line
+                                         'left-char
+                                         'right-char)
                     (active-minibuffer-window))
-          (if sos-reference-mode
+          (if sos-reference-window-mode
               ;; Show them.
               (progn
                 (sos-toggle-buffer-window 1)
@@ -289,141 +424,13 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
 
 ;;;###autoload
 (define-minor-mode sos-watchdog-mode
-  "A global minor mode which refers to buffer's `sos-reference-mode' to show the 
+  "A global minor mode which refers to buffer's `sos-reference-window-mode' to show the 
 `sos-reference-buffer' and `sos-reference-window' or hide them. Show them if 
-`sos-reference-mode' is t; Hide if nil."
+`sos-reference-window-mode' is t; Hide if nil."
   :global t
+  :group 'sos-group
   (if sos-watchdog-mode
       (add-hook 'post-command-hook 'sos-watchdog-post-command t)
     (remove-hook 'post-command-hook 'sos-watchdog-post-command t)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defun sos-pre-command ()
-  (when sos-timer
-    (cancel-timer sos-timer)
-    (setq sos-timer nil)))
-
-(defun sos-post-command ()
-  ;; Setup idle timer to call `sos-idle-begin'.
-  (and (sos-idle-begin-check)
-       (setq sos-timer (run-with-timer sos-idle-delay nil
-                                       'sos-idle-begin
-                                       (current-buffer) (selected-window)
-                                       (buffer-chars-modified-tick) (point)))))
-
-(defun sos-idle-begin-check ()
-  (not (or (eq (current-buffer) sos-reference-buffer)
-           (eq (selected-window) sos-reference-window))))
-
-(defun sos-idle-begin (buf win tick pos)
-  (and (eq buf (current-buffer))
-       (eq win (selected-window))
-       (eq tick (buffer-chars-modified-tick))
-       (eq pos (point))
-       (if (null sos-backend)
-           (sos-1st-process-backends)
-         (sos-process-backend sos-backend))))
-
-(defun sos-1st-process-backends ()
-  (dolist (backend sos-backends)
-    (sos-process-backend backend)
-    (and sos-backend
-         (return t))))
-
-(defun sos-process-backend (backend)
-  (let ((symb (sos-call-backend backend :symbol)))
-    (cond
-     ;; Return a string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-     ((stringp symb)
-      (if (string-equal symb sos-symbol)
-          ;; If return symbol string is equal to `sos-symbol', ask front-ends
-          ;; just to do `:update' task.
-          (sos-call-frontends :update)
-        ;; Call front-ends: `:hide'.
-        (sos-call-frontends :hide)
-        (setq sos-backend backend
-              sos-symbol symb)
-        ;; Call back-end: get `sos-candidates' and `sos-candidate'.
-        (let ((candidates (sos-call-backend backend :candidates symb)))
-          (when (and candidates (listp candidates))
-            (setq sos-candidates candidates)
-            ;; Call front-ends: `:show'.
-            (sos-call-frontends :show :update)))))
-
-     ;; Return nil ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-     ((null symb)
-      (sos-kill-local-variables))
-
-     ;; Return `:stop' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-     ((eq symb :stop)
-      (setq sos-backend backend)))))
-
-(defun sos-kill-local-variables ()
-  (mapc 'kill-local-variable '(sos-backend
-                               sos-symbol
-                               sos-candidates
-                               sos-candidate
-                               sos-tips)))
-
-(defun sos-call-frontends (command &rest args)
-  "Iterate all the `sos-backends' and pass `command' by order."
-  (let ((commands (cons command args)))
-    (dolist (frontend sos-frontends)
-      (dolist (cmd commands)
-        (condition-case err
-            (funcall frontend cmd)
-          (error "[sos] Front-end %s error \"%s\" on command %s"
-                 frontend (error-message-string err) commands))))))
-
-(defmacro sos-call-backend (backend command &rest args)
-  "Call certain backend `backend' and pass `command' to it."
-  `(condition-case err
-       (funcall ,backend ,command ,@args)
-     (error "[sos] Back-end %s error \"%s\" on command %s"
-            ,backend (error-message-string err) (cons ,command ,@args))))
-
-(defun sos-init-backend (backend)
-  (condition-case err
-      (progn
-        (funcall backend :init)
-        (put backend :init t))
-    (put backend :init nil)
-    (error "[sos] Back-end %s error \"%s\" on command %s"
-           backend (error-message-string err) :init)))
-
-;;;###autoload
-(define-minor-mode sos-reference-mode
-  "This local minor mode gethers symbol returned from backends around the point 
-and show the reference visually through frontends. Usually frontends output the 
-result to the `sos-reference-buffer' displayed in the `sos-reference-window'. 
-Show or hide these buffer and window are controlled by `sos-watchdog-mode'."
-  :lighter " SOS:Ref"
-  ;; TODO: menu-bar and tool-bar keymap.
-  (if sos-reference-mode
-      (progn
-        (unless (eq (current-buffer) sos-reference-buffer)
-          (unless sos-watchdog-mode
-            (sos-watchdog-mode 1))
-          (mapc 'sos-init-backend sos-backends)
-          (add-hook 'pre-command-hook 'sos-pre-command nil t)
-          (add-hook 'post-command-hook 'sos-post-command nil t)))
-    (sos-kill-local-variables)
-    (remove-hook 'pre-command-hook 'sos-pre-command t)
-    (remove-hook 'post-command-hook 'sos-post-command t)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;;###autoload
-(define-minor-mode sos-tips-mode
-  "This local minor mode gethers symbol returned from backends around the point 
-and show the reference visually through frontends. Usually frontends output the 
-result to the `sos-reference-buffer' displayed in the `sos-reference-window'. 
-Show or hide these buffer and window are controlled by `sos-watchdog-mode'."
-  :lighter " SOS:Tips"
-  (if sos-tips-mode
-      (progn
-        )
-    ))
 
 (provide 'sos)

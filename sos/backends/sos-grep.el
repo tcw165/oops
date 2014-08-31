@@ -28,7 +28,7 @@
 ;; 2014-10-01 (0.0.1)
 ;;    Initial release.
 
-(defun sos-grep-backend (command &rest args)
+(defun sos-grep-backend (command &optional arg)
   (case command
     (:init t)
     (:symbol
@@ -45,8 +45,7 @@
            :stop))))
     (:candidates
      ;; 1st argument is FILEPATH:LINENO string.
-     (let* ((symb (car args))
-            (strings (split-string symb ":"))
+     (let* ((strings (split-string arg ":"))
             (file (car strings))
             (linum (string-to-int (cadr strings))))
        `((:file ,file :linum ,linum))))

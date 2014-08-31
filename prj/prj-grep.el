@@ -35,7 +35,7 @@
 (defcustom prj-grep-mode-hook `(linum-mode
                                 hl-line-mode
                                 ,(and (featurep 'sos)
-                                      'sos-reference-mode))
+                                      'sos-reference-window-mode))
   "Hook run when entering `prj-grep-mode' mode."
   :type 'hook
   :group 'prj-grep-group)
