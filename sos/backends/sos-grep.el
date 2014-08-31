@@ -36,13 +36,14 @@
                                    'prj-grep-mode)
                               (and (featurep 'compile)
                                    'compilation-mode)))
-       (save-excursion
-         (beginning-of-line)
-         (if (search-forward-regexp "^[-a-zA-Z0-9._/\\ ]+:[0-9]+:"
-                                    (line-end-position) t)
-             ;; Return FILEPATH:LINENO string.
-             (buffer-substring-no-properties (line-beginning-position) (- (point) 1))
-           :stop))))
+       (unless mark-active
+         (save-excursion
+           (beginning-of-line)
+           (if (search-forward-regexp "^[-a-zA-Z0-9._/\\ ]+:[0-9]+:"
+                                      (line-end-position) t)
+               ;; Return FILEPATH:LINENO string.
+               (buffer-substring-no-properties (line-beginning-position) (- (point) 1))
+             :stop)))))
     (:candidates
      ;; 1st argument is FILEPATH:LINENO string.
      (let* ((strings (split-string arg ":"))

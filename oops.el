@@ -44,12 +44,12 @@
 ;;; Oops library ===============================================================
 ;; Core libraries:
 (require 'oops-win)
-(require 'oops-help)
 ;; Language libraries:
 (require 'oops-c-lib)
 (require 'oops-cpp-lib)
 (require 'oops-lisp-lib)
 (require 'oops-python-lib)
+
 (require 'sos)
 (require 'prj)
 

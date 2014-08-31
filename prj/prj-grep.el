@@ -28,22 +28,19 @@
 ;; 2014-08-01 (0.0.1)
 ;;    Initial release.
 
-(defgroup prj-grep-group nil
-  "A major mode for the text produced by GREP like applications."
-  :tag "Prj Grep")
-
 (defcustom prj-grep-mode-hook `(linum-mode
                                 hl-line-mode
                                 ,(and (featurep 'sos)
                                       'sos-reference-window-mode))
   "Hook run when entering `prj-grep-mode' mode."
   :type 'hook
-  :group 'prj-grep-group)
+  :group 'prj-group)
 
 ;;;###autoload
 (define-derived-mode prj-grep-mode nil "Grep"
   "Major mode for search buffers."
-  :group 'search-list-group
+  :group 'prj-group
+  ;; TODO: highlight words behind ">>>>>".
   )
 
 (provide 'prj-grep)

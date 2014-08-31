@@ -263,18 +263,18 @@
 
 (defmacro prj-with-search-buffer (&rest body)
   "Switch to search buffer and setup specific major mode and minor modes. Create a new one if it doesn't exist."
-  `(let (pt)
+  `(progn
      (find-file (prj-searchdb-path))
-     (kill-all-local-variables)
-     (remove-overlays)
-     (goto-char (point-max))
-     (setq pt (point))
      (rename-buffer "*Search*")
-     (progn ,@body)
-     (goto-char pt)
+     (and ,body
+          (goto-char (point-max))
+          (save-excursion
+            (progn ,@body)))
+     (and (buffer-modified-p)
+          (save-buffer 0))
+     ;; TODO: goto last search result.
      ;; Change major mode.
-     (prj-grep-mode)
-     (save-buffer)))
+     (prj-grep-mode)))
 
 (defun prj-create-project-internal (name doctypes filepaths)
   "Internal function to create project. It might be called by widget or other GUI framework."
@@ -453,10 +453,13 @@
   (interactive)
   (if (equal (buffer-name (current-buffer)) "*Search*")
       ;; Back to previous buffer of current window.
-      (switch-to-buffer (caar (window-prev-buffers)))
+      (progn
+        (and (buffer-modified-p)
+             (save-buffer 0))
+        (kill-buffer))
     ;; Go to search buffer.
     (unless (prj-project-p)
-    (prj-load-project))
+      (prj-load-project))
     (prj-with-search-buffer)))
 
 ;;;###autoload
