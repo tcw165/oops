@@ -39,16 +39,20 @@
        (unless mark-active
          (save-excursion
            (beginning-of-line)
-           (if (search-forward-regexp "^[-a-zA-Z0-9._/\\ :]+:[0-9]+:"
+           (if (search-forward-regexp "^.+:[0-9]+:"
                                       (line-end-position) t)
-               ;; Return FILEPATH:LINENO string.
-               (buffer-substring-no-properties (line-beginning-position) (- (point) 1))
+               ;; Return FILEPATH?NUM string.
+               (let* ((full (buffer-substring-no-properties (line-beginning-position) (- (point) 1)))
+                      (offset (string-match ":[0-9]+$" full))
+                      (file (substring full 0 offset))
+                      (linum (substring full (1+ offset))))
+                 (concat file "?" linum))
              :stop)))))
     (:candidates
-     ;; 1st argument is FILEPATH:LINENO string.
-     (let* ((strings (split-string arg ":"))
-            (file (car strings))
-            (linum (string-to-int (cadr strings))))
+     ;; 1st argument is FILEPATH?NUM string.
+     (let* ((strings (split-string arg "?" t))
+            (file (nth 0 strings))
+            (linum (string-to-int (nth 1 strings))))
        ;; TODO: `:hl-line' to `:hl-word'.
        `((:file ,file :linum ,linum :hl-line t))))
     (:tips nil)
