@@ -263,13 +263,13 @@
 
 (defmacro prj-with-search-buffer (&rest body)
   "Switch to search buffer and setup specific major mode and minor modes. Create a new one if it doesn't exist."
+  (declare (indent 0) (debug t))
   `(progn
      (find-file (prj-searchdb-path))
      (rename-buffer "*Search*")
-     (and ,body
-          (goto-char (point-max))
-          (save-excursion
-            (progn ,@body)))
+     (goto-char (point-max))
+     (save-excursion
+       (progn ,@body))
      (and (buffer-modified-p)
           (save-buffer 0))
      ;; TODO: goto last search result.
@@ -329,14 +329,14 @@
   ;; Create search buffer.
   (prj-with-search-buffer
     (let ((db (prj-import-data (prj-filedb-path)))
-	  (files '()))
+          (files '()))
       (insert (format ">>>>> %s\n" match))
       ;; Prepare file list.
       (dolist (elm projects)
-	(dolist (f (gethash elm db))
-	  (message "[%s] Searching ...%s" (prj-project-name) f)
-	  (goto-char (point-max))
-	  (call-process "grep" nil (list (current-buffer) nil) t "-nH" match f)))
+        (dolist (f (gethash elm db))
+          (message "[%s] Searching ...%s" (prj-project-name) f)
+          (goto-char (point-max))
+          (call-process "grep" nil (list (current-buffer) nil) t "-nH" match f)))
       (insert "<<<<<\n\n")
       (message (format "[%s] Search ...done" (prj-project-name))))))
 
@@ -358,13 +358,15 @@
   ;;      (config (json-read-from-string "{\"name\":\"Emacs\", \"filepath\":[\"~/.emacs\", \"~/.emacs.d/elpa\", \"~/.emacs.d/etc\"], \"doctypes\":[[\"Text\", \"*.txt;*.md\"], [\"Lisp\", \"*.el\"], [\"Python\", \"*.py\"]]}")))
   ;; (format "%s" config))
   (interactive)
-  (prj-setup-create-project-widget))
+  (or (and (featurep 'prj-widget)
+           (prj-setup-create-project-widget))))
 
 ;;;###autoload
 (defun prj-delete-project ()
   "Show configuration for deleting projects."
   (interactive)
-  (prj-setup-delete-project-widget))
+  (or (and (featurep 'prj-widget)
+           (prj-setup-delete-project-widget))))
 
 ;;;###autoload
 (defun prj-edit-project ()
@@ -373,7 +375,8 @@
   ;; Load project if wasn't loaded.
   (unless (prj-project-p)
     (prj-load-project))
-  (prj-setup-edit-project-widget))
+  (or (and (featurep 'prj-widget)
+           (prj-setup-edit-project-widget))))
 
 ;;;###autoload
 (defun prj-load-project ()
@@ -446,7 +449,8 @@
   ;; Load project if no project was loaded.
   (unless (prj-project-p)
     (prj-load-project))
-  (prj-setup-search-project-widget (prj-thingatpt)))
+  (or (and (featurep 'prj-widget)
+           (prj-setup-search-project-widget (prj-thingatpt)))))
 
 ;;;###autoload
 (defun prj-toggle-search-buffer ()

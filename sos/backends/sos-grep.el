@@ -39,7 +39,7 @@
        (unless mark-active
          (save-excursion
            (beginning-of-line)
-           (if (search-forward-regexp "^[-a-zA-Z0-9._/\\ ]+:[0-9]+:"
+           (if (search-forward-regexp "^[-a-zA-Z0-9._/\\ :]+:[0-9]+:"
                                       (line-end-position) t)
                ;; Return FILEPATH:LINENO string.
                (buffer-substring-no-properties (line-beginning-position) (- (point) 1))
