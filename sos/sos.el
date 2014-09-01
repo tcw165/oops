@@ -44,7 +44,7 @@ meaningful information around the point."
   :tag "Sos")
 
 (defface sos-hl
-  '((t (:background "yellow")))
+  '((t (:background "yellow" :weight bold :height 1.5)))
   "Default face for highlighting the current line in Hl-Line mode."
   :group 'sos-group)
 
@@ -178,7 +178,15 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
         (buffer-live-p sos-definition-buffer)
         (with-selected-window sos-definition-window
           (with-current-buffer sos-definition-buffer
+            ;; Local variables.
+            (kill-all-local-variables)
+            ;; Overlays
+            (setq sos-hl-overlay (remove-overlays)
+                  sos-hl-overlay (make-overlay 1 1))
+            (overlay-put sos-hl-overlay 'face sos-hl-face)
+            ;; `body' >>>
             (progn ,@body)
+            ;; <<<<<<<<<<
             ;; Minor modes.
             (sos-nav-mode 1)))))
 
@@ -381,12 +389,7 @@ Show or hide these buffer and window are controlled by `sos-watchdog-mode'."
               (and win height
                    (setq sos-definition-window (split-window win height 'below)))))
           ;; Force to apply `sos-definition-buffer' to `sos-definition-window'.
-          (set-window-buffer sos-definition-window sos-definition-buffer)
-          (sos-with-definition-buffer
-            ;; Create highlight line overlay.
-            (unless sos-hl-overlay
-              (setq sos-hl-overlay (make-overlay 1 1))
-              (overlay-put sos-hl-overlay 'face sos-hl-face))))
+          (set-window-buffer sos-definition-window sos-definition-buffer))
       (and (windowp sos-definition-window)
            (delete-window sos-definition-window))
       (and (bufferp sos-definition-buffer)
