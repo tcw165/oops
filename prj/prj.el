@@ -455,6 +455,7 @@
 ;;;###autoload
 (defun prj-toggle-search-buffer ()
   (interactive)
+  ;; TODO: bug when user is select definition window and try to toggle search buffer off.
   (if (equal (buffer-name (current-buffer)) "*Search*")
       ;; Back to previous buffer of current window.
       (progn

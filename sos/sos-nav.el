@@ -40,7 +40,8 @@
 
 ;; ("%e" mode-line-front-space mode-line-mule-info mode-line-client mode-line-modified mode-line-remote mode-line-frame-identification mode-line-buffer-identification "   " mode-line-position  (vc-mode vc-mode) "  " mode-line-modes mode-line-misc-info mode-line-end-spaces)
 (defun sos-nav-mode-line ()
-  nil)
+  (format "(Read Only)"))
+;; (sos-nav-mode-line)
 
 ;;;###autoload
 (define-minor-mode sos-nav-mode
@@ -49,8 +50,9 @@
   :group 'sos-group
   (if sos-nav-mode
       (progn
-        (setq mode-line-format (sos-nav-mode-line))
-        (force-mode-line-update))
+        ;; (setq mode-line-format (sos-nav-mode-line))
+        (setq mode-line-format "Ready Only")
+        )
     (sos-nav-kill-local-variables)))
 
 (provide 'sos-nav)

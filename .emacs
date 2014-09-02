@@ -17,6 +17,7 @@
  '(ido-mode (quote both) nil (ido))
  '(imenu-sort-function (quote imenu--sort-by-name))
  '(indent-tabs-mode nil)
+ '(inhibit-startup-screen t)
  '(initial-buffer-choice t)
  '(make-backup-files nil)
  '(mouse-wheel-follow-mouse t)
