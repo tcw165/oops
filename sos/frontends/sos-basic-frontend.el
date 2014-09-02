@@ -37,7 +37,6 @@
      (if (sos-is-single-candidate)
          (let* ((candidate (car sos-candidates))
                 (file (plist-get candidate :file))
-                (offset (plist-get candidate :offset))
                 (linum (plist-get candidate :linum))
                 (hl-line (plist-get candidate :hl-line))
                 (hl-word (plist-get candidate :hl-word)))
@@ -51,16 +50,18 @@
                  (and (not (null (cdr mode)))
                       (string-match (car mode) file)
                       (funcall (cdr mode))))
+               (and (featurep 'hl-line)
+                    (hl-line-unhighlight))
                ;; Move point and recenter.
-               (or (and linum (goto-char (point-min))
-                        (forward-line (- linum 1)))
-                   (and offset (goto-char offset)))
+               (and (integerp linum)
+                    (goto-char (point-min))
+                    (forward-line (- linum 1)))
                (recenter 3)
                ;; Highlight word or line.
-               (or (and (stringp hl-word)
-                        ;; TODO: hl-word.
-                        ;; (move-overlay)
-                        )
+               (move-overlay sos-hl-overlay 1 1)
+               (or (and (stringp hl-word) (> (length hl-word) 0)
+                        (search-forward hl-word (line-end-position) t)
+                        (move-overlay sos-hl-overlay (- (point) (length hl-word)) (point)))
                    (and hl-line
                         (move-overlay sos-hl-overlay (line-beginning-position) (+ 1 (line-end-position))))))))))
     (:hide nil)

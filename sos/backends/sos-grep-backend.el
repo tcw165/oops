@@ -28,6 +28,12 @@
 ;; 2014-10-01 (0.0.1)
 ;;    Initial release.
 
+(defconst sos-grep-prefix ">>>>> ")
+
+(defvar sos-grep-keyword nil
+  "The string after \">>>>> \" in the search buffer.")
+(make-variable-buffer-local 'sos-grep-keyword)
+
 (defun sos-grep-backend (command &optional arg)
   (case command
     (:init t)
@@ -39,22 +45,29 @@
        (unless mark-active
          (save-excursion
            (beginning-of-line)
-           (if (search-forward-regexp "^.+:[0-9]+:"
-                                      (line-end-position) t)
+           (if (search-forward-regexp "^.+:[0-9]+:" (line-end-position) t)
                ;; Return FILEPATH?NUM string.
                (let* ((full (buffer-substring-no-properties (line-beginning-position) (- (point) 1)))
                       (offset (string-match ":[0-9]+$" full))
                       (file (substring full 0 offset))
-                      (linum (substring full (1+ offset))))
-                 (concat file "?" linum))
+                      (linum (substring full (1+ offset)))
+                      (symb (concat file "?" linum)))
+                 (unless (string= symb sos-symbol)
+                   (kill-local-variable 'sos-grep-keyword))
+                 symb)
              :stop)))))
     (:candidates
      ;; 1st argument is FILEPATH?NUM string.
      (let* ((strings (split-string arg "?" t))
             (file (nth 0 strings))
-            (linum (string-to-int (nth 1 strings))))
-       ;; TODO: `:hl-line' to `:hl-word'.
-       `((:file ,file :linum ,linum :hl-line t))))
+            (linum (string-to-int (nth 1 strings)))
+            (keyword (unless sos-grep-keyword
+                       (save-excursion
+                         (search-backward-regexp (concat "^" sos-grep-prefix ".+$") nil t)
+                         (buffer-substring-no-properties (+ (length sos-grep-prefix) (point)) (line-end-position))))))
+       (setq sos-grep-keyword keyword)
+       ;; (message "sos-grep-keyword = %s" sos-grep-keyword)
+       `((:file ,file :linum ,linum :hl-word ,keyword))))
     (:tips nil)
     (:no-cache t)))
 

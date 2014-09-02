@@ -47,7 +47,7 @@ meaningful information around the point."
   :tag "Sos")
 
 (defface sos-hl
-  '((t (:background "yellow" :weight bold :height 1.5)))
+  '((t (:background "yellow" :foreground "black" :weight bold :height 1.5)))
   "Default face for highlighting the current line in Hl-Line mode."
   :group 'sos-group)
 
@@ -83,8 +83,7 @@ to dispatch remaining back-ends.
       (:symbol (and (member major-mode MAJOR_MODE_CANDIDATES)
                     (thing-at-point 'symbol))))
       (:candidates (list STRING01 STRING02 STRING03 ...))
-      (:tips TIPS)
-      (:no-cache t))
+      (:tips STRING))
 
 Each back-end is a function that takes a variable number of arguments. The
 first argument is the command requested from the sos enine.  It is one of
@@ -118,8 +117,8 @@ Return value will be cached to `sos-candidates'.
  ((:file STRING
    :offset INTEGER
    :linum INTEGER
-   :hl-line BOOLEAN
-   :hl-word STRING) ...)
+   :hl-word STRING
+   :hl-line BOOLEAN) (...) ...)
 
    FILE: A string which indicates the absolute path of the source file.
 
@@ -303,24 +302,27 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
   (let ((commands (cons command args)))
     (dolist (frontend sos-frontends)
       (dolist (cmd commands)
-        (condition-case err
-            (funcall frontend cmd)
-          (error "[sos] Front-end %s error \"%s\" on command %s"
-                 frontend (error-message-string err) commands))))))
+        ;; (condition-case err
+        ;;     (funcall frontend cmd)
+        ;;   (error "[sos] Front-end %s error \"%s\" on command %s"
+        ;;          frontend (error-message-string err) commands))
+        (funcall frontend cmd)))))
 
 (defun sos-call-backend (backend command &optional arg)
   "Call certain backend `backend' and pass `command' to it."
-  (condition-case err
-      (funcall backend command arg)
-    (error "[sos] Back-end %s error \"%s\" on command %s"
-           backend (error-message-string err) (cons command arg))))
+  ;; (condition-case err
+  ;;     (funcall backend command arg)
+  ;;   (error "[sos] Back-end %s error \"%s\" on command %s"
+  ;;          backend (error-message-string err) (cons command arg)))
+  (funcall backend command arg))
 
 (defun sos-init-backend (backend)
-  (condition-case err
-      (progn
-        (funcall backend :init))
-    (error "[sos] Back-end %s error \"%s\" on command %s"
-           backend (error-message-string err) :init)))
+  ;; (condition-case err
+  ;;     (progn
+  ;;       (funcall backend :init))
+  ;;   (error "[sos] Back-end %s error \"%s\" on command %s"
+  ;;          backend (error-message-string err) :init))
+  (funcall backend :init))
 
 ;;;###autoload
 (define-minor-mode sos-definition-window-mode

@@ -362,9 +362,6 @@ Maybe you'll need it for history and navigation feature.")
       (set-marker (mark-marker) beg)
       (goto-char end)
       (setq mark-active t)
-      (message "[hl-anything] find \"%s\" %s."
-               str
-               (if (> step 0) "forwardly" "backwardly"))
       ;; Hook after searching.
       (run-hook-with-args hl-thing-after-find-hook (list str beg end)))))
 
