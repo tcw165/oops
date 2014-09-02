@@ -199,10 +199,9 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
        (with-current-buffer sos-definition-buffer
          ;; Disable minor modes (read-write enabled).
          (sos-nav-mode -1)
-         ;; ;; Local variables.
-         ;; (kill-all-local-variables)
          ;; Overlays
-         (unless sos-hl-overlay
+         (unless (and sos-hl-overlay
+                      (buffer-live-p (overlay-buffer sos-hl-overlay)))
            (setq sos-hl-overlay (make-overlay 1 1)))
          (overlay-put sos-hl-overlay 'face sos-hl-face)
          ;; `body' >>>
