@@ -158,17 +158,11 @@
                         (cdr overlays))
               (move-overlay (pop overlays) pos1 (1+ pos1))
               (when (setq pos2 (scan-sexps pos1 1))
-                (move-overlay (pop overlays) (1- pos2) pos2)
-                )
-              )
-          (error nil)
-          )
-        )
+                (move-overlay (pop overlays) (1- pos2) pos2)))
+          (error nil)))
       ;; Hide unused overlays.
       (dolist (ov overlays)
-        (move-overlay ov 1 1)
-        )
-      )
+        (move-overlay ov 1 1)))
 
     ;; Inward overlays.
     (let ((overlays hl--inward-paren-overlays)
@@ -178,32 +172,21 @@
         (condition-case err
             (cond
              ((and (or (looking-back ")")
-                       (looking-back "]"))
-                   ;; TODO: skip comment.
-                   )
+                       (looking-back "]")))
+              ;; TODO: skip comment.
               (move-overlay (pop overlays) pos1 (1- pos1))
               (setq pos2 (scan-sexps pos1 -1))
-              (move-overlay (pop overlays) pos2 (1+ pos2))
-              )
+              (move-overlay (pop overlays) pos2 (1+ pos2)))
              ((and (or (looking-at "(")
-                       (looking-at "["))
-                   ;; TODO: skip comment.
-                   )
+                       (looking-at "[")))
+              ;; TODO: skip comment.
               (move-overlay (pop overlays) pos1 (1+ pos1))
               (setq pos2 (scan-sexps pos1 1))
-              (move-overlay (pop overlays) pos2 (1- pos2))
-              )
-             )
-          (error nil)
-          )
-        )
+              (move-overlay (pop overlays) pos2 (1- pos2))))
+          (error nil)))
       ;; Hide unused overlays.
       (dolist (ov overlays)
-        (move-overlay ov 1 1)
-        )
-      )
-    )
-  )
+        (move-overlay ov 1 1)))))
 
 (defun hl--paren-destruct-all ()
   (mapc 'delete-overlay hl--outward-paren-overlays)
@@ -212,8 +195,7 @@
   (kill-local-variable 'hl--inward-paren-overlays)
   (kill-local-variable 'hl--paren-last-point)
   (remove-hook 'post-command-hook 'hl--paren-update t)
-  (remove-hook 'post-command-hook 'hl--paren-destruct-all t)
-  )
+  (remove-hook 'post-command-hook 'hl--paren-destruct-all t))
 
 ;;;###autoload
 (define-minor-mode hl-paren-mode
@@ -223,15 +205,12 @@
   (when hl-paren-mode
     (hl--paren-create-overlays)
     (add-hook 'post-command-hook 'hl--paren-update nil t)
-    (add-hook 'change-major-mode-hook 'hl--paren-destruct-all nil t)
-    )
-  )
+    (add-hook 'change-major-mode-hook 'hl--paren-destruct-all nil t)))
 
 ;; Symbol or Selection =========================================================
 
 (defun hl--thing-custom-set (symbol value)
-  (set symbol value)
-  )
+  (set symbol value))
 
 (defface hl-thing-face nil
   "Face used for highlighting thing (a symbol or a text selection)."
@@ -253,11 +232,13 @@
 
 (defvar hl--things-color-index 0)
 
+;; TODO: defcustom
 (defvar hl-thing-before-find-hook nil
   "Hook for doing something before `hl--thing-find' do the searching.
 This hook has one argument, (REGEXP_STRING BEG END).
 Maybe you'll need it for history and navigation feature.")
 
+;; TODO: defcustom
 (defvar hl-thing-after-find-hook nil
   "Hook for doing something after `hl--thing-find' do the searching.
 This hook has one argument, (REGEXP_STRING BEG END).
@@ -332,9 +313,7 @@ Maybe you'll need it for history and navigation feature.")
 (defun hl--thing-find (step)
   (let* ((case-fold-search t)
          (thing (hl--thingatpt))
-         (str (nth 0 thing))
-         beg
-         end)
+         (str (nth 0 thing)))
     (when (and thing
                (not (= step 0)))
       ;; Hook before searching.
@@ -342,28 +321,25 @@ Maybe you'll need it for history and navigation feature.")
       ;; Disable selection.
       (setq mark-active nil)
       ;; Regexp search.
-      (goto-char (or (and (> step 0)
-                          ;; Move to end.
-                          (nth 2 thing))
-                     (and (< step 0)
-                          ;; Move to beginning.
-                          (nth 1 thing))))
-      (re-search-forward str nil t step)
+      (goto-char (if (> step 0)
+                     ;; Move to end.
+                     (nth 2 thing)
+                   ;; Move to beginning.
+                   (nth 1 thing)))
       ;; Make a selection.
-      (save-excursion
-        (when (> step 0)
-          (setq end (point))
-          (re-search-backward str nil t 1)
-          (setq beg (point)))
-        (when (< step 0)
-          (setq beg (point))
-          (re-search-forward str nil t 1)
-          (setq end (point))))
-      (set-marker (mark-marker) beg)
-      (goto-char end)
+      (re-search-forward str nil t step)
+      (let* ((pos1 (point))
+             (pos2 (if (> step 0)
+                       (- (point) (length str))
+                     (+ (point) (length str))))
+             (beg (if (< pos1 pos2) pos1 pos2))
+             (end (if (> pos1 pos2) pos1 pos2)))
+        (set-marker (mark-marker) beg)
+        (goto-char end))
       (setq mark-active t)
       ;; Hook after searching.
-      (run-hook-with-args hl-thing-after-find-hook (list str beg end)))))
+      (run-hook-with-args hl-thing-after-find-hook
+                          `(,str ,(marker-position (mark-marker)) ,(point))))))
 
 ;;;###autoload
 (defun hl-thing-at-point ()
@@ -401,8 +377,6 @@ Maybe you'll need it for history and navigation feature.")
 ;; 1. Remember highlights of last session."
 ;;   :lighter " hl-t"
 ;;   (when hl-thing-mode
-;;     ()
-;;     )
-;;   )
+;;     ()))
 
 (provide 'hl-anything)
