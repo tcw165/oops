@@ -31,4 +31,4 @@
 (defun sos-semantic-backend (cmd &optional arg)
   )
 
-(provide 'sos-semantic)
+(provide 'sos-semantic-backend)

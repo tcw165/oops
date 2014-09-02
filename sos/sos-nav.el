@@ -28,15 +28,15 @@
 ;; 2014-08-01 (0.0.1)
 ;;    Initial release.
 
-(defcustom sos-nav-mode-hook '()
+(defcustom sos-navigation-mode-hook '()
   "Hook run when entering `prj-grep-mode' mode."
   :type 'hook
   :group 'sos-group)
 
-(defvar sos-nav-map nil)
+(defvar sos-navigation-map nil)
 
 ;; TODO: keymap.
-(defvar sos-nav-mode-line-highlight-map nil)
+(defvar sos-navigation-mode-line-highlight-map nil)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -78,8 +78,8 @@
   (mapc 'kill-local-variable '(mode-line-format)))
 
 ;; Sample: ("%e" mode-line-front-space mode-line-mule-info mode-line-client mode-line-modified mode-line-remote mode-line-frame-identification mode-line-buffer-identification "   " mode-line-position  (vc-mode vc-mode) "  " mode-line-modes mode-line-misc-info mode-line-end-spaces)
-;; (sos-nav-mode-line)
-(defun sos-nav-mode-line ()
+;; (sos-navigation-mode-line)
+(defun sos-navigation-mode-line ()
   `((8 ,(propertize " L:%l "))
     ,(propertize "%13b "
                  'face 'mode-line-buffer-id)
@@ -90,18 +90,18 @@
                    "(read-write) "))))
     (:eval (and sos-file-name
                 (concat "file: " (propertize (abbreviate-file-name sos-file-name)
-                                             'local-map sos-nav-mode-line-highlight-map
+                                             'local-map sos-navigation-mode-line-highlight-map
                                              'face 'link
                                              'mouse-face 'mode-line-highlight))))))
 
 ;;;###autoload
-(define-minor-mode sos-nav-mode
-  "Minor mode for *Reference* buffers."
+(define-minor-mode sos-navigation-mode
+  "Minor mode for *Definition* buffers."
   :lighter " SOS:Navigation"
   :group 'sos-group
-  (if sos-nav-mode
+  (if sos-navigation-mode
       (progn
-        (setq mode-line-format (sos-nav-mode-line)
+        (setq mode-line-format (sos-navigation-mode-line)
               buffer-read-only t))
     (setq buffer-read-only nil)
     (sos-nav-kill-local-variables)))

@@ -33,10 +33,13 @@
 ;; Required modules.
 (require 'sos-nav)
 
-;; Default supported back-ends.
-(require 'sos-grep)
-(require 'sos-elisp)
-(require 'sos-semantic)
+;; Front-ends.
+(require 'sos-basic-frontend)
+
+;; Back-ends.
+(require 'sos-grep-backend)
+(require 'sos-elisp-backend)
+(require 'sos-semantic-backend)
 
 (defgroup sos-group nil
   "A utility to show you documentation at button window by finding some 
@@ -154,7 +157,7 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
   "The overlay for `sos-definition-buffer'.")
 
 (defvar sos-file-name nil
-  "Cache file name for `sos-nav-mode'.")
+  "Cache file name for `sos-navigation-mode'.")
 
 (defvar sos-backend nil
   "The back-end which takes control of current session in the back-ends list.")
@@ -197,8 +200,8 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
      (set-window-buffer sos-definition-window sos-definition-buffer t)
      (with-selected-window sos-definition-window
        (with-current-buffer sos-definition-buffer
-         ;; Disable minor modes (read-write enabled).
-         (sos-nav-mode -1)
+         ;; Disable minor modes (read-write enabled, ...etc).
+         (sos-navigation-mode -1)
          ;; Overlays
          (unless (and sos-hl-overlay
                       (buffer-live-p (overlay-buffer sos-hl-overlay)))
@@ -207,10 +210,8 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
          ;; `body' >>>
          (progn ,@body)
          ;; <<<<<<<<<<
-         ;; Enable minor modes (read-only).
-         (sos-nav-mode 1)))))
-
-;; (with-temp-buffer)
+         ;; Enable minor modes (read-only, ...etc).
+         (sos-navigation-mode 1)))))
 
 (defun sos-is-skip-command (&rest commands)
   (member this-command `(mwheel-scroll
@@ -222,52 +223,6 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
 
 (defun sos-is-single-candidate ()
   (= (length sos-candidates) 1))
-
-(defun sos-definition-buffer-frontend (command &rest args)
-  (case command
-    (:show
-     ;; TODO: multiple candidates `sos-is-single-candidate'.
-     (if (sos-is-single-candidate)
-         (let* ((candidate (car sos-candidates))
-                (file (plist-get candidate :file))
-                (offset (plist-get candidate :offset))
-                (linum (plist-get candidate :linum))
-                (hl-line (plist-get candidate :hl-line))
-                (hl-word (plist-get candidate :hl-word)))
-           (when (file-exists-p file)
-             (sos-with-definition-buffer
-               (insert-file-contents file nil nil nil t)
-               ;; Set it for `sos-nav-mode'.
-               (setq sos-file-name file)
-               ;; Find a appropriate major-mode for it.
-               (dolist (mode auto-mode-alist)
-                 (and (not (null (cdr mode)))
-                      (string-match (car mode) file)
-                      (funcall (cdr mode))))
-               ;; Move point and recenter.
-               (or (and linum (goto-char (point-min))
-                        (forward-line (- linum 1)))
-                   (and offset (goto-char offset)))
-               (recenter 3)
-               ;; Highlight word or line.
-               (or (and (stringp hl-word)
-                        ;; TODO: hl-word.
-                        ;; (move-overlay)
-                        )
-                   (and hl-line
-                        (move-overlay sos-hl-overlay (line-beginning-position) (+ 1 (line-end-position))))))))))
-    (:hide nil)
-    (:update nil)))
-
-(defun sos-tips-frontend (command &rest args)
-  (case command
-    (:show
-     (when (stringp sos-tips)
-       ;; TODO: draw a overlay.
-       ;; (message "%s" sos-tips)
-       ))
-    (:hide nil)
-    (:update nil)))
 
 (defun sos-pre-command ()
   (when sos-timer

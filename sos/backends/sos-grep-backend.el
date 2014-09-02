@@ -58,4 +58,4 @@
     (:tips nil)
     (:no-cache t)))
 
-(provide 'sos-grep)
+(provide 'sos-grep-backend)

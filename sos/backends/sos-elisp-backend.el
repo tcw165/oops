@@ -87,4 +87,4 @@
     (:tips
      (format "Test tips .... %s" (current-time)))))
 
-(provide 'sos-elisp)
+(provide 'sos-elisp-backend)
