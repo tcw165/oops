@@ -33,15 +33,66 @@
   :type 'hook
   :group 'sos-group)
 
+(defvar sos-nav-map nil)
+
+;; TODO: keymap.
+(defvar sos-nav-mode-line-highlight-map nil)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Sample:
+;; (defvar mode-line-position
+;;   `((-3 ,(propertize
+;; 	  "%p"
+;; 	  'local-map mode-line-column-line-number-mode-map
+;; 	  'mouse-face 'mode-line-highlight
+;; 	  ;; XXX needs better description
+;; 	  'help-echo "Size indication mode"))
+;;     (size-indication-mode
+;;      (8 ,(propertize
+;; 	  " of %I"
+;; 	  'local-map mode-line-column-line-number-mode-map
+;; 	  'mouse-face 'mode-line-highlight
+;; 	  ;; XXX needs better description
+;; 	  'help-echo "Size indication mode")))
+;;     (line-number-mode
+;;      ((column-number-mode
+;;        (10 ,(propertize
+;; 	     " (%l,%c)"
+;; 	     'local-map mode-line-column-line-number-mode-map
+;; 	     'mouse-face 'mode-line-highlight
+;; 	     'help-echo "Line number and Column number"))
+;;        (6 ,(propertize
+;; 	    " L%l"
+;; 	    'local-map mode-line-column-line-number-mode-map
+;; 	    'mouse-face 'mode-line-highlight
+;; 	    'help-echo "Line Number"))))
+;;      ((column-number-mode
+;;        (5 ,(propertize
+;; 	    " C%c"
+;; 	    'local-map mode-line-column-line-number-mode-map
+;; 	    'mouse-face 'mode-line-highlight
+;; 	    'help-echo "Column number")))))))
 
 (defun sos-nav-kill-local-variables ()
   (mapc 'kill-local-variable '(mode-line-format)))
 
-;; ("%e" mode-line-front-space mode-line-mule-info mode-line-client mode-line-modified mode-line-remote mode-line-frame-identification mode-line-buffer-identification "   " mode-line-position  (vc-mode vc-mode) "  " mode-line-modes mode-line-misc-info mode-line-end-spaces)
-(defun sos-nav-mode-line ()
-  (format "(Read Only)"))
+;; Sample: ("%e" mode-line-front-space mode-line-mule-info mode-line-client mode-line-modified mode-line-remote mode-line-frame-identification mode-line-buffer-identification "   " mode-line-position  (vc-mode vc-mode) "  " mode-line-modes mode-line-misc-info mode-line-end-spaces)
 ;; (sos-nav-mode-line)
+(defun sos-nav-mode-line ()
+  `((8 ,(propertize " L:%l "))
+    ,(propertize "%13b "
+                 'face 'mode-line-buffer-id)
+    (13 (:eval (if buffer-read-only
+                   "(read-only) "
+                 (if (buffer-modified-p)
+                     "(modified) "
+                   "(read-write) "))))
+    (:eval (and sos-file-name
+                (concat "file: " (propertize (abbreviate-file-name sos-file-name)
+                                             'local-map sos-nav-mode-line-highlight-map
+                                             'face 'link
+                                             'mouse-face 'mode-line-highlight))))))
 
 ;;;###autoload
 (define-minor-mode sos-nav-mode
@@ -50,9 +101,9 @@
   :group 'sos-group
   (if sos-nav-mode
       (progn
-        ;; (setq mode-line-format (sos-nav-mode-line))
-        (setq mode-line-format "Ready Only")
-        )
+        (setq mode-line-format (sos-nav-mode-line)
+              buffer-read-only t))
+    (setq buffer-read-only nil)
     (sos-nav-kill-local-variables)))
 
 (provide 'sos-nav)
