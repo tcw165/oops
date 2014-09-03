@@ -53,11 +53,9 @@
        (setq sos-definition-buffer (get-buffer-create "*Definition*")))
      (unless (window-live-p sos-definition-window)
        (let* ((win (cond
-                    ;; Only one window ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-                    ((window-live-p (frame-root-window))
-                     (selected-window))
+                    ;; Outline window is present ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                     ;; Default ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-                    (t (selected-window))))
+                    (t (frame-root-window))))
               (height (or (and (> sos-definition-window-height 0)
                                (- 0 sos-definition-window-height))
                           (and win

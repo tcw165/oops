@@ -65,7 +65,9 @@ meaningful information around the point."
   :group 'sos-group)
 
 (defcustom sos-backends '(sos-grep-backend
-                          sos-elisp-backend)
+                          sos-elisp-backend
+                          ;; (sos-elisp-backend sos-elisp-tips-backend)
+                          )
   "The list of back-ends for the purpose of collecting candidates. The sos 
 engine will dispatch all the back-ends and pass specific commands in order. 
 Every command has its purpose, paremeter rule and return rule (get meaningful 
@@ -207,63 +209,67 @@ If you want to skip additional commands, try example:
       (sos-call-frontends :hide))))
 
 (defun sos-normal-process (backend)
-  (let ((symb (sos-call-backend backend :symbol)))
-    (cond
-     ;; Return a string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-     ((stringp symb)
-      (if (string-equal symb sos-symbol)
-          (progn
-            ;; If return symbol string is equal to `sos-symbol', ask front-ends
-            ;; to do `:update' task.
-            (sos-call-frontends :update))
-        (setq sos-backend backend
-              sos-symbol symb)
-        ;; Call back-end: get `sos-candidates' and `sos-candidate'.
-        (setq sos-candidates (sos-call-backend backend :candidates symb))
-        ;; (sos-call-backend backend :tips symb)
-        (if (and sos-candidates (listp sos-candidates))
-            (sos-call-frontends :show :update)
-          (sos-call-frontends :hide))))
+  (if (listp backend)
+      (sos-mixed-process backend)
+    (let ((symb (sos-call-backend backend :symbol)))
+      (cond
+       ;; Return a string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       ((stringp symb)
+        (if (string-equal symb sos-symbol)
+            (progn
+              ;; If return symbol string is equal to `sos-symbol', ask front-ends
+              ;; to do `:update' task.
+              (sos-call-frontends :update))
+          (setq sos-backend backend
+                sos-symbol symb)
+          ;; Call back-end: get `sos-candidates' and `sos-candidate'.
+          (setq sos-candidates (sos-call-backend backend :candidates symb))
+          (if (and sos-candidates (listp sos-candidates))
+              (sos-call-frontends :show :update)
+            (sos-call-frontends :hide))))
 
-     ;; Return nil ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-     ((null symb)
-      (sos-kill-local-variables)
-      (sos-call-frontends :hide))
+       ;; Return nil ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       ((null symb)
+        (sos-kill-local-variables)
+        (sos-call-frontends :hide))
 
-     ;; Return `:stop' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-     ((eq symb :stop)
-      (setq sos-backend backend)
-      (sos-call-frontends :hide)))))
+       ;; Return `:stop' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       ((eq symb :stop)
+        (setq sos-backend backend)
+        (sos-call-frontends :hide))))))
 
-(defun sos-combined-process (backend)
-  ;; (let ((symb (sos-call-backend backend :symbol)))
-  ;;   (cond
-  ;;    ;; Return a string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-  ;;    ((stringp symb)
-  ;;     (if (string-equal symb sos-symbol)
-  ;;         (progn
-  ;;           ;; If return symbol string is equal to `sos-symbol', ask front-ends
-  ;;           ;; Renew the `:tips' and to do `:update' task.
-  ;;           (sos-call-frontends :update))
-  ;;       (setq sos-backend backend
-  ;;             sos-symbol symb)
-  ;;       ;; Call back-end: get `sos-candidates' and `sos-candidate'.
-  ;;       (setq sos-candidates (sos-call-backend backend :candidates symb))
-  ;;       ;; (sos-call-backend backend :tips symb)
-  ;;       (if (and sos-candidates (listp sos-candidates))
-  ;;           (sos-call-frontends :show :update)
-  ;;         (sos-call-frontends :hide))))
+(defun sos-mixed-process (backends)
+  (dolist (backend backends)
+    (let ((symb (or sos-symbol
+                    (sos-call-backend backend :symbol))))
+      (cond
+       ;; Return a string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       ((stringp symb)
+        (if (string-equal symb sos-symbol)
+            (progn
+              ;; If return symbol string is equal to `sos-symbol', ask front-ends
+              ;; Renew the `:tips' and to do `:update' task.
+              (sos-call-frontends :update))
+          (setq sos-backend backend
+                sos-symbol symb)
+          ;; Call back-end: get `sos-candidates' and `sos-candidate'.
+          (setq sos-candidates (sos-call-backend backend :candidates symb))
+          ;; (sos-call-backend backend :tips symb)
+          (if (and sos-candidates (listp sos-candidates))
+              (sos-call-frontends :show :update)
+            (sos-call-frontends :hide))))
 
-  ;;    ;; Return nil ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-  ;;    ((null symb)
-  ;;     (sos-kill-local-variables)
-  ;;     (sos-call-frontends :hide))
+       ;; Return nil ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       ((null symb)
+        ;; (sos-kill-local-variables)
+        ;; (sos-call-frontends :hide)
+        )
 
-  ;;    ;; Return `:stop' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-  ;;    ((eq symb :stop)
-  ;;     (setq sos-backend backend)
-  ;;     (sos-call-frontends :hide))))
-  )
+       ;; Return `:stop' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       ((eq symb :stop)
+        ;; (setq sos-backend backend)
+        ;; (sos-call-frontends :hide)
+        )))))
 
 (defun sos-kill-local-variables ()
   (mapc 'kill-local-variable '(sos-backend
@@ -304,5 +310,20 @@ Show or hide these buffer and window are controlled by `sos-watchdog-mode'."
     (remove-hook 'pre-command-hook 'sos-pre-command)
     (remove-hook 'post-command-hook 'sos-post-command)
     (sos-kill-local-variables)))
+
+;;;###autoload
+(define-minor-mode sos-outline-window-mode
+  "This local minor mode gethers symbol returned from backends around the point 
+and show the reference visually through frontends. Usually frontends output the 
+result to the `sos-definition-buffer' displayed in the `sos-definition-window'. 
+Show or hide these buffer and window are controlled by `sos-watchdog-mode'."
+  :lighter " SOS:outline"
+  :global t
+  :group 'sos-group
+  ;; TODO: menu-bar and tool-bar keymap.
+  (if sos-outline-window-mode
+      (progn
+        nil)
+    nil) )
 
 (provide 'sos)

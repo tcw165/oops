@@ -76,7 +76,6 @@
 ;;;###autoload
 (defun sos-elisp-backend (command &optional arg)
   (case command
-    (:init t)
     (:symbol
      (when (member major-mode '(emacs-lisp-mode lisp-interaction-mode))
        (let ((symb (sos-elisp-thingatpt)))
@@ -85,6 +84,12 @@
                   (message "%s" symb)
                   symb)
              :stop))))
+    (:candidates nil)))
+
+;;;###autoload
+(defun sos-elisp-tips-backend (command &optional arg)
+  (case command
+    (:symbol nil)
     (:candidates nil)))
 
 (provide 'sos-elisp-backend)
