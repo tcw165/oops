@@ -30,10 +30,6 @@
 
 (defconst sos-grep-prefix ">>>>> ")
 
-(defvar sos-grep-keyword nil
-  "The string after \">>>>> \" in the search buffer.")
-(make-variable-buffer-local 'sos-grep-keyword)
-
 (defun sos-grep-backend (command &optional arg)
   (case command
     (:init t)
@@ -53,7 +49,7 @@
                       (linum (substring full (1+ offset)))
                       (symb (concat file "?" linum)))
                  (unless (string= symb sos-symbol)
-                   (kill-local-variable 'sos-grep-keyword))
+                   (kill-local-variable 'sos-file-keyword))
                  symb)
              :stop)))))
     (:candidates
@@ -61,14 +57,10 @@
      (let* ((strings (split-string arg "?" t))
             (file (nth 0 strings))
             (linum (string-to-int (nth 1 strings)))
-            (keyword (unless sos-grep-keyword
+            (keyword (unless sos-file-keyword
                        (save-excursion
                          (search-backward-regexp (concat "^" sos-grep-prefix ".+$") nil t)
                          (buffer-substring-no-properties (+ (length sos-grep-prefix) (point)) (line-end-position))))))
-       ;; Set them for `sos-nav-mode'.
-       (setq sos-file-name file
-             sos-file-linum linum
-             sos-grep-keyword keyword)
        `((:file ,file :linum ,linum :hl-word ,keyword))))
     (:tips nil)
     (:no-cache t)))

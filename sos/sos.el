@@ -30,9 +30,6 @@
 ;; 2014-10-01 (0.0.1)
 ;;    Initial release.
 
-;; Required modules.
-(require 'sos-nav)
-
 ;; Front-ends.
 (require 'sos-basic-frontend)
 
@@ -117,8 +114,7 @@ Return value will be cached to `sos-candidates'.
  ((:file STRING
    :offset INTEGER
    :linum INTEGER
-   :hl-word STRING
-   :hl-line BOOLEAN) (...) ...)
+   :hl-word STRING) (...) ...)
 
    FILE: A string which indicates the absolute path of the source file.
 
@@ -151,6 +147,7 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
 (defvar sos-definition-window-height 0)
 
 (defvar sos-hl-face 'sos-hl)
+
 (defvar sos-hl-overlay nil
   "The overlay for `sos-definition-buffer'.")
 
@@ -169,15 +166,6 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
 (defvar sos-tips nil
   "Cache the return value from back-end with `:tips' command.")
 (make-variable-buffer-local 'sos-tips)
-
-;; Back-ends should take care of following variables ;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defvar sos-file-name nil
-  "Cache file name for `sos-navigation-mode'.")
-;; (make-variable-buffer-local 'sos-file-name)
-(defvar sos-file-linum nil
-  "Cache line number for `sos-navigation-mode'.")
-;; (make-variable-buffer-local 'sos-file-linum)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -204,18 +192,13 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
      (set-window-buffer sos-definition-window sos-definition-buffer t)
      (with-selected-window sos-definition-window
        (with-current-buffer sos-definition-buffer
-         ;; Disable minor modes (read-write enabled, ...etc).
-         (sos-navigation-mode -1)
          ;; Overlays
          (unless (and sos-hl-overlay
                       (buffer-live-p (overlay-buffer sos-hl-overlay)))
            (setq sos-hl-overlay (make-overlay 1 1)))
          (overlay-put sos-hl-overlay 'face sos-hl-face)
          ;; `body' >>>
-         (progn ,@body)
-         ;; <<<<<<<<<<
-         ;; Enable minor modes (read-only, ...etc).
-         (sos-navigation-mode 1)))))
+         (progn ,@body)))))
 
 (defun sos-is-skip-command (&rest commands)
   (member this-command `(mwheel-scroll
@@ -365,8 +348,6 @@ Show or hide these buffer and window are controlled by `sos-watchdog-mode'."
         (kill-buffer sos-definition-buffer))
       (setq sos-definition-buffer nil
             sos-definition-window nil
-            sos-file-name nil
-            sos-file-linum nil
             sos-hl-overlay nil))))
 
 (defun sos-watchdog-post-command ()
