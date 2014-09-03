@@ -134,17 +134,11 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
   :type '(repeat (symbol :tag "Back-end"))
   :group 'sos-group)
 
-(defcustom sos-idle-delay 0.25
+(defcustom sos-idle-delay 0.15
   "The idle delay in seconds until sos starts automatically."
   :type '(number :tag "Seconds"))
 
 (defvar sos-timer nil)
-
-(defvar sos-definition-buffer nil)
-
-(defvar sos-definition-window nil)
-
-(defvar sos-definition-window-height 0)
 
 (defvar sos-hl-face 'sos-hl)
 
@@ -169,38 +163,16 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defmacro sos-with-definition-buffer (&rest body)
-  "Get definition buffer and window ready then interpret the `body'."
-  (declare (indent 0) (debug t))
-  `(progn
-     (unless sos-definition-buffer
-       (setq sos-definition-buffer (get-buffer-create "*Definition*")))
-     (unless (window-live-p sos-definition-window)
-       (let* ((win (cond
-                    ;; Only one window ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-                    ((window-live-p (frame-root-window))
-                     (selected-window))
-                    ;; Default ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-                    (t (selected-window))))
-              (height (or (and (> sos-definition-window-height 0)
-                               (- 0 sos-definition-window-height))
-                          (and win
-                               (/ (window-height win) -3)))))
-         (and win height
-              (setq sos-definition-window (split-window win height 'below)))))
-     ;; Bind definition buffer to definition window.
-     (set-window-buffer sos-definition-window sos-definition-buffer t)
-     (with-selected-window sos-definition-window
-       (with-current-buffer sos-definition-buffer
-         ;; Overlays
-         (unless (and sos-hl-overlay
-                      (buffer-live-p (overlay-buffer sos-hl-overlay)))
-           (setq sos-hl-overlay (make-overlay 1 1)))
-         (overlay-put sos-hl-overlay 'face sos-hl-face)
-         ;; `body' >>>
-         (progn ,@body)))))
-
 (defun sos-is-skip-command (&rest commands)
+  "Return t if `this-command' should be skipped.
+If you want to skip additional commands, try example:
+
+  (sos-is-skip-command 'self-insert-command
+                       'previous-line
+                       'next-line
+                       'left-char
+                       'right-char)
+"
   (member this-command `(mwheel-scroll
                          save-buffer
                          eval-buffer
@@ -221,32 +193,30 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
        ;;;;;; Begin instantly.
        (or nil
            (and (= sos-idle-delay 0)
-                (sos-idle-begin (current-buffer) (point)))
+                (sos-idle-begin))
            ;; Begin with delay `sos-idle-delay'
            (setq sos-timer (run-with-timer sos-idle-delay nil
-                                           'sos-idle-begin
-                                           (current-buffer) (point))))))
+                                           'sos-idle-begin)))))
 
 (defun sos-is-idle-begin ()
-  (not (or (eq (current-buffer) sos-definition-buffer)
+  (not (or (active-minibuffer-window)
+           (eq (current-buffer) sos-definition-buffer)
            (eq (selected-window) sos-definition-window)
            (sos-is-skip-command))))
 
-(defun sos-idle-begin (buf pt)
-  (and (eq buf (current-buffer))
-       (eq pt (point))
-       (if (null sos-backend)
-           (sos-1st-process-backends)
-         (sos-process-backend sos-backend))))
+(defun sos-idle-begin ()
+  (if (null sos-backend)
+      (sos-1st-process)
+    (sos-continue-process sos-backend)))
 
-(defun sos-1st-process-backends ()
+(defun sos-1st-process ()
   (dolist (backend sos-backends)
-    (sos-process-backend backend)
-    (and sos-backend
-         (return t)))
-  t)
+    (sos-continue-process backend)
+    (if sos-backend
+        (return t)
+      (sos-call-frontends :hide))))
 
-(defun sos-process-backend (backend)
+(defun sos-continue-process (backend)
   (let ((symb (sos-call-backend backend :symbol)))
     (cond
      ;; Return a string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -257,26 +227,25 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
             ;; Renew the `:tips' and to do `:update' task.
             (setq sos-tips (sos-call-backend backend :tips symb))
             (sos-call-frontends :update))
-        ;; Call front-ends: `:hide'.
-        (sos-call-frontends :hide)
         (setq sos-backend backend
               sos-symbol symb)
         ;; Call back-end: get `sos-candidates' and `sos-candidate'.
         (setq sos-candidates (sos-call-backend backend :candidates symb)
               sos-tips (sos-call-backend backend :tips symb))
         ;; (sos-call-backend backend :tips symb)
-        (and sos-candidates (listp sos-candidates)
-             ;; Call front-ends: `:show'.
-             (sos-call-frontends :show :update))))
+        (if (and sos-candidates (listp sos-candidates))
+            (sos-call-frontends :show :update)
+          (sos-call-frontends :hide))))
 
      ;; Return nil ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
      ((null symb)
-      (sos-kill-local-variables))
+      (sos-kill-local-variables)
+      (sos-call-frontends :hide))
 
      ;; Return `:stop' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
      ((eq symb :stop)
-      (setq sos-backend backend))))
-  t)
+      (setq sos-backend backend)
+      (sos-call-frontends :hide)))))
 
 (defun sos-kill-local-variables ()
   (mapc 'kill-local-variable '(sos-backend
@@ -290,26 +259,13 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
   (let ((commands (cons command args)))
     (dolist (frontend sos-frontends)
       (dolist (cmd commands)
-        ;; (condition-case err
-        ;;     (funcall frontend cmd)
-        ;;   (error "[sos] Front-end %s error \"%s\" on command %s"
-        ;;          frontend (error-message-string err) commands))
         (funcall frontend cmd)))))
 
 (defun sos-call-backend (backend command &optional arg)
   "Call certain backend `backend' and pass `command' to it."
-  ;; (condition-case err
-  ;;     (funcall backend command arg)
-  ;;   (error "[sos] Back-end %s error \"%s\" on command %s"
-  ;;          backend (error-message-string err) (cons command arg)))
   (funcall backend command arg))
 
 (defun sos-init-backend (backend)
-  ;; (condition-case err
-  ;;     (progn
-  ;;       (funcall backend :init))
-  ;;   (error "[sos] Back-end %s error \"%s\" on command %s"
-  ;;          backend (error-message-string err) :init))
   (funcall backend :init))
 
 ;;;###autoload
@@ -318,77 +274,18 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
 and show the reference visually through frontends. Usually frontends output the 
 result to the `sos-definition-buffer' displayed in the `sos-definition-window'. 
 Show or hide these buffer and window are controlled by `sos-watchdog-mode'."
-  :lighter " SOS:Ref"
+  :lighter " SOS:def"
+  :global t
   :group 'sos-group
   ;; TODO: menu-bar and tool-bar keymap.
   (if sos-definition-window-mode
       (progn
-        (unless (eq (current-buffer) sos-definition-buffer)
-          (unless sos-watchdog-mode
-            (sos-watchdog-mode 1))
-          (mapc 'sos-init-backend sos-backends)
-          (add-hook 'pre-command-hook 'sos-pre-command nil t)
-          (add-hook 'post-command-hook 'sos-post-command nil t)))
-    (sos-kill-local-variables)
-    (remove-hook 'pre-command-hook 'sos-pre-command t)
-    (remove-hook 'post-command-hook 'sos-post-command t)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defun sos-toggle-buffer-window (toggle)
-  "Display or hide the `sos-definition-buffer' and `sos-definition-window'."
-  (let ((enabled (or (and (booleanp toggle) toggle)
-                     (and (numberp toggle)
-                          (> toggle 0)))))
-    (if enabled
-        (sos-with-definition-buffer)
-      (when (windowp sos-definition-window)
-        (delete-window sos-definition-window))
-      (when (bufferp sos-definition-buffer)
-        (kill-buffer sos-definition-buffer))
-      (setq sos-definition-buffer nil
-            sos-definition-window nil
-            sos-hl-overlay nil))))
-
-(defun sos-watchdog-post-command ()
-  (condition-case err
-      (progn
-        (unless (or (sos-is-skip-command 'self-insert-command
-                                         'previous-line
-                                         'next-line
-                                         'left-char
-                                         'right-char)
-                    (active-minibuffer-window))
-          (if sos-definition-window-mode
-              ;; Show them.
-              (progn
-                (sos-toggle-buffer-window 1)
-                (setq sos-definition-window-height (window-height sos-definition-window)))
-            ;; Hide them or not.
-            (cond
-             ;; If selected window is `sos-definition-window' and current buffer is
-             ;; `sos-definition-buffer':
-             ((and (eq (selected-window) sos-definition-window)
-                   (eq (current-buffer) sos-definition-buffer)) t)
-             ;; If selected window is `sos-definition-window' but its buffer is not
-             ;; `sos-definition-buffer':
-             ((and (eq (selected-window) sos-definition-window)
-                   (not (eq (window-buffer) sos-definition-buffer)))
-              (sos-toggle-buffer-window 1))
-             ;; Hide by default:
-             (t (sos-toggle-buffer-window -1))))))
-    (error "[sos] sos-watchdog-post-command error \"%s\""
-           (error-message-string err))))
-
-;;;###autoload
-(define-minor-mode sos-watchdog-mode
-  "A global minor mode which refers to buffer's `sos-definition-window-mode' to show the 
-`sos-definition-buffer' and `sos-definition-window' or hide them. Show them if 
-`sos-definition-window-mode' is t; Hide if nil."
-  :global t
-  :group 'sos-group
-  (if sos-watchdog-mode
-      (add-hook 'post-command-hook 'sos-watchdog-post-command t)
-    (remove-hook 'post-command-hook 'sos-watchdog-post-command t)))
+        (mapc 'sos-init-backend sos-backends)
+        (add-hook 'pre-command-hook 'sos-pre-command)
+        (add-hook 'post-command-hook 'sos-post-command))
+    (sos-call-frontends :hide)
+    (remove-hook 'pre-command-hook 'sos-pre-command)
+    (remove-hook 'post-command-hook 'sos-post-command)
+    (sos-kill-local-variables)))
 
 (provide 'sos)

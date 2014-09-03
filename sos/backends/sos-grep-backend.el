@@ -49,7 +49,7 @@
                       (linum (substring full (1+ offset)))
                       (symb (concat file "?" linum)))
                  (unless (string= symb sos-symbol)
-                   (kill-local-variable 'sos-file-keyword))
+                   (setq sos-file-keyword nil))
                  symb)
              :stop)))))
     (:candidates

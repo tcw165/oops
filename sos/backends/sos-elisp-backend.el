@@ -63,28 +63,23 @@
 ;;        ((keywordp symbol)
 ;;         (message "[Definition] It's a keyword, %s" symbol))))))
 
+(require 'thingatpt)
+
+(defun sos-elisp-thingatpt ()
+  "Return string on which the point is or just string of selection."
+  (if mark-active
+      ;; return the selection.
+      (buffer-substring-no-properties (region-beginning) (region-end))
+    ;; else.
+    (thing-at-point 'symbol)))
+
 (defun sos-elisp-backend (command &optional arg)
   (case command
     (:init t)
     (:symbol
      (when (member major-mode '(emacs-lisp-mode lisp-interaction-mode))
-       (format "%s" (current-time))))
-    (:candidates
-     ;; Single candidate case:
-     (let* ((num (random 1000))
-            (i (% num 10)))
-       (list (nth i '((:file "~/.emacs.d/oops/sos/text1.el" :line 5)
-                      (:file "~/.emacs.d/oops/sos/text2.el" :line 10)
-                      (:file "~/.emacs.d/oops/sos/text3.el" :line 15)
-                      (:file "~/.emacs.d/oops/sos/text4.java" :line 20)
-                      (:file "~/.emacs.d/oops/sos/text5.el" :line 25)
-                      (:file "~/.emacs.d/oops/sos/text6.c" :line 30)
-                      (:file "~/.emacs.d/oops/sos/text7.el" :line 35)
-                      (:file "~/.emacs.d/oops/sos/text8.java" :line 40)
-                      (:file "~/.emacs.d/oops/sos/text9.c" :line 45)
-                      (:file "~/.emacs.d/oops/sos/text10.txt" :line 5)
-                      )))))
-    (:tips
-     (format "Test tips .... %s" (current-time)))))
+       (intern-soft (sos-elisp-thingatpt))))
+    (:candidates nil)
+    (:tips (format nil))))
 
 (provide 'sos-elisp-backend)
