@@ -395,6 +395,9 @@
       (prj-clean)
       ;; Read configuration.
       (setq prj-config (prj-import-data (format "%s/%s/%s" prj-workspace-path c prj-config-name)))
+      (and (featurep 'sos)
+           (symbolp 'sos-definition-window)
+           (sos-definition-window-mode 1))
       (message "[%s] Load project ...done" (prj-project-name)))))
 
 ;;;###autoload

@@ -76,7 +76,9 @@
            (setq sos-hl-overlay (make-overlay 1 1)))
          (overlay-put sos-hl-overlay 'face sos-hl-face)
          ;; `body' >>>
-         (progn ,@body)
+         (condition-case nil
+             (progn ,@body)
+           (error nil))
          ;; Enable minor modes (read-only, ...etc).
          (sos-navigation-mode 1)))))
 
@@ -98,6 +100,10 @@
 ;;;###autoload
 (defun sos-definition-buffer-frontend (command)
   (case command
+    (:init
+     (sos-toggle-definition-buffer&window 1))
+    (:destroy
+     (sos-toggle-definition-buffer&window -1))
     (:show
      (sos-toggle-definition-buffer&window 1)
      ;; TODO: multiple candidates `sos-is-single-candidate'.
@@ -132,7 +138,6 @@
                         (move-overlay sos-hl-overlay (- (point) (length hl-word)) (point)))
                    (and hl-line
                         (move-overlay sos-hl-overlay (line-beginning-position) (+ 1 (line-end-position))))))))))
-    (:hide (sos-toggle-definition-buffer&window -1))
     (:update
      (unless sos-definition-buffer
        (sos-definition-buffer-frontend :show)))))
@@ -157,54 +162,20 @@
 
 ;; TODO: keymap.
 (defvar sos-navigation-map nil)
-(defvar sos-nav-file-map nil)
-(defvar sos-nav-file-linum-map nil)
-
-;; Sample:
-;; (defvar mode-line-position
-;;   `((-3 ,(propertize
-;; 	  "%p"
-;; 	  'local-map mode-line-column-line-number-mode-map
-;; 	  'mouse-face 'mode-line-highlight
-;; 	  ;; XXX needs better description
-;; 	  'help-echo "Size indication mode"))
-;;     (size-indication-mode
-;;      (8 ,(propertize
-;; 	  " of %I"
-;; 	  'local-map mode-line-column-line-number-mode-map
-;; 	  'mouse-face 'mode-line-highlight
-;; 	  ;; XXX needs better description
-;; 	  'help-echo "Size indication mode")))
-;;     (line-number-mode
-;;      ((column-number-mode
-;;        (10 ,(propertize
-;; 	     " (%l,%c)"
-;; 	     'local-map mode-line-column-line-number-mode-map
-;; 	     'mouse-face 'mode-line-highlight
-;; 	     'help-echo "Line number and Column number"))
-;;        (6 ,(propertize
-;; 	    " L%l"
-;; 	    'local-map mode-line-column-line-number-mode-map
-;; 	    'mouse-face 'mode-line-highlight
-;; 	    'help-echo "Line Number"))))
-;;      ((column-number-mode
-;;        (5 ,(propertize
-;; 	    " C%c"
-;; 	    'local-map mode-line-column-line-number-mode-map
-;; 	    'mouse-face 'mode-line-highlight
-;; 	    'help-echo "Column number")))))))
+(defvar sos-goto-file-map nil)
+(defvar sos-goto-file-linum-map nil)
 
 (defun sos-navigation-mode-line ()
-  `(,(propertize " %b "
+  `(,(propertize "  %b "
                  'face 'mode-line-buffer-id)
-    (:eval (and sos-file-name
+    (:eval (and sos-file-name (file-exists-p sos-file-name)
                 (concat "| file:" (propertize (abbreviate-file-name sos-file-name)
-                                              'local-map sos-nav-file-map
+                                              'local-map sos-goto-file-map
                                               'face 'link
                                               'mouse-face 'mode-line-highlight)
                         (and sos-file-linum
                              (concat ", line:" (propertize (format "%d" sos-file-linum)
-                                                           'local-map sos-nav-file-linum-map
+                                                           'local-map sos-goto-file-linum-map
                                                            'face 'link
                                                            'mouse-face 'mode-line-highlight)))
                         ", function:(yet supported)")))))

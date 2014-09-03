@@ -52,9 +52,13 @@ meaningful information around the point."
                            sos-tips-frontend)
   "The list of front-ends for the purpose of visualization.
 
-`:show': When the visualization should start.
+`:init': When the visualization should be initialized.
 
-`:hide': When the visualization should end.
+`:show': When the visualization should be showed.
+
+`:hide': When the visualization should be hidden.
+
+`:destroy': When the visualization should be destroied.
 
 `:update': When the data has been updated."
   :type '(repeat (symbol :tag "Front-end"))
@@ -120,17 +124,7 @@ Return value will be cached to `sos-candidates'.
 
    OFFSET: A integer which indicates the location of the symbol in the source file.
 
-   HIGHLIGHT: A boolean which indicate to highlight the symbol.
-
-sample:
-  TODO: sample
-
-### Optional commands (no sequent order):
-
-`:tips': The back-end should return a string or nil. The return string represents 
-a documentation for a completion candidate. The second argument is `sos-symbol' 
-which is returned from `:symbol' command.
-The sos engine will iterate the candidates and ask for each candidate its `tips'."
+   HIGHLIGHT: A boolean which indicate to highlight the symbol."
   :type '(repeat (symbol :tag "Back-end"))
   :group 'sos-group)
 
@@ -156,10 +150,6 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
 (defvar sos-candidates nil
   "Cache the return value from back-end with `:candidates' command.")
 (make-variable-buffer-local 'sos-candidates)
-
-(defvar sos-tips nil
-  "Cache the return value from back-end with `:tips' command.")
-(make-variable-buffer-local 'sos-tips)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -224,14 +214,12 @@ If you want to skip additional commands, try example:
       (if (string-equal symb sos-symbol)
           (progn
             ;; If return symbol string is equal to `sos-symbol', ask front-ends
-            ;; Renew the `:tips' and to do `:update' task.
-            (setq sos-tips (sos-call-backend backend :tips symb))
+            ;; to do `:update' task.
             (sos-call-frontends :update))
         (setq sos-backend backend
               sos-symbol symb)
         ;; Call back-end: get `sos-candidates' and `sos-candidate'.
-        (setq sos-candidates (sos-call-backend backend :candidates symb)
-              sos-tips (sos-call-backend backend :tips symb))
+        (setq sos-candidates (sos-call-backend backend :candidates symb))
         ;; (sos-call-backend backend :tips symb)
         (if (and sos-candidates (listp sos-candidates))
             (sos-call-frontends :show :update)
@@ -247,12 +235,40 @@ If you want to skip additional commands, try example:
       (setq sos-backend backend)
       (sos-call-frontends :hide)))))
 
+(defun sos-combined-process (backend)
+  ;; (let ((symb (sos-call-backend backend :symbol)))
+  ;;   (cond
+  ;;    ;; Return a string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  ;;    ((stringp symb)
+  ;;     (if (string-equal symb sos-symbol)
+  ;;         (progn
+  ;;           ;; If return symbol string is equal to `sos-symbol', ask front-ends
+  ;;           ;; Renew the `:tips' and to do `:update' task.
+  ;;           (sos-call-frontends :update))
+  ;;       (setq sos-backend backend
+  ;;             sos-symbol symb)
+  ;;       ;; Call back-end: get `sos-candidates' and `sos-candidate'.
+  ;;       (setq sos-candidates (sos-call-backend backend :candidates symb))
+  ;;       ;; (sos-call-backend backend :tips symb)
+  ;;       (if (and sos-candidates (listp sos-candidates))
+  ;;           (sos-call-frontends :show :update)
+  ;;         (sos-call-frontends :hide))))
+
+  ;;    ;; Return nil ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  ;;    ((null symb)
+  ;;     (sos-kill-local-variables)
+  ;;     (sos-call-frontends :hide))
+
+  ;;    ;; Return `:stop' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  ;;    ((eq symb :stop)
+  ;;     (setq sos-backend backend)
+  ;;     (sos-call-frontends :hide))))
+  )
+
 (defun sos-kill-local-variables ()
   (mapc 'kill-local-variable '(sos-backend
                                sos-symbol
-                               sos-candidates
-                               sos-candidate
-                               sos-tips)))
+                               sos-candidates)))
 
 (defun sos-call-frontends (command &rest args)
   "Iterate all the `sos-backends' and pass `command' by order."
@@ -281,9 +297,10 @@ Show or hide these buffer and window are controlled by `sos-watchdog-mode'."
   (if sos-definition-window-mode
       (progn
         (mapc 'sos-init-backend sos-backends)
+        (sos-call-frontends :init)
         (add-hook 'pre-command-hook 'sos-pre-command)
         (add-hook 'post-command-hook 'sos-post-command))
-    (sos-call-frontends :hide)
+    (sos-call-frontends :destroy)
     (remove-hook 'pre-command-hook 'sos-pre-command)
     (remove-hook 'post-command-hook 'sos-post-command)
     (sos-kill-local-variables)))
