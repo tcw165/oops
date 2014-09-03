@@ -95,7 +95,8 @@
             sos-definition-window nil
             sos-hl-overlay nil))))
 
-(defun sos-definition-buffer-frontend (command &rest args)
+;;;###autoload
+(defun sos-definition-buffer-frontend (command)
   (case command
     (:show
      (sos-toggle-definition-buffer&window 1)
@@ -132,9 +133,12 @@
                    (and hl-line
                         (move-overlay sos-hl-overlay (line-beginning-position) (+ 1 (line-end-position))))))))))
     (:hide (sos-toggle-definition-buffer&window -1))
-    (:update nil)))
+    (:update
+     (unless sos-definition-buffer
+       (sos-definition-buffer-frontend :show)))))
 
-(defun sos-tips-frontend (command &rest args)
+;;;###autoload
+(defun sos-tips-frontend (command)
   (case command
     (:show
      (when (stringp sos-tips)

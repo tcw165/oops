@@ -73,6 +73,7 @@
     ;; else.
     (thing-at-point 'symbol)))
 
+;;;###autoload
 (defun sos-elisp-backend (command &optional arg)
   (case command
     (:init t)

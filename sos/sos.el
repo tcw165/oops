@@ -207,16 +207,16 @@ If you want to skip additional commands, try example:
 (defun sos-idle-begin ()
   (if (null sos-backend)
       (sos-1st-process)
-    (sos-continue-process sos-backend)))
+    (sos-normal-process sos-backend)))
 
 (defun sos-1st-process ()
   (dolist (backend sos-backends)
-    (sos-continue-process backend)
+    (sos-normal-process backend)
     (if sos-backend
         (return t)
       (sos-call-frontends :hide))))
 
-(defun sos-continue-process (backend)
+(defun sos-normal-process (backend)
   (let ((symb (sos-call-backend backend :symbol)))
     (cond
      ;; Return a string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

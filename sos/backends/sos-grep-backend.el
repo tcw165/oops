@@ -30,6 +30,7 @@
 
 (defconst sos-grep-prefix ">>>>> ")
 
+;;;###autoload
 (defun sos-grep-backend (command &optional arg)
   (case command
     (:init t)

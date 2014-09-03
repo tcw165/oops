@@ -28,7 +28,8 @@
 ;; 2014-10-01 (0.0.1)
 ;;    Initial release.
 
-(defun sos-semantic-backend (cmd &optional arg)
+;;;###autoload
+(defun sos-semantic-backend (command &optional arg)
   )
 
 (provide 'sos-semantic-backend)
