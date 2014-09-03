@@ -65,8 +65,11 @@
                        (save-excursion
                          (search-backward-regexp (concat "^" sos-grep-prefix ".+$") nil t)
                          (buffer-substring-no-properties (+ (length sos-grep-prefix) (point)) (line-end-position))))))
-       (setq sos-grep-keyword keyword)
-       ;; (message "sos-grep-keyword = %s" sos-grep-keyword)
+       ;; Set them for `sos-nav-mode'.
+       (setq sos-file-name file
+             sos-file-linum linum
+             sos-grep-keyword keyword)
+       (message "sos-file-linum = %s" sos-file-linum)
        `((:file ,file :linum ,linum :hl-word ,keyword))))
     (:tips nil)
     (:no-cache t)))

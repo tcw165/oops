@@ -151,12 +151,8 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
 (defvar sos-definition-window-height 0)
 
 (defvar sos-hl-face 'sos-hl)
-
 (defvar sos-hl-overlay nil
   "The overlay for `sos-definition-buffer'.")
-
-(defvar sos-file-name nil
-  "Cache file name for `sos-navigation-mode'.")
 
 (defvar sos-backend nil
   "The back-end which takes control of current session in the back-ends list.")
@@ -173,6 +169,15 @@ The sos engine will iterate the candidates and ask for each candidate its `tips'
 (defvar sos-tips nil
   "Cache the return value from back-end with `:tips' command.")
 (make-variable-buffer-local 'sos-tips)
+
+;; Back-ends should take care of following variables ;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defvar sos-file-name nil
+  "Cache file name for `sos-navigation-mode'.")
+;; (make-variable-buffer-local 'sos-file-name)
+(defvar sos-file-linum nil
+  "Cache line number for `sos-navigation-mode'.")
+;; (make-variable-buffer-local 'sos-file-linum)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -361,6 +366,7 @@ Show or hide these buffer and window are controlled by `sos-watchdog-mode'."
       (setq sos-definition-buffer nil
             sos-definition-window nil
             sos-file-name nil
+            sos-file-linum nil
             sos-hl-overlay nil))))
 
 (defun sos-watchdog-post-command ()

@@ -33,10 +33,10 @@
   :type 'hook
   :group 'sos-group)
 
-(defvar sos-navigation-map nil)
-
 ;; TODO: keymap.
-(defvar sos-navigation-mode-line-highlight-map nil)
+(defvar sos-navigation-map nil)
+(defvar sos-nav-file-map nil)
+(defvar sos-nav-file-linum-map nil)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -80,19 +80,19 @@
 ;; Sample: ("%e" mode-line-front-space mode-line-mule-info mode-line-client mode-line-modified mode-line-remote mode-line-frame-identification mode-line-buffer-identification "   " mode-line-position  (vc-mode vc-mode) "  " mode-line-modes mode-line-misc-info mode-line-end-spaces)
 ;; (sos-navigation-mode-line)
 (defun sos-navigation-mode-line ()
-  `((8 ,(propertize " L:%l "))
-    ,(propertize "%13b "
+  `(,(propertize " %b "
                  'face 'mode-line-buffer-id)
-    (13 (:eval (if buffer-read-only
-                   "(read-only) "
-                 (if (buffer-modified-p)
-                     "(modified) "
-                   "(read-write) "))))
     (:eval (and sos-file-name
-                (concat "file: " (propertize (abbreviate-file-name sos-file-name)
-                                             'local-map sos-navigation-mode-line-highlight-map
-                                             'face 'link
-                                             'mouse-face 'mode-line-highlight))))))
+                (concat "| file:" (propertize (abbreviate-file-name sos-file-name)
+                                              'local-map sos-nav-file-map
+                                              'face 'link
+                                              'mouse-face 'mode-line-highlight)
+                        (and sos-file-linum
+                             (concat ", line:" (propertize (format "%d" sos-file-linum)
+                                                           'local-map sos-nav-file-linum-map
+                                                           'face 'link
+                                                           'mouse-face 'mode-line-highlight)))
+                        ", function:(yet supported)")))))
 
 ;;;###autoload
 (define-minor-mode sos-navigation-mode

@@ -43,8 +43,6 @@
            (when (file-exists-p file)
              (sos-with-definition-buffer
                (insert-file-contents file nil nil nil t)
-               ;; Set it for `sos-nav-mode'.
-               (setq sos-file-name file)
                ;; Find a appropriate major-mode for it.
                (dolist (mode auto-mode-alist)
                  (and (not (null (cdr mode)))
