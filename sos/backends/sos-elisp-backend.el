@@ -79,8 +79,12 @@
     (:init t)
     (:symbol
      (when (member major-mode '(emacs-lisp-mode lisp-interaction-mode))
-       (intern-soft (sos-elisp-thingatpt))))
-    (:candidates nil)
-    (:tips (format nil))))
+       (let ((symb (sos-elisp-thingatpt)))
+         (or (and symb
+                  (intern-soft symb)
+                  (message "%s" symb)
+                  symb)
+             :stop))))
+    (:candidates nil)))
 
 (provide 'sos-elisp-backend)

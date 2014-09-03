@@ -62,8 +62,6 @@
                        (save-excursion
                          (search-backward-regexp (concat "^" sos-grep-prefix ".+$") nil t)
                          (buffer-substring-no-properties (+ (length sos-grep-prefix) (point)) (line-end-position))))))
-       `((:file ,file :linum ,linum :hl-word ,keyword))))
-    (:tips nil)
-    (:no-cache t)))
+       `((:file ,file :linum ,linum :hl-word ,keyword))))))
 
 (provide 'sos-grep-backend)
