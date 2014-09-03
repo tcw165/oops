@@ -69,7 +69,6 @@
        (setq sos-file-name file
              sos-file-linum linum
              sos-grep-keyword keyword)
-       (message "sos-file-linum = %s" sos-file-linum)
        `((:file ,file :linum ,linum :hl-word ,keyword))))
     (:tips nil)
     (:no-cache t)))
