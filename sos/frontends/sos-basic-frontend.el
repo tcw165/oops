@@ -76,9 +76,8 @@
            (setq sos-hl-overlay (make-overlay 1 1)))
          (overlay-put sos-hl-overlay 'face sos-hl-face)
          ;; `body' >>>
-         (condition-case nil
-             (progn ,@body)
-           (error nil))
+         (ignore-errors
+           (progn ,@body))
          ;; Enable minor modes (read-only, ...etc).
          (sos-navigation-mode 1)))))
 
