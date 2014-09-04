@@ -45,6 +45,9 @@
 (defvar sos-file-keyword nil
   "Cache keyword string for `sos-navigation-mode'.")
 
+(defvar sos-index 0
+  "The index of current candidate in the list.")
+
 (defmacro sos-with-definition-buffer (&rest body)
   "Get definition buffer and window ready then interpret the `body'."
   (declare (indent 0) (debug t))
@@ -103,13 +106,17 @@
      (sos-toggle-definition-buffer&window -1))
     (:show
      (sos-toggle-definition-buffer&window 1)
+     (setq sos-index 0)
      ;; TODO: multiple candidates `sos-is-single-candidate'.
      (if (sos-is-single-candidate)
-         (let* ((candidate (car sos-candidates))
+         (let* ((candidate (nth sos-index sos-candidates))
                 (file (plist-get candidate :file))
+                (doc (plist-get candidate :doc))
                 (linum (plist-get candidate :linum))
                 (hl-word (plist-get candidate :hl-word)))
-           (when (file-exists-p file)
+           (cond
+            ;; A file ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+            ((file-exists-p file)
              (sos-with-definition-buffer
                (insert-file-contents file nil nil nil t)
                ;; Set them for `sos-nav-mode'.
@@ -134,21 +141,21 @@
                         (search-forward hl-word (line-end-position) t)
                         (move-overlay sos-hl-overlay (- (point) (length hl-word)) (point)))
                    (and hl-line
-                        (move-overlay sos-hl-overlay (line-beginning-position) (+ 1 (line-end-position))))))))))
+                        (move-overlay sos-hl-overlay (line-beginning-position) (+ 1 (line-end-position)))))))
+
+            ;; A document string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+            ((stringp doc)
+             )))))
     (:update
      (unless sos-definition-buffer
        (sos-definition-buffer-frontend :show)))))
 
 ;;;###autoload
 (defun sos-tips-frontend (command)
-  (case command
-    (:show
-     (when (stringp sos-tips)
-       ;; TODO: draw a overlay.
-       ;; (message "%s" sos-tips)
-       ))
-    (:hide nil)
-    (:update nil)))
+  (when (memq command '(:show :update))
+    (let* ((tips (nth sos-index sos-tips)))
+      (message tips)
+      )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

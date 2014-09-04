@@ -68,28 +68,24 @@
 (defun sos-elisp-thingatpt ()
   "Return string on which the point is or just string of selection."
   (if mark-active
-      ;; return the selection.
       (buffer-substring-no-properties (region-beginning) (region-end))
-    ;; else.
     (thing-at-point 'symbol)))
 
 ;;;###autoload
 (defun sos-elisp-backend (command &optional arg)
   (case command
     (:symbol
-     (when (member major-mode '(emacs-lisp-mode lisp-interaction-mode))
+     (when (member major-mode '(emacs-lisp-mode
+                                lisp-interaction-mode))
        (let ((symb (sos-elisp-thingatpt)))
          (or (and symb
                   (intern-soft symb)
-                  (message "%s" symb)
+                  ;; (message ":symbol -> %s" symb)
                   symb)
              :stop))))
-    (:candidates nil)))
-
-;;;###autoload
-(defun sos-elisp-tips-backend (command &optional arg)
-  (case command
-    (:symbol nil)
-    (:candidates nil)))
+    (:candidates
+     (list (:doc "document..." :mode nil)))
+    (:tips
+     (list (format "%s" arg)))))
 
 (provide 'sos-elisp-backend)

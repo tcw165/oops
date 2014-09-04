@@ -65,9 +65,7 @@ meaningful information around the point."
   :group 'sos-group)
 
 (defcustom sos-backends '(sos-grep-backend
-                          sos-elisp-backend
-                          ;; (sos-elisp-backend sos-elisp-tips-backend)
-                          )
+                          sos-elisp-backend)
   "The list of back-ends for the purpose of collecting candidates. The sos 
 engine will dispatch all the back-ends and pass specific commands in order. 
 Every command has its purpose, paremeter rule and return rule (get meaningful 
@@ -117,16 +115,18 @@ the following back-ends.
 Return value will be cached to `sos-candidates'.
 
  $CANDIDATES format (alist):
+ ### If candidate is a file...
  ((:file STRING
-   :offset INTEGER
    :linum INTEGER
-   :hl-word STRING) (...) ...)
+   :hl-word STRING
+   :tips) (...) ...)
 
-   FILE: A string which indicates the absolute path of the source file.
+ ### If candidate is a document string...
+ ((:doc STRING
+   :mode SYMBOL) (...) ...)
 
-   OFFSET: A integer which indicates the location of the symbol in the source file.
-
-   HIGHLIGHT: A boolean which indicate to highlight the symbol."
+### Optional commands:
+`:tips': ."
   :type '(repeat (symbol :tag "Back-end"))
   :group 'sos-group)
 
@@ -152,6 +152,10 @@ Return value will be cached to `sos-candidates'.
 (defvar sos-candidates nil
   "Cache the return value from back-end with `:candidates' command.")
 (make-variable-buffer-local 'sos-candidates)
+
+(defvar sos-tips nil
+  "Cache the return value from back-end with `:tips' command.")
+(make-variable-buffer-local 'sos-tips)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -209,72 +213,39 @@ If you want to skip additional commands, try example:
       (sos-call-frontends :hide))))
 
 (defun sos-normal-process (backend)
-  (if (listp backend)
-      (sos-mixed-process backend)
-    (let ((symb (sos-call-backend backend :symbol)))
-      (cond
-       ;; Return a string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-       ((stringp symb)
-        (if (string-equal symb sos-symbol)
-            (progn
-              ;; If return symbol string is equal to `sos-symbol', ask front-ends
-              ;; to do `:update' task.
-              (sos-call-frontends :update))
-          (setq sos-backend backend
-                sos-symbol symb)
-          ;; Call back-end: get `sos-candidates' and `sos-candidate'.
-          (setq sos-candidates (sos-call-backend backend :candidates symb))
-          (if (and sos-candidates (listp sos-candidates))
-              (sos-call-frontends :show :update)
-            (sos-call-frontends :hide))))
+  (let ((symb (sos-call-backend backend :symbol)))
+    (cond
+     ;; Return a string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+     ((stringp symb)
+      (if (string-equal symb sos-symbol)
+          (progn
+            ;; If return symbol string is equal to `sos-symbol', ask front-ends
+            ;; to do `:update' task.
+            (setq sos-tips (sos-call-backend backend :tips symb))
+            (sos-call-frontends :update))
+        (setq sos-backend backend
+              sos-symbol symb
+              sos-candidates (sos-call-backend backend :candidates symb)
+              sos-tips (sos-call-backend backend :tips symb))
+        (if (and sos-candidates (listp sos-candidates))
+            (sos-call-frontends :show)
+          (sos-call-frontends :hide))))
 
-       ;; Return nil ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-       ((null symb)
-        (sos-kill-local-variables)
-        (sos-call-frontends :hide))
+     ;; Return nil ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+     ((null symb)
+      (sos-kill-local-variables)
+      (sos-call-frontends :hide))
 
-       ;; Return `:stop' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-       ((eq symb :stop)
-        (setq sos-backend backend)
-        (sos-call-frontends :hide))))))
-
-(defun sos-mixed-process (backends)
-  (dolist (backend backends)
-    (let ((symb (or sos-symbol
-                    (sos-call-backend backend :symbol))))
-      (cond
-       ;; Return a string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-       ((stringp symb)
-        (if (string-equal symb sos-symbol)
-            (progn
-              ;; If return symbol string is equal to `sos-symbol', ask front-ends
-              ;; Renew the `:tips' and to do `:update' task.
-              (sos-call-frontends :update))
-          (setq sos-backend backend
-                sos-symbol symb)
-          ;; Call back-end: get `sos-candidates' and `sos-candidate'.
-          (setq sos-candidates (sos-call-backend backend :candidates symb))
-          ;; (sos-call-backend backend :tips symb)
-          (if (and sos-candidates (listp sos-candidates))
-              (sos-call-frontends :show :update)
-            (sos-call-frontends :hide))))
-
-       ;; Return nil ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-       ((null symb)
-        ;; (sos-kill-local-variables)
-        ;; (sos-call-frontends :hide)
-        )
-
-       ;; Return `:stop' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-       ((eq symb :stop)
-        ;; (setq sos-backend backend)
-        ;; (sos-call-frontends :hide)
-        )))))
+     ;; Return `:stop' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+     ((eq symb :stop)
+      (setq sos-backend backend)
+      (sos-call-frontends :hide)))))
 
 (defun sos-kill-local-variables ()
   (mapc 'kill-local-variable '(sos-backend
                                sos-symbol
-                               sos-candidates)))
+                               sos-candidates
+                               sos-tips)))
 
 (defun sos-call-frontends (command &rest args)
   "Iterate all the `sos-backends' and pass `command' by order."
