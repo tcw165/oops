@@ -136,18 +136,18 @@
                (recenter 3)
                ;; Highlight word or line.
                (move-overlay sos-hl-overlay 1 1)
-               (or (and (stringp hl-word) (> (length hl-word) 0)
-                        (search-forward hl-word (line-end-position) t)
-                        (move-overlay sos-hl-overlay (- (point) (length hl-word)) (point)))
-                   (and hl-line
-                        (move-overlay sos-hl-overlay (line-beginning-position) (+ 1 (line-end-position)))))))
+               (and (stringp hl-word) (> (length hl-word) 0)
+                    (if (search-forward hl-word (line-end-position) t)
+                        (move-overlay sos-hl-overlay
+                                      (- (point) (length hl-word))
+                                      (point))
+                      (message "Can't find keyword, %s in the file!"
+                               (propertize (concat "\"" hl-word "\"")
+                                           'face 'font-lock-string-face))))))
 
             ;; A document string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-            ((and doc)
-             )))))
-    (:update
-     (unless sos-definition-buffer
-       (sos-definition-buffer-frontend :show)))))
+            ((stringp doc)
+             )))))))
 
 ;;;###autoload
 (defun sos-tips-frontend (command)

@@ -97,14 +97,12 @@ programs and files and load any required libraries.  Raising an error here
 will show up in message log once, and the back-end will not be used for
 completion.
 
-`:symbol': The back-end should return a string, nil or 'stop.
-Return a string which represents a symbol name tells sos engine that the back
--end will take charge current task. The back-end collect the string around the
-point and produce a meaningful symbol name. It also tells sos engine don't
-iterate the following back-ends.
-Return nil tells sos engine to skip the back-end.
-Return `:stop' tells sos engine to stop iterating the following back-ends.
-Return value will be cached to `sos-symbol'.
+`:symbol': The back-end should return a symbol, nil or 'stop.
+- Return a symbol tells sos engine that the back-end will take charge current task. It 
+also tells sos engine don't iterate the following back-ends.
+- Return nil tells sos engine to skip the back-end.
+- Return `:stop' tells sos engine to stop iterating the following back-ends.
+- Return value will be cached to `sos-symbol'.
 
 `:candidates': The back-end should return a $CANDIDATES list or nil.
 Return a list tells sos engine where the definition is and it must be a list
@@ -217,12 +215,25 @@ If you want to skip additional commands, try example:
 (defun sos-normal-process (backend)
   (let ((symb (sos-call-backend backend :symbol)))
     (cond
-     ;; Return a string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-     ((stringp symb)
-      (if (string-equal symb sos-symbol)
+     ;; Return `:stop' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+     ((eq symb :stop)
+      ;; (message "(%s) sos-normal-process: stop" (current-time))
+      (setq sos-backend backend)
+      (sos-call-frontends :hide))
+
+     ;; Return nil ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+     ((null symb)
+      ;; (message "(%s) sos-normal-process: hide" (current-time))
+      (sos-kill-local-variables)
+      (sos-call-frontends :hide))
+
+     ;; Something ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+     (t
+      (if (equal symb sos-symbol)
           (progn
             ;; If return symbol string is equal to `sos-symbol', ask front-ends
             ;; to do `:update' task.
+            ;; (message "(%s) sos-normal-process: update" (current-time))
             (setq sos-tips (sos-call-backend backend :tips symb))
             (sos-call-frontends :update))
         (setq sos-backend backend
@@ -231,18 +242,10 @@ If you want to skip additional commands, try example:
               sos-tips (sos-call-backend backend :tips symb))
         (if (and sos-candidates (listp sos-candidates))
             (progn
+              ;; (message "(%s) sos-normal-process: show" (current-time))
               (sos-call-frontends :show))
-          (sos-call-frontends :hide))))
-
-     ;; Return nil ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-     ((null symb)
-      (sos-kill-local-variables)
-      (sos-call-frontends :hide))
-
-     ;; Return `:stop' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-     ((eq symb :stop)
-      (setq sos-backend backend)
-      (sos-call-frontends :hide)))))
+          ;; (message "(%s) sos-normal-process: hide" (current-time))
+          (sos-call-frontends :hide)))))))
 
 (defun sos-kill-local-variables ()
   (mapc 'kill-local-variable '(sos-backend

@@ -28,48 +28,46 @@
 ;; 2014-10-01 (0.0.1)
 ;;    Initial release.
 
-;; (defun oops-lisp-show-help-atpt ()
-;;   (let* ((symbol (intern-soft (oops--lisp-thingatpt)))
-;;          search-result)
-;;     (when symbol
-;;       (cond
-;;        ;; TODO: Support feature.
-;;        ;; Library:
-;;        ;; ((featurep symbol)
-;;        ;;  nil
-;;        ;;  )
-;;        ;; Function:
-;;        ((fboundp symbol)
-;;         (setq search-result (oops--lisp-find-function symbol))
-;;         (if search-result
-;;             (oops-update-help search-result)
-;;           ;; Built-in function, show HELP.
-;;           (oops-update-help (oops--lisp-describe-function symbol))))
-;;        ;; Variable:
-;;        ((boundp symbol)
-;;         (setq search-result (oops--lisp-find-variable symbol))
-;;         (if search-result
-;;             (oops-update-help search-result)
-;;           ;; Built-in variable, show HELP.
-;;           (oops-update-help (oops--lisp-describe-variable symbol))))
-;;        ;; Face:
-;;        ((facep symbol)
-;;         (setq search-result (oops--lisp-find-face symbol))
-;;         (if search-result
-;;             (oops-update-help search-result)
-;;           ;; Built-in variable, show HELP.
-;;           (oops-update-help (oops--lisp-describe-variable symbol))))
-;;        ;; Keyword:
-;;        ((keywordp symbol)
-;;         (message "[Definition] It's a keyword, %s" symbol))))))
-
 (require 'thingatpt)
 
 (defun sos-elisp-thingatpt ()
-  "Return string on which the point is or just string of selection."
+  "Find symbol string around the point or text selection."
   (if mark-active
       (buffer-substring-no-properties (region-beginning) (region-end))
-    (thing-at-point 'symbol)))
+    ;; Skip document and comment.
+    (unless (memq (get-text-property (point) 'face) '(font-lock-doc-face
+                                                      font-lock-string-face
+                                                      font-lock-comment-face))
+      (let* ((bound (bounds-of-thing-at-point 'symbol)))
+        (and bound
+             (buffer-substring-no-properties (car bound) (cdr bound)))))))
+
+(defun sos-find-candidates (symb)
+  (let* ((symbol (intern-soft (oops--lisp-thingatpt)))
+         search-result)
+    (when symbol
+      (cond
+       ;; TODO: Support feature.
+       ;; Library:
+       ;; ((featurep symbol)
+       ;;  nil
+       ;;  )
+       ;; Function:
+       ((fboundp symbol)
+        (setq search-result (oops--lisp-find-function symbol)))
+       ;; Variable:
+       ((boundp symbol)
+        (setq search-result (oops--lisp-find-variable symbol)))
+       ;; Face:
+       ((facep symbol)
+        (setq search-result (oops--lisp-find-face symbol))
+        (if search-result
+            (oops-update-help search-result)
+          ;; Built-in variable, show HELP.
+          (oops-update-help (oops--lisp-describe-variable symbol))))
+       ;; Keyword:
+       ((keywordp symbol)
+        (message "[Definition] It's a keyword, %s" symbol))))))
 
 ;;;###autoload
 (defun sos-elisp-backend (command &optional arg)
@@ -78,10 +76,7 @@
      (when (member major-mode '(emacs-lisp-mode
                                 lisp-interaction-mode))
        (let ((symb (sos-elisp-thingatpt)))
-         (or (and symb
-                  (intern-soft symb)
-                  ;; (message ":symbol -> %s" symb)
-                  symb)
+         (or (and symb (intern-soft symb))
              :stop))))
     (:candidates
      (list `(:doc "document..." :mode "emacs-lisp-mode")))
