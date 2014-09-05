@@ -33,7 +33,6 @@
 ;;;###autoload
 (defun sos-grep-backend (command &optional arg)
   (case command
-    (:init t)
     (:symbol
      (when (eq major-mode (or (and (featurep 'prj-grep)
                                    'prj-grep-mode)
@@ -44,13 +43,11 @@
            (beginning-of-line)
            (if (search-forward-regexp "^.+:[0-9]+:" (line-end-position) t)
                ;; Return FILEPATH?NUM string.
-               (let* ((full (buffer-substring-no-properties (line-beginning-position) (- (point) 1)))
-                      (offset (string-match ":[0-9]+$" full))
-                      (file (substring full 0 offset))
-                      (linum (substring full (1+ offset)))
+               (let* ((text (buffer-substring-no-properties (line-beginning-position) (- (point) 1)))
+                      (offset (string-match ":[0-9]+$" text))
+                      (file (substring text 0 offset))
+                      (linum (substring text (1+ offset)))
                       (symb (concat file "?" linum)))
-                 (unless (string= symb sos-symbol)
-                   (setq sos-file-keyword nil))
                  symb)
              :stop)))))
     (:candidates
@@ -58,10 +55,9 @@
      (let* ((strings (split-string arg "?" t))
             (file (nth 0 strings))
             (linum (string-to-int (nth 1 strings)))
-            (keyword (unless sos-file-keyword
-                       (save-excursion
-                         (search-backward-regexp (concat "^" sos-grep-prefix ".+$") nil t)
-                         (buffer-substring-no-properties (+ (length sos-grep-prefix) (point)) (line-end-position))))))
+            (keyword (save-excursion
+                       (search-backward-regexp (concat "^" sos-grep-prefix ".+$") nil t)
+                       (buffer-substring-no-properties (+ (length sos-grep-prefix) (point)) (line-end-position)))))
        (list `(:file ,file :linum ,linum :hl-word ,keyword))))))
 
 (provide 'sos-grep-backend)

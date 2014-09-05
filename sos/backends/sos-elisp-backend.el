@@ -46,29 +46,44 @@
   )
 
 (defun sos-elisp-find-function (symb)
-  ;; (let ((def (symbol-function (find-function-advised-original symbol)))
-  ;;       aliases)
-  ;;   ;; FIXME for completeness, it might be nice to print something like:
-  ;;   ;; foo (which is advised), which is an alias for bar (which is advised).
-  ;;   (while (symbolp def)
-  ;;     (or (eq def symbol)
-  ;;         (if aliases
-  ;;             (setq aliases (concat aliases
-  ;;                                   (format ", which is an alias for `%s'"
-  ;;                                           (symbol-name def))))
-  ;;           (setq aliases (format "`%s' is an alias for `%s'"
-  ;;                                 symbol (symbol-name def)))))
-  ;;     (setq symbol (symbol-function (find-function-advised-original symbol))
-  ;;           def (symbol-function (find-function-advised-original symbol))))
-  ;;   (and aliases (message "%s" aliases))
-
-  ;;   ;; Find library and return the result.
-  ;;   (let ((library (cond ((autoloadp def)
-  ;;                         (nth 1 def))
-  ;;                        ((subrp def) nil)
-  ;;                        ((symbol-file symbol 'defun)))))
-  ;;     (and library (oops--lisp-search-for-symbol symbol 'defun library))))
-  )
+  ;; TODO: use tag system.
+  (let ((def (symbol-function (find-function-advised-original symb))))
+    (when def
+      (if (subrp def)
+          nil
+        (let ((file (symbol-file symb 'defun))
+              (linum 0))
+          ;; Convert extension from .elc to .el.
+          (when (string-match "\\.el\\(c\\)\\'" file)
+            (setq file (substring file 0 (match-beginning 1))))
+          ;; Strip extension from .emacs.el to make sure symbol is searched in
+          ;; .emacs too.
+          (when (string-match "\\.emacs\\(.el\\)" file)
+            (setq file (substring file 0 (match-beginning 1))))
+          ;; Open the file in order to get line number (waste way).
+          (with-temp-buffer
+            (insert-file-contents file)
+            (let ((regexp (format find-function-regexp
+                                  (concat "\\\\?"
+                                          (regexp-quote (symbol-name symb)))))
+                  (case-fold-search nil))
+              (with-syntax-table emacs-lisp-mode-syntax-table
+                (goto-char (point-min))
+                (when (or (re-search-forward regexp nil t)
+                          ;; `regexp' matches definitions using known forms like
+                          ;; `defun', or `defvar'.  But some functions/variables
+                          ;; are defined using special macros (or functions), so
+                          ;; if `regexp' can't find the definition, we look for
+                          ;; something of the form "(SOMETHING <symbol> ...)".
+                          ;; This fails to distinguish function definitions from
+                          ;; variable declarations (or even uses thereof), but is
+                          ;; a good pragmatic fallback.
+                          (re-search-forward
+                           (concat "^([^ ]+" find-function-space-re "['(]?"
+                                   (regexp-quote (symbol-name symb))
+                                   "\\_>") nil t))
+                  (setq linum (line-number-at-pos))))))
+          `(:file ,file :linum ,linum :hl-word ,(symbol-name symb)))))))
 
 (defun sos-elisp-find-variable (symb)
   )
@@ -89,19 +104,19 @@
          (or (and symb (intern-soft symb))
              :stop))))
     (:candidates
-     (and arg
-          ;; TODO: remove this test case.
-          ;; (let ((symb (intern-soft "sos-definition-window-mode"))
-          (let ((symb arg)
-                candidates)
-            (dolist (cand (list (sos-elisp-find-feature symb)
-                                (sos-elisp-find-function symb)
-                                (sos-elisp-find-variable symb)
-                                (sos-elisp-find-face symb)
-                                (sos-elisp-find-keyword symb)))
-              (and cand
-                   (push cand candidates)))
-            (reverse candidates)))
+     (when arg
+       ;; TODO: remove this test case.
+       ;; (let ((symb (intern-soft "sos-definition-window-mode"))
+       (let ((symb arg)
+             candidates)
+         (dolist (cand (list (sos-elisp-find-feature symb)
+                             (sos-elisp-find-function symb)
+                             (sos-elisp-find-variable symb)
+                             (sos-elisp-find-face symb)
+                             (sos-elisp-find-keyword symb)))
+           (and cand
+                (push cand candidates)))
+         (reverse candidates)))
      ;; TODO: remove this test case.
      (list `(:doc "document..." :mode "emacs-lisp-mode")))
     (:tips

@@ -116,8 +116,7 @@ Return value will be cached to `sos-candidates'.
  ### If candidate is a file...
  ((:file STRING
    :linum INTEGER
-   :hl-word STRING
-   :tips) (...) ...)
+   :hl-word STRING) (...) ...)
 
  ### If candidate is a document string...
  ((:doc STRING

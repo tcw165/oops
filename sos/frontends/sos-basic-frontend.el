@@ -99,11 +99,12 @@
 
 ;;;###autoload
 (defun sos-definition-buffer-frontend (command)
-  (and (window-live-p sos-definition-buffer)
-       (setq sos-definition-window-height (window-height sos-definition-window)))
   (case command
     (:init (sos-toggle-definition-buffer&window 1))
-    (:destroy (sos-toggle-definition-buffer&window -1))
+    (:destroy
+     (and (window-live-p sos-definition-buffer)
+       (setq sos-definition-window-height (window-height sos-definition-window)))
+     (sos-toggle-definition-buffer&window -1))
     (:show
      (sos-toggle-definition-buffer&window 1)
      (setq sos-index 0)
