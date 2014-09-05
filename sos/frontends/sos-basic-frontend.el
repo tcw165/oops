@@ -107,50 +107,56 @@
      (sos-toggle-definition-buffer&window -1))
     (:show
      (sos-toggle-definition-buffer&window 1)
-     (setq sos-index 0)
-     ;; TODO: multiple candidates `sos-is-single-candidate'.
-     (if (sos-is-single-candidate)
-         (let* ((candidate (nth sos-index sos-candidates))
-                (file (plist-get candidate :file))
-                (doc (plist-get candidate :doc))
-                (linum (plist-get candidate :linum))
-                (hl-word (plist-get candidate :hl-word)))
-           (cond
-            ;; A file ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-            ((and (stringp file)
-                  (file-exists-p file))
-             (sos-with-definition-buffer
-               (insert-file-contents file nil nil nil t)
-               ;; Set them for `sos-nav-mode'.
-               (setq sos-file-name file
-                     sos-file-linum linum
-                     sos-file-keyword hl-word)
-               ;; Find a appropriate major-mode for it.
-               (dolist (mode auto-mode-alist)
-                 (and (not (null (cdr mode)))
-                      (string-match (car mode) file)
-                      (funcall (cdr mode))))
-               (and (featurep 'hl-line)
-                    (hl-line-unhighlight))
-               ;; Move point and recenter.
-               (and (integerp linum)
-                    (goto-char (point-min))
-                    (forward-line (- linum 1)))
-               (recenter 3)
-               ;; Highlight word or line.
-               (move-overlay sos-hl-overlay 1 1)
-               (and (stringp hl-word) (> (length hl-word) 0)
-                    (if (search-forward hl-word (line-end-position) t)
-                        (move-overlay sos-hl-overlay
-                                      (- (point) (length hl-word))
-                                      (point))
-                      (message "Can't find keyword, %s in the file!"
-                               (propertize (concat "\"" hl-word "\"")
-                                           'face 'font-lock-string-face))))))
+     (when sos-candidates
+       (if (sos-is-single-candidate)
+           ;; TODO: update `sos-index'.
+           ;; TODO: delete margin.
+           (setq sos-index 0)
+         ;; TODO: create margin.
+         (setq sos-index 0))
+       (let* ((candidate (nth sos-index sos-candidates))
+              (file (plist-get candidate :file))
+              (doc (plist-get candidate :doc))
+              (linum (plist-get candidate :linum))
+              (hl-word (plist-get candidate :hl-word)))
+         (cond
+          ;; A file ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+          ((and (stringp file)
+                (file-exists-p file))
+           (sos-with-definition-buffer
+             (insert-file-contents file nil nil nil t)
+             ;; Set them for `sos-nav-mode'.
+             (setq sos-file-name file
+                   sos-file-linum linum
+                   sos-file-keyword hl-word)
+             ;; Find a appropriate major-mode for it.
+             (dolist (mode auto-mode-alist)
+               (and (not (null (cdr mode)))
+                    (string-match (car mode) file)
+                    (funcall (cdr mode))))
+             (and (featurep 'hl-line)
+                  (hl-line-unhighlight))
+             ;; Move point and recenter.
+             (and (integerp linum)
+                  (goto-char (point-min))
+                  (forward-line (- linum 1)))
+             (recenter 3)
+             ;; Highlight word or line.
+             (move-overlay sos-hl-overlay 1 1)
+             (and (stringp hl-word) (> (length hl-word) 0)
+                  (if (search-forward hl-word (line-end-position) t)
+                      (move-overlay sos-hl-overlay
+                                    (- (point) (length hl-word))
+                                    (point))
+                    (message "Can't find  %s at line %s in the file!"
+                             (propertize (concat "\"" hl-word "\"")
+                                         'face 'font-lock-string-face)
+                             (propertize (format "%s" linum)
+                                         'face 'font-lock-string-face))))))
 
-            ;; A document string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-            ((stringp doc)
-             )))))))
+          ;; A document string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+          ((stringp doc)
+           )))))))
 
 ;;;###autoload
 (defun sos-tips-frontend (command)
