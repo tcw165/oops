@@ -102,8 +102,8 @@
   (case command
     (:init (sos-toggle-definition-buffer&window 1))
     (:destroy
-     (and (window-live-p sos-definition-buffer)
-       (setq sos-definition-window-height (window-height sos-definition-window)))
+     (and (window-live-p sos-definition-window)
+          (setq sos-definition-window-height (window-height sos-definition-window)))
      (sos-toggle-definition-buffer&window -1))
     (:show
      (sos-toggle-definition-buffer&window 1)
