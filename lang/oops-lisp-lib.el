@@ -467,35 +467,24 @@ The 1st element of all the records is RECORD-TYPE.")
         (if search-result
             (oops-update-help search-result)
           ;; Built-in function, show HELP.
-          (oops-update-help (oops--lisp-describe-function symbol))
-          )
-        )
+          (oops-update-help (oops--lisp-describe-function symbol))))
        ;; Variable:
        ((boundp symbol)
         (setq search-result (oops--lisp-find-variable symbol))
         (if search-result
             (oops-update-help search-result)
           ;; Built-in variable, show HELP.
-          (oops-update-help (oops--lisp-describe-variable symbol))
-          )
-        )
+          (oops-update-help (oops--lisp-describe-variable symbol))))
        ;; Face:
        ((facep symbol)
         (setq search-result (oops--lisp-find-face symbol))
         (if search-result
             (oops-update-help search-result)
           ;; Built-in variable, show HELP.
-          (oops-update-help (oops--lisp-describe-variable symbol))
-          )
-        )
+          (oops-update-help (oops--lisp-describe-variable symbol))))
        ;; Keyword:
        ((keywordp symbol)
-        (message "[Definition] It's a keyword, %s" symbol)
-        )
-       )
-      )
-    )
-  )
+        (message "[Definition] It's a keyword, %s" symbol))))))
 
 ;; Source Code Navigation ======================================================
 
@@ -515,19 +504,15 @@ TYPE specifies the kind of definition, and it is interpreted via `oops--lisp-sea
   ;; Some functions are defined as part of the construct that defines something else.
   (while (and (symbolp symbol)
               (get symbol 'definition-name))
-    (setq symbol (get symbol 'definition-name))
-    )
+    (setq symbol (get symbol 'definition-name)))
 
   (cond
    ((string-match "\\.el\\(c\\)\\'" library)
-    (setq library (substring library 0 (match-beginning 1)))
-    )
+    (setq library (substring library 0 (match-beginning 1))))
    ;; Strip extension from .emacs.el to make sure symbol is searched in
    ;; .emacs too.
    ((string-match "\\.emacs\\(.el\\)" library)
-    (setq library (substring library 0 (match-beginning 1)))
-    )
-   )
+    (setq library (substring library 0 (match-beginning 1)))))
 
   (let* ((filename (find-library-name library))
          (regexp-symbol (cdr (assq type oops--lisp-search-symbol-regexp-alist))))
@@ -563,17 +548,9 @@ TYPE specifies the kind of definition, and it is interpreted via `oops--lisp-sea
                              (forward-thing 'symbol -1)
                              (point)
                              )))
-                  (list (current-buffer) beg end)
-                  )
+                  (list (current-buffer) beg end))
               ;; Not found, return nil
-              nil
-              )
-            )
-          )
-        )
-      )
-    )
-  )
+              nil)))))))
 
 (defun oops--lisp-find-function (symbol)
   "Return a list (BUFFER POS-BEG POS-END) pointing to the definition of FUNCTION. Return nil if symbol is a built-in function.
@@ -590,24 +567,17 @@ TYPE specifies the kind of definition, and it is interpreted via `oops--lisp-sea
                                     (format ", which is an alias for `%s'"
                                             (symbol-name def))))
             (setq aliases (format "`%s' is an alias for `%s'"
-                                  symbol (symbol-name def)))
-            ))
+                                  symbol (symbol-name def)))))
       (setq symbol (symbol-function (find-function-advised-original symbol))
-            def (symbol-function (find-function-advised-original symbol)))
-      )
+            def (symbol-function (find-function-advised-original symbol))))
     (and aliases (message "%s" aliases))
 
     ;; Find library and return the result.
     (let ((library (cond ((autoloadp def)
-                          (nth 1 def)
-                          )
+                          (nth 1 def))
                          ((subrp def) nil)
-                         ((symbol-file symbol 'defun))
-                         )))
-      (and library (oops--lisp-search-for-symbol symbol 'defun library))
-      )
-    )
-  )
+                         ((symbol-file symbol 'defun)))))
+      (and library (oops--lisp-search-for-symbol symbol 'defun library)))))
 
 ;; (oops--lisp-find-variable 'hl-paren-face)
 (defun oops--lisp-find-variable (symbol)
@@ -615,18 +585,14 @@ TYPE specifies the kind of definition, and it is interpreted via `oops--lisp-sea
 \(It was written by refering to GNU function, `find-variable-noselect'.\)
 "
   (let ((library (symbol-file symbol 'defvar)))
-    (and library (oops--lisp-search-for-symbol symbol 'defun library))
-    )
-  )
+    (and library (oops--lisp-search-for-symbol symbol 'defun library))))
 
 (defun oops--lisp-find-face (symbol)
   "Return a list (BUFFER POS-BEG POS-END) pointing to the definition of LIBRARY.
 \(It was written by refering to GNU function, `find-function-noselect'.\)
 "
   (let ((library (symbol-file 'hl-paren-face 'defface)))
-    (and library (oops--lisp-search-for-symbol symbol 'defface library))
-    )
-  )
+    (and library (oops--lisp-search-for-symbol symbol 'defface library))))
 
 (defun oops--lisp-find-library (symbol)
   "Return a list (BUFFER POS-BEG POS-END) pointing to the definition of LIBRARY.
