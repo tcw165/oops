@@ -42,6 +42,16 @@
         (and bound
              (buffer-substring-no-properties (car bound) (cdr bound)))))))
 
+(defun sos-elisp-normalize-path (file)
+  ;; Convert extension from .elc to .el.
+  (when (string-match "\\.el\\(c\\)\\'" file)
+    (setq file (substring file 0 (match-beginning 1))))
+  ;; Strip extension from .emacs.el to make sure symbol is searched in
+  ;; .emacs too.
+  (when (string-match "\\.emacs\\(.el\\)" file)
+    (setq file (substring file 0 (match-beginning 1))))
+  file)
+
 (defun sos-elisp-find-feature (symb)
   )
 
@@ -50,16 +60,12 @@
   (let ((def (symbol-function (find-function-advised-original symb))))
     (when def
       (if (subrp def)
-          nil
+          (progn
+            ;; TODO: print document.
+            )
         (let ((file (symbol-file symb 'defun))
               (linum 0))
-          ;; Convert extension from .elc to .el.
-          (when (string-match "\\.el\\(c\\)\\'" file)
-            (setq file (substring file 0 (match-beginning 1))))
-          ;; Strip extension from .emacs.el to make sure symbol is searched in
-          ;; .emacs too.
-          (when (string-match "\\.emacs\\(.el\\)" file)
-            (setq file (substring file 0 (match-beginning 1))))
+          (setq file (sos-elisp-normalize-path file))
           ;; Open the file in order to get line number (waste way).
           (with-temp-buffer
             (insert-file-contents file)
@@ -86,7 +92,14 @@
           `(:file ,file :linum ,linum :hl-word ,(symbol-name symb)))))))
 
 (defun sos-elisp-find-variable (symb)
-  )
+  (let ((file (symbol-file symb 'defvar))
+        (linum 0))
+    (if file
+        (progn
+          (setq file (sos-elisp-normalize-path file)))
+      (progn
+        )))
+  nil)
 
 (defun sos-elisp-find-face (symb)
   )
