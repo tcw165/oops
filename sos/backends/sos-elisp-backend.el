@@ -114,11 +114,10 @@
                              (sos-elisp-find-variable symb)
                              (sos-elisp-find-face symb)
                              (sos-elisp-find-keyword symb)))
+           ;;
            (and cand
                 (push cand candidates)))
-         (reverse candidates)))
-     ;; TODO: remove this test case.
-     (list `(:doc "document..." :mode "emacs-lisp-mode")))
+         (reverse candidates))))
     (:tips
      (and arg
           (list (format "%s" arg))))))
