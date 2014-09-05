@@ -201,9 +201,11 @@ If you want to skip additional commands, try example:
            (sos-is-skip-command))))
 
 (defun sos-idle-begin ()
-  (if (null sos-backend)
-      (sos-1st-process)
-    (sos-normal-process sos-backend)))
+  (condition-case err
+      (if (null sos-backend)
+          (sos-1st-process)
+        (sos-normal-process sos-backend))
+    (error err)))
 
 (defun sos-1st-process ()
   (dolist (backend sos-backends)
@@ -228,7 +230,8 @@ If you want to skip additional commands, try example:
               sos-candidates (sos-call-backend backend :candidates symb)
               sos-tips (sos-call-backend backend :tips symb))
         (if (and sos-candidates (listp sos-candidates))
-            (sos-call-frontends :show)
+            (progn
+              (sos-call-frontends :show))
           (sos-call-frontends :hide))))
 
      ;; Return nil ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

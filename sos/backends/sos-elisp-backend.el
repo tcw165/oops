@@ -84,8 +84,9 @@
                   symb)
              :stop))))
     (:candidates
-     (list (:doc "document..." :mode nil)))
+     (list `(:doc "document..." :mode "emacs-lisp-mode")))
     (:tips
-     (list (format "%s" arg)))))
+     (and arg
+          (list (format "%s" arg))))))
 
 (provide 'sos-elisp-backend)

@@ -100,10 +100,8 @@
 ;;;###autoload
 (defun sos-definition-buffer-frontend (command)
   (case command
-    (:init
-     (sos-toggle-definition-buffer&window 1))
-    (:destroy
-     (sos-toggle-definition-buffer&window -1))
+    (:init (sos-toggle-definition-buffer&window 1))
+    (:destroy (sos-toggle-definition-buffer&window -1))
     (:show
      (sos-toggle-definition-buffer&window 1)
      (setq sos-index 0)
@@ -116,7 +114,8 @@
                 (hl-word (plist-get candidate :hl-word)))
            (cond
             ;; A file ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-            ((file-exists-p file)
+            ((and (stringp file)
+                  (file-exists-p file))
              (sos-with-definition-buffer
                (insert-file-contents file nil nil nil t)
                ;; Set them for `sos-nav-mode'.
@@ -144,7 +143,7 @@
                         (move-overlay sos-hl-overlay (line-beginning-position) (+ 1 (line-end-position)))))))
 
             ;; A document string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-            ((stringp doc)
+            ((and doc)
              )))))
     (:update
      (unless sos-definition-buffer
@@ -152,10 +151,10 @@
 
 ;;;###autoload
 (defun sos-tips-frontend (command)
-  (when (memq command '(:show :update))
-    (let* ((tips (nth sos-index sos-tips)))
-      (message tips)
-      )))
+  (and sos-tips (memq command '(:show :update))
+       (let* ((tips (nth sos-index sos-tips)))
+         (and tips
+              (message tips)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
