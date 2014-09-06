@@ -30,6 +30,70 @@
 
 (require 'thingatpt)
 
+(defun sos-elisp-normalize-path (file)
+  ;; Convert extension from .elc to .el.
+  (when (string-match "\\.el\\(c\\)\\'" file)
+    (setq file (substring file 0 (match-beginning 1))))
+  ;; Strip extension from .emacs.el to make sure symbol is searched in
+  ;; .emacs too.
+  (when (string-match "\\.emacs\\(.el\\)" file)
+    (setq file (substring file 0 (match-beginning 1))))
+  file)
+
+(defun sos-elisp-count-lines (file name regexp-temp)
+  ;; Open the file in order to get line number (waste way).
+  (let ((regexp (format regexp-temp
+                        (concat "\\\\?"
+                                (regexp-quote name))))
+        (case-fold-search nil)
+        (linum 0))
+    (with-temp-buffer
+      (insert-file-contents file)
+      (with-syntax-table emacs-lisp-mode-syntax-table
+        (goto-char (point-min))
+        (when (re-search-forward regexp nil t)
+          (setq linum (line-number-at-pos)))))
+    linum))
+
+(defun sos-elisp-find-feature (symb)
+  )
+
+;; (subrp (symbol-function (intern-soft "let")))
+(defun sos-elisp-find-function (symb)
+  "Return the candidate pointing to the definition of `symb'. It was written 
+refer to `find-function-noselect' and `find-function-search-for-symbol'."
+  (ignore-errors
+    (let ((symb (find-function-advised-original symb)))
+      (if (subrp (symbol-function symb))
+          (progn
+            ;; TODO: print document.
+            nil)
+        (let* ((name (symbol-name symb))
+               (file (sos-elisp-normalize-path (symbol-file symb 'defun)))
+               (linum (sos-elisp-count-lines file name find-function-regexp)))
+          `(:file ,file :linum ,linum :hl-word ,name))))))
+
+;; (symbol-file (intern-soft "find-variable-regexp") 'defvar)
+;; (sos-elisp-find-variable (intern-soft "find-variable-regexp"))
+(defun sos-elisp-find-variable (symb)
+  "Return the candidate pointing to the definition of `symb'. It was written 
+refer to `find-function-noselect' and `find-function-search-for-symbol'."
+  (ignore-errors
+    (let ((file (symbol-file symb 'defvar)))
+    (if file
+        (let* ((name (symbol-name symb))
+               (file (sos-elisp-normalize-path file))
+               (linum (sos-elisp-count-lines file name find-variable-regexp)))
+          `(:file ,file :linum ,linum :hl-word ,name))
+      ;; TODO: print document.
+      ))))
+
+(defun sos-elisp-find-face (symb)
+  )
+
+(defun sos-elisp-find-keyword (symb)
+  )
+
 (defun sos-elisp-thingatpt ()
   "Find symbol string around the point or text selection."
   (if mark-active
@@ -41,71 +105,6 @@
       (let* ((bound (bounds-of-thing-at-point 'symbol)))
         (and bound
              (buffer-substring-no-properties (car bound) (cdr bound)))))))
-
-(defun sos-elisp-normalize-path (file)
-  ;; Convert extension from .elc to .el.
-  (when (string-match "\\.el\\(c\\)\\'" file)
-    (setq file (substring file 0 (match-beginning 1))))
-  ;; Strip extension from .emacs.el to make sure symbol is searched in
-  ;; .emacs too.
-  (when (string-match "\\.emacs\\(.el\\)" file)
-    (setq file (substring file 0 (match-beginning 1))))
-  file)
-
-(defun sos-elisp-find-feature (symb)
-  )
-
-(defun sos-elisp-find-function (symb)
-  ;; TODO: use tag system.
-  (let ((def (symbol-function (find-function-advised-original symb))))
-    (when def
-      (if (subrp def)
-          (progn
-            ;; TODO: print document.
-            )
-        (let ((file (symbol-file symb 'defun))
-              (linum 0))
-          (setq file (sos-elisp-normalize-path file))
-          ;; Open the file in order to get line number (waste way).
-          (with-temp-buffer
-            (insert-file-contents file)
-            (let ((regexp (format find-function-regexp
-                                  (concat "\\\\?"
-                                          (regexp-quote (symbol-name symb)))))
-                  (case-fold-search nil))
-              (with-syntax-table emacs-lisp-mode-syntax-table
-                (goto-char (point-min))
-                (when (or (re-search-forward regexp nil t)
-                          ;; `regexp' matches definitions using known forms like
-                          ;; `defun', or `defvar'.  But some functions/variables
-                          ;; are defined using special macros (or functions), so
-                          ;; if `regexp' can't find the definition, we look for
-                          ;; something of the form "(SOMETHING <symbol> ...)".
-                          ;; This fails to distinguish function definitions from
-                          ;; variable declarations (or even uses thereof), but is
-                          ;; a good pragmatic fallback.
-                          (re-search-forward
-                           (concat "^([^ ]+" find-function-space-re "['(]?"
-                                   (regexp-quote (symbol-name symb))
-                                   "\\_>") nil t))
-                  (setq linum (line-number-at-pos))))))
-          `(:file ,file :linum ,linum :hl-word ,(symbol-name symb)))))))
-
-(defun sos-elisp-find-variable (symb)
-  (let ((file (symbol-file symb 'defvar))
-        (linum 0))
-    (if file
-        (progn
-          (setq file (sos-elisp-normalize-path file)))
-      (progn
-        )))
-  nil)
-
-(defun sos-elisp-find-face (symb)
-  )
-
-(defun sos-elisp-find-keyword (symb)
-  )
 
 ;;;###autoload
 (defun sos-elisp-backend (command &optional arg)
@@ -122,17 +121,17 @@
        ;; (let ((symb (intern-soft "sos-definition-window-mode"))
        (let ((symb arg)
              candidates)
+         ;; TODO: use tag system.
          (dolist (cand (list (sos-elisp-find-feature symb)
                              (sos-elisp-find-function symb)
                              (sos-elisp-find-variable symb)
                              (sos-elisp-find-face symb)
                              (sos-elisp-find-keyword symb)))
-           ;;
            (and cand
                 (push cand candidates)))
          (reverse candidates))))
     (:tips
-     (and arg
-          (list (format "%s" arg))))))
+     (when arg
+       (list (format "%s" arg))))))
 
 (provide 'sos-elisp-backend)
