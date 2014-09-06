@@ -161,7 +161,8 @@
      (let* ((candidate (nth sos-index sos-candidates))
             (file (plist-get candidate :file)))
        ;; Refresh buffer if file attribute is different from `sos-file-name'.
-       (unless (string= file sos-file-name)
+       (unless (or (string= file sos-file-name)
+                   (buffer-file-name sos-definition-buffer))
          (sos-definition-buffer-frontend :show))))))
 
 ;;;###autoload

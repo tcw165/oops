@@ -120,7 +120,7 @@ Return value will be cached to `sos-candidates'.
 
  ### If candidate is a document string...
  ((:doc STRING
-   :mode SYMBOL) (...) ...)
+   :funcall FUNCTION) (...) ...)
 
 ### Optional commands:
 `:tips': ."
