@@ -44,7 +44,7 @@ meaningful information around the point."
   :tag "Sos")
 
 (defface sos-hl
-  '((t (:background "yellow" :foreground "black" :weight bold :height 1.5)))
+  '((t (:background "yellow" :foreground "black" :weight bold :height 2.0)))
   "Default face for highlighting the current line in Hl-Line mode."
   :group 'sos-group)
 

@@ -146,8 +146,6 @@ refer to `find-function-noselect' and `find-function-search-for-symbol'."
              :stop))))
     (:candidates
      (when arg
-       ;; TODO: remove this test case.
-       ;; (let ((symb (intern-soft "sos-definition-window-mode"))
        (let ((symb arg)
              candidates)
          ;; TODO: use tag system.

@@ -58,7 +58,7 @@
   :group 'prj-group)
 
 (defcustom prj-document-types '(("Text" . "*.txt;*.md;*.xml")
-                                ("Lisp" . ".emacs;*.el")
+                                ("Emacs Lisp" . ".emacs;*.el")
                                 ("Python" . "*.py")
                                 ("Java" . "*.java")
                                 ("C/C++ Header" . "*.h;*.hxx;*.hpp")
