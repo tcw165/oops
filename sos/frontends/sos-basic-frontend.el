@@ -156,7 +156,13 @@
 
           ;; A document string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           ((stringp doc)
-           )))))))
+           )))))
+    (:update
+     (let* ((candidate (nth sos-index sos-candidates))
+            (file (plist-get candidate :file)))
+       ;; Refresh buffer if file attribute is different from `sos-file-name'.
+       (unless (string= file sos-file-name)
+         (sos-definition-buffer-frontend :show))))))
 
 ;;;###autoload
 (defun sos-tips-frontend (command)
