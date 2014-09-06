@@ -58,7 +58,6 @@
 (defun sos-elisp-find-feature (symb)
   )
 
-;; (subrp (symbol-function (intern-soft "let")))
 (defun sos-elisp-find-function (symb)
   "Return the candidate pointing to the definition of `symb'. It was written 
 refer to `find-function-noselect' and `find-function-search-for-symbol'."
@@ -73,26 +72,27 @@ refer to `find-function-noselect' and `find-function-search-for-symbol'."
                (linum (sos-elisp-count-lines file name find-function-regexp)))
           `(:file ,file :linum ,linum :hl-word ,name))))))
 
-;; (symbol-file (intern-soft "find-variable-regexp") 'defvar)
-;; (sos-elisp-find-variable (intern-soft "find-variable-regexp"))
 (defun sos-elisp-find-variable (symb)
   "Return the candidate pointing to the definition of `symb'. It was written 
 refer to `find-function-noselect' and `find-function-search-for-symbol'."
   (ignore-errors
     (let ((file (symbol-file symb 'defvar)))
-    (if file
-        (let* ((name (symbol-name symb))
-               (file (sos-elisp-normalize-path file))
-               (linum (sos-elisp-count-lines file name find-variable-regexp)))
-          `(:file ,file :linum ,linum :hl-word ,name))
-      ;; TODO: print document.
-      ))))
+      (if file
+          (let* ((name (symbol-name symb))
+                 (file (sos-elisp-normalize-path file))
+                 (linum (sos-elisp-count-lines file name find-variable-regexp)))
+            `(:file ,file :linum ,linum :hl-word ,name))
+        ;; TODO: print document.
+        ))))
 
 (defun sos-elisp-find-face (symb)
-  )
-
-(defun sos-elisp-find-keyword (symb)
-  )
+  (ignore-errors
+    (let ((file (symbol-file symb 'defface)))
+      (when file
+        (let* ((name (symbol-name symb))
+               (file (sos-elisp-normalize-path file))
+               (linum (sos-elisp-count-lines file name find-face-regexp)))
+          `(:file ,file :linum ,linum :hl-word ,name))))))
 
 (defun sos-elisp-thingatpt ()
   "Find symbol string around the point or text selection."
@@ -125,8 +125,7 @@ refer to `find-function-noselect' and `find-function-search-for-symbol'."
          (dolist (cand (list (sos-elisp-find-feature symb)
                              (sos-elisp-find-function symb)
                              (sos-elisp-find-variable symb)
-                             (sos-elisp-find-face symb)
-                             (sos-elisp-find-keyword symb)))
+                             (sos-elisp-find-face symb)))
            (and cand
                 (push cand candidates)))
          (reverse candidates))))
