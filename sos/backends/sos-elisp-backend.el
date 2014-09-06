@@ -58,10 +58,40 @@
 (defun sos-elisp-find-feature (symb)
   )
 
+;; >>>>>
+(defun test-find-library (library)
+  (interactive
+   (let* ((dirs (or find-function-source-path load-path))
+          (suffixes (find-library-suffixes))
+          (table (apply-partially 'locate-file-completion-table
+                                  dirs suffixes))
+	  (def (if (eq (function-called-at-point) 'require)
+		   ;; `function-called-at-point' may return 'require
+		   ;; with `point' anywhere on this line.  So wrap the
+		   ;; `save-excursion' below in a `condition-case' to
+		   ;; avoid reporting a scan-error here.
+		   (condition-case nil
+		       (save-excursion
+			 (backward-up-list)
+			 (forward-char)
+			 (forward-sexp 2)
+			 (thing-at-point 'symbol))
+		     (error nil))
+		 (thing-at-point 'symbol))))
+     (when (and def (not (test-completion def table)))
+       (setq def nil))
+     (list
+      (completing-read (if def (format "Library name (default %s): " def)
+			 "Library name: ")
+		       table nil nil nil nil def))))
+  (let ((buf (find-file-noselect (find-library-name library))))
+    (condition-case nil (switch-to-buffer buf) (error (pop-to-buffer buf)))))
+;; <<<<<
+
 (defun sos-elisp-find-function (symb)
   "Return the candidate pointing to the definition of `symb'. It was written 
 refer to `find-function-noselect' and `find-function-search-for-symbol'."
-  (ignore-errors
+  (when (fboundp symb)
     (let ((symb (find-function-advised-original symb)))
       (if (subrp (symbol-function symb))
           (progn
@@ -75,7 +105,7 @@ refer to `find-function-noselect' and `find-function-search-for-symbol'."
 (defun sos-elisp-find-variable (symb)
   "Return the candidate pointing to the definition of `symb'. It was written 
 refer to `find-function-noselect' and `find-function-search-for-symbol'."
-  (ignore-errors
+  (when (boundp symb)
     (let ((file (symbol-file symb 'defvar)))
       (if file
           (let* ((name (symbol-name symb))
@@ -86,13 +116,12 @@ refer to `find-function-noselect' and `find-function-search-for-symbol'."
         ))))
 
 (defun sos-elisp-find-face (symb)
-  (ignore-errors
-    (let ((file (symbol-file symb 'defface)))
-      (when file
-        (let* ((name (symbol-name symb))
-               (file (sos-elisp-normalize-path file))
-               (linum (sos-elisp-count-lines file name find-face-regexp)))
-          `(:file ,file :linum ,linum :hl-word ,name))))))
+  (when (facep symb)
+    (let* ((file (symbol-file symb 'defface))
+           (name (symbol-name symb))
+           (file (sos-elisp-normalize-path file))
+           (linum (sos-elisp-count-lines file name find-face-regexp)))
+      `(:file ,file :linum ,linum :hl-word ,name))))
 
 (defun sos-elisp-thingatpt ()
   "Find symbol string around the point or text selection."
