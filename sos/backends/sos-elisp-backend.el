@@ -30,6 +30,8 @@
 
 (require 'thingatpt)
 
+(defconst sos-elisp-find-feature-regexp "^\\s-*(provide '%s)")
+
 (defun sos-elisp-normalize-path (file)
   ;; Convert extension from .elc to .el.
   (when (string-match "\\.el\\(c\\)\\'" file)
@@ -55,38 +57,20 @@
           (setq linum (line-number-at-pos)))))
     linum))
 
+;; (locate-file "files" (or find-function-source-path load-path) (find-library-suffixes))
 (defun sos-elisp-find-feature (symb)
-  )
-
-;; >>>>>
-(defun test-find-library (library)
-  (interactive
-   (let* ((dirs (or find-function-source-path load-path))
-          (suffixes (find-library-suffixes))
-          (table (apply-partially 'locate-file-completion-table
-                                  dirs suffixes))
-	  (def (if (eq (function-called-at-point) 'require)
-		   ;; `function-called-at-point' may return 'require
-		   ;; with `point' anywhere on this line.  So wrap the
-		   ;; `save-excursion' below in a `condition-case' to
-		   ;; avoid reporting a scan-error here.
-		   (condition-case nil
-		       (save-excursion
-			 (backward-up-list)
-			 (forward-char)
-			 (forward-sexp 2)
-			 (thing-at-point 'symbol))
-		     (error nil))
-		 (thing-at-point 'symbol))))
-     (when (and def (not (test-completion def table)))
-       (setq def nil))
-     (list
-      (completing-read (if def (format "Library name (default %s): " def)
-			 "Library name: ")
-		       table nil nil nil nil def))))
-  (let ((buf (find-file-noselect (find-library-name library))))
-    (condition-case nil (switch-to-buffer buf) (error (pop-to-buffer buf)))))
-;; <<<<<
+  "Return the absolute file name of the Emacs Lisp source of LIBRARY.
+LIBRARY should be a string (the name of the library)."
+  (ignore-errors
+    (let* ((name (symbol-name symb))
+           (file (or (locate-file name
+                                  (or find-function-source-path load-path)
+                                  (find-library-suffixes))
+                     (locate-file name
+                                  (or find-function-source-path load-path)
+                                  load-file-rep-suffixes)))
+           (linum (sos-elisp-count-lines file name sos-elisp-find-feature-regexp)))
+      `(:file ,file :linum ,linum :hl-word ,name))))
 
 (defun sos-elisp-find-function (symb)
   "Return the candidate pointing to the definition of `symb'. It was written 
