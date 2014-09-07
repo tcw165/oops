@@ -156,7 +156,10 @@
 
           ;; A document string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           ((stringp doc)
-           )))))
+           (sos-with-definition-buffer
+             (erase-buffer)
+             (fundamental-mode)
+             (insert doc)))))))
     (:update
      (let* ((candidate (nth sos-index sos-candidates))
             (file (plist-get candidate :file)))
@@ -169,8 +172,7 @@
 (defun sos-tips-frontend (command)
   (and sos-tips (memq command '(:show :update))
        (let* ((tips (nth sos-index sos-tips)))
-         (and tips
-              (message tips)))))
+         (and tips (message tips)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

@@ -57,7 +57,6 @@
           (setq linum (line-number-at-pos)))))
     linum))
 
-;; (locate-file "files" (or find-function-source-path load-path) (find-library-suffixes))
 (defun sos-elisp-find-feature (symb)
   "Return the absolute file name of the Emacs Lisp source of LIBRARY.
 LIBRARY should be a string (the name of the library)."
@@ -72,15 +71,33 @@ LIBRARY should be a string (the name of the library)."
            (linum (sos-elisp-count-lines file name sos-elisp-find-feature-regexp)))
       `(:file ,file :linum ,linum :hl-word ,name))))
 
+;; (documentation 'substitute-command-keys t)
+;; (documentation 'string-match t)
+;; (substitute-command-keys (documentation 'substitute-command-keys t))
+;; (describe-function 'substitute-command-keys)
+;; (help-split-fundoc (documentation 'substitute-command-keys t) 'substitute-command-keys)
+;; (find-lisp-object-file-name)
 (defun sos-elisp-find-function (symb)
   "Return the candidate pointing to the definition of `symb'. It was written 
 refer to `find-function-noselect' and `find-function-search-for-symbol'."
   (when (fboundp symb)
     (let ((symb (find-function-advised-original symb)))
       (if (subrp (symbol-function symb))
-          (progn
-            ;; TODO: print document.
-            nil)
+          ;; Document struct ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+          (let* ((doc-raw (documentation symb t))
+                 (data (help-split-fundoc doc-raw symb))
+                 (usage (car data))
+                 (doc (cdr data)))
+            (with-temp-buffer
+              (setq standard-output (current-buffer))
+              (prin1 (concat (propertize (symbol-name 'let) 'face 'sos-hl-face)
+                             " is a built-in function."))
+              ;; (help-xref-button 1 'help-function real-def)
+              (terpri)(terpri)
+              (print usage)
+              (print doc)
+              `(:doc ,(buffer-string))))
+        ;; File struct ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
         (let* ((name (symbol-name symb))
                (file (sos-elisp-normalize-path (symbol-file symb 'defun)))
                (linum (sos-elisp-count-lines file name find-function-regexp)))
@@ -92,10 +109,12 @@ refer to `find-function-noselect' and `find-function-search-for-symbol'."
   (when (boundp symb)
     (let ((file (symbol-file symb 'defvar)))
       (if file
+          ;; File struct ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           (let* ((name (symbol-name symb))
                  (file (sos-elisp-normalize-path file))
                  (linum (sos-elisp-count-lines file name find-variable-regexp)))
             `(:file ,file :linum ,linum :hl-word ,name))
+        ;; Document struct ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
         ;; TODO: print document.
         ))))
 
