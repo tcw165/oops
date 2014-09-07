@@ -71,13 +71,6 @@ LIBRARY should be a string (the name of the library)."
            (linum (sos-elisp-count-lines file name sos-elisp-find-feature-regexp)))
       `(:file ,file :linum ,linum :hl-word ,name))))
 
-;; (documentation 'setq t)
-;; (substitute-command-keys (documentation 'setq t))
-;; (describe-function 'setq)
-;; (help-split-fundoc (documentation 'setq t) 'setq)
-;; (find-lisp-object-file-name)
-;; (prin1 "hello")
-;; (princ "hello")
 (defun sos-elisp-find-function (symb)
   "Return the candidate pointing to the definition of `symb'. It was written 
 refer to `find-function-noselect' and `find-function-search-for-symbol'."
@@ -95,7 +88,9 @@ refer to `find-function-noselect' and `find-function-search-for-symbol'."
               (princ usage)
               (terpri)(terpri)
               (princ doc)
-              `(:doc ,(buffer-string) :linum 1 :hl-word ,name)))
+              `(:doc ,(buffer-string) :linum 1 :hl-word ,name
+                     :mode-line ,(format "%s is a built-in Elisp function."
+                                         (propertize name 'face 'link)))))
         ;; File struct ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
         (let* ((name (symbol-name symb))
                (file (sos-elisp-normalize-path (symbol-file symb 'defun)))

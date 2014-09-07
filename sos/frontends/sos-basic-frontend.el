@@ -42,7 +42,7 @@
 (defvar sos-file-linum nil
   "Cache line number for `sos-navigation-mode'.")
 
-(defvar sos-file-keyword nil
+(defvar sos-file-mode-line nil
   "Cache keyword string for `sos-navigation-mode'.")
 
 (defvar sos-index 0
@@ -95,7 +95,10 @@
         (kill-buffer sos-definition-buffer))
       (setq sos-definition-buffer nil
             sos-definition-window nil
-            sos-hl-overlay nil))))
+            sos-hl-overlay nil
+            sos-file-name nil
+            sos-file-linum nil
+            sos-file-mode-line nil))))
 
 (defun sos-hl-word (hl-word)
   (move-overlay sos-hl-overlay 1 1)
@@ -128,20 +131,20 @@
          ;; TODO: create margin.
          (setq sos-index 0))
        (let* ((candidate (nth sos-index sos-candidates))
-              (file (plist-get candidate :file))
               (doc (plist-get candidate :doc))
+              (file (plist-get candidate :file))
               (linum (plist-get candidate :linum))
-              (hl-word (plist-get candidate :hl-word)))
+              (hl-word (plist-get candidate :hl-word))
+              (mode-line (plist-get candidate :mode-line)))
          (cond
           ;; A file ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           ((and (stringp file)
                 (file-exists-p file))
            (sos-with-definition-buffer
-             (insert-file-contents file nil nil nil t)
-             ;; Set them for `sos-nav-mode'.
              (setq sos-file-name file
                    sos-file-linum linum
-                   sos-file-keyword hl-word)
+                   sos-file-mode-line mode-line)
+             (insert-file-contents file nil nil nil t)
              ;; Find a appropriate major-mode for it.
              (dolist (mode auto-mode-alist)
                (and (not (null (cdr mode)))
@@ -150,15 +153,16 @@
              (and (featurep 'hl-line)
                   (hl-line-unhighlight))
              ;; Move point and recenter.
-             (and (integerp linum)
+             (and (integerp sos-file-linum)
                   (goto-char (point-min))
-                  (forward-line (- linum 1)))
+                  (forward-line (- sos-file-linum 1)))
              (recenter 3)
              ;; Highlight word.
              (sos-hl-word hl-word)))
 
           ;; A document string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           ((stringp doc)
+           (setq sos-file-mode-line mode-line)
            (sos-with-definition-buffer
              (erase-buffer)
              (fundamental-mode)
@@ -198,17 +202,19 @@
 (defun sos-navigation-mode-line ()
   `(,(propertize "  %b "
                  'face 'mode-line-buffer-id)
-    (:eval (and sos-file-name (file-exists-p sos-file-name)
-                (concat "| file:" (propertize (abbreviate-file-name sos-file-name)
-                                              'local-map sos-goto-file-map
-                                              'face 'link
-                                              'mouse-face 'mode-line-highlight)
-                        (and sos-file-linum
-                             (concat ", line:" (propertize (format "%d" sos-file-linum)
-                                                           'local-map sos-goto-file-linum-map
-                                                           'face 'link
-                                                           'mouse-face 'mode-line-highlight)))
-                        ", function:(yet supported)")))))
+    (:eval (or (and sos-file-mode-line
+                    (concat "| " sos-file-mode-line))
+               (and sos-file-name (file-exists-p sos-file-name)
+                    (concat "| file:" (propertize (abbreviate-file-name sos-file-name)
+                                                  'local-map sos-goto-file-map
+                                                  'face 'link
+                                                  'mouse-face 'mode-line-highlight)
+                            (and sos-file-linum
+                                 (concat ", line:" (propertize (format "%d" sos-file-linum)
+                                                               'local-map sos-goto-file-linum-map
+                                                               'face 'link
+                                                               'mouse-face 'mode-line-highlight)))
+                            ", function:(yet supported)"))))))
 
 ;;;###autoload
 (define-minor-mode sos-navigation-mode
@@ -219,10 +225,7 @@
       (progn
         (setq mode-line-format (sos-navigation-mode-line)
               buffer-read-only t))
-    (setq buffer-read-only nil
-          sos-file-name nil
-          sos-file-linum nil
-          sos-file-keyword nil)
+    (setq buffer-read-only nil)
     (mapc 'kill-local-variable '(mode-line-format))))
 
 (provide 'sos-basic-frontend)

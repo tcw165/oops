@@ -116,10 +116,12 @@ Return value will be cached to `sos-candidates'.
  ### If candidate is a file...
  ((:file STRING
    :linum INTEGER
-   :hl-word STRING) (...) ...)
+   :hl-word STRING
+   :mode-line STRING) (...) ...)
 
  ### If candidate is a document string...
  ((:doc STRING
+   :mode-line STRING
    :funcall FUNCTION) (...) ...)
 
 ### Optional commands:
