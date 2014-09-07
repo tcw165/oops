@@ -97,6 +97,19 @@
             sos-definition-window nil
             sos-hl-overlay nil))))
 
+(defun sos-hl-word (hl-word)
+  (move-overlay sos-hl-overlay 1 1)
+  (and (stringp hl-word) (> (length hl-word) 0)
+       (if (search-forward hl-word (line-end-position) t)
+           (move-overlay sos-hl-overlay
+                         (- (point) (length hl-word))
+                         (point))
+         (message "Can't find  %s at line %s in the file!"
+                  (propertize (concat "\"" hl-word "\"")
+                              'face 'font-lock-string-face)
+                  (propertize (format "%s" linum)
+                              'face 'font-lock-string-face)))))
+
 ;;;###autoload
 (defun sos-definition-buffer-frontend (command)
   (case command
@@ -141,18 +154,8 @@
                   (goto-char (point-min))
                   (forward-line (- linum 1)))
              (recenter 3)
-             ;; Highlight word or line.
-             (move-overlay sos-hl-overlay 1 1)
-             (and (stringp hl-word) (> (length hl-word) 0)
-                  (if (search-forward hl-word (line-end-position) t)
-                      (move-overlay sos-hl-overlay
-                                    (- (point) (length hl-word))
-                                    (point))
-                    (message "Can't find  %s at line %s in the file!"
-                             (propertize (concat "\"" hl-word "\"")
-                                         'face 'font-lock-string-face)
-                             (propertize (format "%s" linum)
-                                         'face 'font-lock-string-face))))))
+             ;; Highlight word.
+             (sos-hl-word hl-word)))
 
           ;; A document string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           ((stringp doc)
@@ -162,7 +165,10 @@
              (and (featurep 'hl-line)
                   (hl-line-unhighlight))
              (insert doc)
-             (goto-char (point-min))))))))
+             ;; Move point
+             (goto-char (point-min))
+             ;; Highlight word.
+             (sos-hl-word hl-word)))))))
     (:update
      (let* ((candidate (nth sos-index sos-candidates))
             (file (plist-get candidate :file)))
