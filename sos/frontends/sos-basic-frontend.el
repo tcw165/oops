@@ -36,14 +36,17 @@
 
 (defvar sos-definition-window-height 0)
 
-(defvar sos-file-name nil
-  "Cache file name for `sos-navigation-mode'.")
+(defvar sos-file-mode-line nil
+  "A string for definition buffer's `mode-line-format' in minor mode,
+ `sos-navigation-mode'.")
 
+;; TODO: remove it.
+(defvar sos-file-name nil
+  "Cache file name for `sos-navigation-mode'. It ")
+
+;; TODO: remove it.
 (defvar sos-file-linum nil
   "Cache line number for `sos-navigation-mode'.")
-
-(defvar sos-file-mode-line nil
-  "Cache keyword string for `sos-navigation-mode'.")
 
 (defvar sos-index 0
   "The index of current candidate in the list.")
@@ -135,7 +138,8 @@
               (file (plist-get candidate :file))
               (linum (plist-get candidate :linum))
               (hl-word (plist-get candidate :hl-word))
-              (mode-line (plist-get candidate :mode-line)))
+              (mode-line (plist-get candidate :mode-line))
+              (func (plist-get candidate :funcall)))
          (cond
           ;; A file ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           ((and (stringp file)
@@ -153,9 +157,9 @@
              (and (featurep 'hl-line)
                   (hl-line-unhighlight))
              ;; Move point and recenter.
-             (and (integerp sos-file-linum)
+             (and (integerp linum)
                   (goto-char (point-min))
-                  (forward-line (- sos-file-linum 1)))
+                  (forward-line (- linum 1)))
              (recenter 3)
              ;; Highlight word.
              (sos-hl-word hl-word)))
@@ -172,7 +176,10 @@
              ;; Move point
              (goto-char (point-min))
              ;; Highlight word.
-             (sos-hl-word hl-word)))))))
+             (sos-hl-word hl-word)
+             ;; Apply function provided by back-end.
+             (and (functionp func)
+                  (funcall func))))))))
     (:update
      (let* ((candidate (nth sos-index sos-candidates))
             (file (plist-get candidate :file)))
