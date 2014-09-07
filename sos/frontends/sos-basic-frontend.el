@@ -159,7 +159,10 @@
            (sos-with-definition-buffer
              (erase-buffer)
              (fundamental-mode)
-             (insert doc)))))))
+             (and (featurep 'hl-line)
+                  (hl-line-unhighlight))
+             (insert doc)
+             (goto-char (point-min))))))))
     (:update
      (let* ((candidate (nth sos-index sos-candidates))
             (file (plist-get candidate :file)))

@@ -75,7 +75,7 @@ LIBRARY should be a string (the name of the library)."
 ;; (documentation 'string-match t)
 ;; (substitute-command-keys (documentation 'substitute-command-keys t))
 ;; (describe-function 'substitute-command-keys)
-;; (help-split-fundoc (documentation 'substitute-command-keys t) 'substitute-command-keys)
+;; (help-split-fundoc (documentation 'setq t) 'setq)
 ;; (find-lisp-object-file-name)
 (defun sos-elisp-find-function (symb)
   "Return the candidate pointing to the definition of `symb'. It was written 
@@ -84,19 +84,17 @@ refer to `find-function-noselect' and `find-function-search-for-symbol'."
     (let ((symb (find-function-advised-original symb)))
       (if (subrp (symbol-function symb))
           ;; Document struct ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-          (let* ((doc-raw (documentation symb t))
+          (let* ((name (symbol-name symb))
+                 (doc-raw (documentation symb t))
                  (data (help-split-fundoc doc-raw symb))
                  (usage (car data))
                  (doc (cdr data)))
             (with-temp-buffer
               (setq standard-output (current-buffer))
-              (prin1 (concat (propertize (symbol-name 'let) 'face 'sos-hl-face)
-                             " is a built-in function."))
-              ;; (help-xref-button 1 'help-function real-def)
+              (prin1 usage)
               (terpri)(terpri)
-              (print usage)
-              (print doc)
-              `(:doc ,(buffer-string))))
+              (prin1 doc)
+              `(:doc ,(buffer-string) :linum 1 :hl-word ,name)))
         ;; File struct ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
         (let* ((name (symbol-name symb))
                (file (sos-elisp-normalize-path (symbol-file symb 'defun)))
@@ -152,10 +150,10 @@ refer to `find-function-noselect' and `find-function-search-for-symbol'."
        (let ((symb arg)
              candidates)
          ;; TODO: use tag system.
-         (dolist (cand (list (sos-elisp-find-feature symb)
-                             (sos-elisp-find-function symb)
+         (dolist (cand (list (sos-elisp-find-function symb)
                              (sos-elisp-find-variable symb)
-                             (sos-elisp-find-face symb)))
+                             (sos-elisp-find-face symb)
+                             (sos-elisp-find-feature symb)))
            (and cand
                 (push cand candidates)))
          (reverse candidates))))
