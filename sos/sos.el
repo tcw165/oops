@@ -135,6 +135,8 @@ Return value will be cached to `sos-candidates'.
 
 (defvar sos-timer nil)
 
+(defvar sos-cached-buffer nil)
+
 (defvar sos-hl-face 'sos-hl)
 
 (defvar sos-hl-overlay nil
@@ -151,6 +153,10 @@ Return value will be cached to `sos-candidates'.
 (defvar sos-candidates nil
   "Cache the return value from back-end with `:candidates' command.")
 (make-variable-buffer-local 'sos-candidates)
+
+(defvar sos-index 0
+  "The index of current candidate in the list.")
+(make-variable-buffer-local 'sos-index)
 
 (defvar sos-tips nil
   "Cache the return value from back-end with `:tips' command.")
@@ -230,7 +236,8 @@ If you want to skip additional commands, try example:
 
      ;; Something ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
      (t
-      (if (equal symb sos-symbol)
+      (if (and (equal symb sos-symbol)
+               (equal (current-buffer) sos-cached-buffer))
           (progn
             ;; If return symbol string is equal to `sos-symbol', ask front-ends
             ;; to do `:update' task.
@@ -246,7 +253,8 @@ If you want to skip additional commands, try example:
               ;; (message "(%s) sos-normal-process: show" (current-time))
               (sos-call-frontends :show))
           ;; (message "(%s) sos-normal-process: hide" (current-time))
-          (sos-call-frontends :hide)))))))
+          (sos-call-frontends :hide)))
+      (setq sos-cached-buffer (current-buffer))))))
 
 (defun sos-kill-local-variables ()
   (mapc 'kill-local-variable '(sos-backend

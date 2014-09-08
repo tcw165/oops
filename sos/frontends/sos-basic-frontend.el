@@ -36,21 +36,6 @@
 
 (defvar sos-definition-window-height 0)
 
-(defvar sos-file-mode-line nil
-  "A string for definition buffer's `mode-line-format' in minor mode,
- `sos-navigation-mode'.")
-
-;; TODO: remove it.
-(defvar sos-file-name nil
-  "Cache file name for `sos-navigation-mode'. It ")
-
-;; TODO: remove it.
-(defvar sos-file-linum nil
-  "Cache line number for `sos-navigation-mode'.")
-
-(defvar sos-index 0
-  "The index of current candidate in the list.")
-
 (defmacro sos-with-definition-buffer (&rest body)
   "Get definition buffer and window ready then interpret the `body'."
   (declare (indent 0) (debug t))
@@ -98,10 +83,7 @@
         (kill-buffer sos-definition-buffer))
       (setq sos-definition-buffer nil
             sos-definition-window nil
-            sos-hl-overlay nil
-            sos-file-name nil
-            sos-file-linum nil
-            sos-file-mode-line nil))))
+            sos-hl-overlay nil))))
 
 (defun sos-hl-word (hl-word)
   (move-overlay sos-hl-overlay 1 1)
@@ -126,28 +108,25 @@
      (sos-toggle-definition-buffer&window -1))
     (:show
      (sos-toggle-definition-buffer&window 1)
+     (setq sos-index (if (sos-is-single-candidate)
+                         0
+                       ;; TODO: remember user choice at last session in the prj.
+                       0))
      (when sos-candidates
-       (if (sos-is-single-candidate)
-           ;; TODO: update `sos-index'.
-           ;; TODO: delete margin.
-           (setq sos-index 0)
-         ;; TODO: create margin.
-         (setq sos-index 0))
        (let* ((candidate (nth sos-index sos-candidates))
               (doc (plist-get candidate :doc))
               (file (plist-get candidate :file))
               (linum (plist-get candidate :linum))
               (hl-word (plist-get candidate :hl-word))
               (mode-line (plist-get candidate :mode-line))
+              (header-mode-line (sos-header-mode-line))
+              (button-mode-line (sos-button-mode-line mode-line file linum))
               (func (plist-get candidate :funcall)))
          (cond
           ;; A file ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           ((and (stringp file)
                 (file-exists-p file))
            (sos-with-definition-buffer
-             (setq sos-file-name file
-                   sos-file-linum linum
-                   sos-file-mode-line mode-line)
              (insert-file-contents file nil nil nil t)
              ;; Find a appropriate major-mode for it.
              (dolist (mode auto-mode-alist)
@@ -162,13 +141,13 @@
                   (forward-line (- linum 1)))
              (recenter 3)
              ;; Highlight word.
-             (sos-hl-word hl-word)))
+             (sos-hl-word hl-word)
+             ;; Set header line and button line.
+             (setq header-line-format header-mode-line
+                   mode-line-format button-mode-line)))
 
           ;; A document string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           ((stringp doc)
-           (setq sos-file-name nil
-                 sos-file-linum 0
-                 sos-file-mode-line mode-line)
            (sos-with-definition-buffer
              (erase-buffer)
              (fundamental-mode)
@@ -179,22 +158,20 @@
              (goto-char (point-min))
              ;; Highlight word.
              (sos-hl-word hl-word)
+             ;; Set header line and button line.
+             (setq header-line-format header-mode-line
+                   mode-line-format button-mode-line)
              ;; Apply function provided by back-end.
              (and (functionp func)
-                  (funcall func))))))))
-    (:update
-     (let* ((candidate (nth sos-index sos-candidates))
-            (file (plist-get candidate :file)))
-       ;; Refresh buffer if file attribute is different from `sos-file-name'.
-       (unless (or (string= file sos-file-name)
-                   (buffer-file-name sos-definition-buffer))
-         (sos-definition-buffer-frontend :show))))))
+                  (funcall func))))))))))
 
 ;;;###autoload
 (defun sos-tips-frontend (command)
   (and sos-tips (memq command '(:show :update))
        (let* ((tips (nth sos-index sos-tips)))
-         (and tips (message tips)))))
+         (and tips
+              ;; (message tips)
+              ))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -208,21 +185,33 @@
 (defvar sos-goto-file-map nil)
 (defvar sos-goto-file-linum-map nil)
 
-(defun sos-navigation-mode-line ()
+(defun sos-header-mode-line ()
+  (unless (sos-is-single-candidate)
+    `(,(propertize " < "
+                   'face 'button
+                   'mouse-face 'button)
+      ,(propertize " > "
+                   'face 'button
+                   'mouse-face 'button)
+      "  There're multiple candidates (implementing).")))
+
+(defun sos-button-mode-line (&optional desc file line)
+  ;; (setq sos-file-name file
+  ;;       sos-file-linum linum)
   `(,(propertize "  %b "
                  'face 'mode-line-buffer-id)
-    (:eval (and sos-file-mode-line
-                (concat "| " sos-file-mode-line)))
-    (:eval (and sos-file-name (file-exists-p sos-file-name)
-                (concat "| file:" (propertize (abbreviate-file-name sos-file-name)
+    (:eval (and ,desc
+                (concat "| " ,desc)))
+    (:eval (and ,file (file-exists-p ,file)
+                (concat "| file:" (propertize (abbreviate-file-name ,file)
                                               'local-map sos-goto-file-map
                                               'face 'link
-                                              'mouse-face 'mode-line-highlight)
-                        (and sos-file-linum
-                             (concat ", line:" (propertize (format "%d" sos-file-linum)
+                                              'mouse-face 'link)
+                        (and ,line
+                             (concat ", line:" (propertize (format "%d" ,line)
                                                            'local-map sos-goto-file-linum-map
                                                            'face 'link
-                                                           'mouse-face 'mode-line-highlight)))
+                                                           'mouse-face 'link)))
                         ", function:(yet supported)")))))
 
 ;;;###autoload
@@ -232,9 +221,9 @@
   :group 'sos-group
   (if sos-navigation-mode
       (progn
-        (setq mode-line-format (sos-navigation-mode-line)
-              buffer-read-only t))
+        (setq buffer-read-only t))
     (setq buffer-read-only nil)
-    (mapc 'kill-local-variable '(mode-line-format))))
+    (mapc 'kill-local-variable '(header-line-format
+                                 mode-line-format))))
 
 (provide 'sos-basic-frontend)
