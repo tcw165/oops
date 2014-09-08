@@ -166,7 +166,9 @@
 
           ;; A document string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           ((stringp doc)
-           (setq sos-file-mode-line mode-line)
+           (setq sos-file-name nil
+                 sos-file-linum 0
+                 sos-file-mode-line mode-line)
            (sos-with-definition-buffer
              (erase-buffer)
              (fundamental-mode)
@@ -209,19 +211,19 @@
 (defun sos-navigation-mode-line ()
   `(,(propertize "  %b "
                  'face 'mode-line-buffer-id)
-    (:eval (or (and sos-file-mode-line
-                    (concat "| " sos-file-mode-line))
-               (and sos-file-name (file-exists-p sos-file-name)
-                    (concat "| file:" (propertize (abbreviate-file-name sos-file-name)
-                                                  'local-map sos-goto-file-map
-                                                  'face 'link
-                                                  'mouse-face 'mode-line-highlight)
-                            (and sos-file-linum
-                                 (concat ", line:" (propertize (format "%d" sos-file-linum)
-                                                               'local-map sos-goto-file-linum-map
-                                                               'face 'link
-                                                               'mouse-face 'mode-line-highlight)))
-                            ", function:(yet supported)"))))))
+    (:eval (and sos-file-mode-line
+                (concat "| " sos-file-mode-line)))
+    (:eval (and sos-file-name (file-exists-p sos-file-name)
+                (concat "| file:" (propertize (abbreviate-file-name sos-file-name)
+                                              'local-map sos-goto-file-map
+                                              'face 'link
+                                              'mouse-face 'mode-line-highlight)
+                        (and sos-file-linum
+                             (concat ", line:" (propertize (format "%d" sos-file-linum)
+                                                           'local-map sos-goto-file-linum-map
+                                                           'face 'link
+                                                           'mouse-face 'mode-line-highlight)))
+                        ", function:(yet supported)")))))
 
 ;;;###autoload
 (define-minor-mode sos-navigation-mode

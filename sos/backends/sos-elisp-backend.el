@@ -71,18 +71,22 @@ LIBRARY should be a string (the name of the library)."
            (linum (sos-elisp-count-lines file name sos-elisp-find-feature-regexp)))
       `(:file ,file :linum ,linum :hl-word ,name))))
 
-;; test `case'
 (defun sos-elisp-find-function (symb)
   "Return the candidate pointing to the definition of `symb'. It was written 
 refer to `find-function-noselect', `find-function-search-for-symbol' and 
 `describe-function'."
   (ignore-errors
     (let ((name (symbol-name symb))
-          (symb (find-function-advised-original symb)))
-      (if (subrp (symbol-function symb))
+          (real-symb symb))
+      ;; Try to dereference the symbol if it's a alias.
+      (while (symbolp (symbol-function real-symb))
+        (setq real-symb (symbol-function
+                         (find-function-advised-original real-symb))
+              name (symbol-name real-symb)))
+      (if (subrp (symbol-function real-symb))
           ;; Document struct ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-          (let* ((doc-raw (documentation symb t))
-                 (data (help-split-fundoc doc-raw symb))
+          (let* ((doc-raw (documentation real-symb t))
+                 (data (help-split-fundoc doc-raw real-symb))
                  (usage (car data))
                  (doc (cdr data)))
             (with-temp-buffer
@@ -94,10 +98,15 @@ refer to `find-function-noselect', `find-function-search-for-symbol' and
                      :mode-line ,(format "%s is a built-in Elisp function."
                                          (propertize name 'face 'link)))))
         ;; File struct ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-        (let* (
-               (file (sos-elisp-normalize-path (symbol-file symb 'defun)))
+        (let* ((file (sos-elisp-normalize-path (symbol-file real-symb 'defun)))
                (linum (sos-elisp-count-lines file name find-function-regexp)))
-          `(:file ,file :linum ,linum :hl-word ,name))))))
+          `(:file ,file :linum ,linum :hl-word ,name
+                  :mode-line ,(unless (eq real-symb symb)
+                                (format "%s is an alias of %s "
+                                        (propertize (symbol-name symb)
+                                                    'face 'link)
+                                        (propertize (symbol-name real-symb)
+                                                    'face 'link)))))))))
 
 ;; test: `buffer-file-name'
 (defun sos-elisp-find-variable (symb)
