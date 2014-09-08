@@ -147,9 +147,6 @@ The `base' should be a directory string and the `exclude' should be a list that 
 (setq company-idle-delay 0)
 (setq company-minimum-prefix-length 1)
 
-(require 'history)
-(require 'sos)
-(require 'prj)
 (require 'oops)
 (unless (prj-load-recent-project)
   (prj-load-project))

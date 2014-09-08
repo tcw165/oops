@@ -108,7 +108,6 @@ refer to `find-function-noselect', `find-function-search-for-symbol' and
                                         (propertize (symbol-name real-symb)
                                                     'face 'link)))))))))
 
-;; test: `buffer-file-name'
 (defun sos-elisp-find-variable (symb)
   "Return the candidate pointing to the definition of `symb'. It was written 
 refer to `find-variable-noselect', `find-function-search-for-symbol' and 
@@ -256,8 +255,8 @@ file-local variable.\n")
              candidates)
          ;; TODO: use tag system.
          (dolist (cand (list (sos-elisp-find-function symb)
-                             (sos-elisp-find-variable symb)
                              (sos-elisp-find-let-variable symb)
+                             (sos-elisp-find-variable symb)
                              (sos-elisp-find-face symb)
                              (sos-elisp-find-feature symb)))
            (and cand
