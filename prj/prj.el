@@ -380,7 +380,8 @@
 
 ;;;###autoload
 (defun prj-load-project ()
-  "List available prjects in current workspace and let user to choose which project to be loaded."
+  "List available prjects in current workspace and let user to choose which 
+project to be loaded."
   (interactive)
   (let (choices)
     ;; Find available directories which represent a project.
@@ -388,6 +389,9 @@
       (let ((config-file (format "%s/%s/%s" prj-workspace-path f prj-config-name)))
 	(when (file-exists-p config-file)
 	  (push f choices))))
+    ;; Prompt user to create project if no projects is in workspace.
+    (and (= 0 (length choices))
+         (prj-create-project))
     ;; Prompt user to load project.
     (let ((c (ido-completing-read "[Prj] Load project: " choices)))
       (unless (member c choices)

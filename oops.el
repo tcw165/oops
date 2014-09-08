@@ -42,16 +42,10 @@
 (require 'history)
 
 ;;; Oops library ===============================================================
-;; Core libraries:
-(require 'oops-win)
-;; Language libraries:
-(require 'oops-c-lib)
-(require 'oops-cpp-lib)
-(require 'oops-lisp-lib)
-(require 'oops-python-lib)
-
 (require 'sos)
 (require 'prj)
+(require 'oops-win)
+(require 'oops-lisp-lib)
 
 ;; TODO: customization.
 (defconst oops--hooks
@@ -62,75 +56,6 @@
     (emacs-lisp-mode-hook . hl-paren-mode))
   "An association list that indicates the bindings of major mode and minor mode. Its format should be (MAJOR-MODE-HOOK . MINOR-MODE-HOOK)")
 
-(defvar oops--idtimer nil
-  "An idle timer that ask `oops--idtimer-function' to do something.")
-
-(defun oops--idtimer-function ()
-  "The function for `oops--idtimer' do the following things:
-  * Detect the symbol nearby the `point', and show symbol's definition in another window. Normally, the definition window is under the current window."
-  (when oops-mode
-    (cond
-     ;; lisp
-     ((or (eq major-mode 'emacs-lisp-mode)
-          (eq major-mode 'lisp-interaction-mode))
-      (when oops--is-basic-perspective
-        (oops-lisp-show-help-atpt)
-        )
-      )
-     ;; c
-     ;; c++-mode
-     ;; python-mode
-     ;; eshell
-     )
-    )
-  )
-
-(defun oops--init-idtimer (enable)
-  "Create the `oops--idtimer' if `enable' is 1. Destory it if -1.
-
-!DO NOT use this function in your lisp, or there would be side effects!"
-  (if (> enable 0)
-      ;; Enable idle timer.
-      (when (null oops--idtimer)
-        (setq oops--idtimer (run-with-idle-timer 0.3 t 'oops--idtimer-function))
-        )
-    ;; Disable idle timer.
-    (when oops--idtimer
-      (cancel-timer oops--idtimer)
-      (setq oops--idtimer nil)
-      )
-    )
-  )
-
-;; (defun paradox-require (feature &optional filename noerror package refresh)
-;;   "A replacement for `require' which also installs the feature if it is absent.
-;; - If FEATURE is present, `require' it and return t.
-
-;; - If FEATURE is not present, install PACKAGE with `package-install'.
-;; If PACKAGE is nil, assume FEATURE is the package name.
-;; After installation, `require' FEATURE.
-
-;; FILENAME is passed to `require'.
-
-;; If NOERROR is non-nil, don't complain if the feature couldn't be
-;; installed, just return nil.
-
-;; By default, the current package database (stored in
-;; `package-archive-contents') is only updated if it is empty.
-;; Passing a non-nil REFRESH argument forces this update."
-;;   (or (require feature filename t)
-;;       (let ((package (or package
-;;                          (if (stringp feature)
-;;                              (intern feature)
-;;                            feature))))
-;;         (require 'package)
-;;         (unless (and package-archive-contents (null refresh))
-;;           (package-refresh-contents))
-;;         (and (condition-case e
-;;                  (package-install package)
-;;                (error (if noerror nil (error (cadr e)))))
-;;              (require feature filename noerror)))))
-
 ;;; Text Operation =============================================================
 
 ;;;###autoload
@@ -138,8 +63,7 @@
   "Discard the selection and then undo something."
   (interactive)
   (deactivate-mark)
-  (undo)
-  )
+  (undo))
 
 ;;;###autoload
 (defun oops-kill-buffer-or-window-or-frame (buffer-window-or-frame)
@@ -171,12 +95,8 @@
             end (save-excursion
                   (goto-char (region-end))
                   (end-of-line)
-                  (point))
-            )
-      )
-    (comment-or-uncomment-region beg end)
-    )
-  )
+                  (point))))
+    (comment-or-uncomment-region beg end)))
 
 ;;;###autoload
 (defun oops-duplicate-lines ()
@@ -200,21 +120,15 @@
                   (goto-char (region-end))
                   (beginning-of-line 2)
                   (point))
-            str (buffer-substring-no-properties beg end)
-            )
-      ;; (push-mark)
-      )
+            str (buffer-substring-no-properties beg end)))
     (save-excursion
       (if (and mark-active
                (> (mark) (point)))
           (goto-char (region-end)))
       (beginning-of-line 2)
-      (insert str)
-      )
+      (insert str))
     ;; Restore selection.
-    (setq deactivate-mark nil)
-    )
-  )
+    (setq deactivate-mark nil)))
 
 ;;;###autoload
 (defun oops-kill-lines ()
@@ -230,12 +144,8 @@
             end (save-excursion
                   (goto-char (region-end))
                   (beginning-of-line 2)
-                  (point))
-            )
-      )
-    (delete-region beg end)
-    )
-  )
+                  (point))))
+    (delete-region beg end)))
 
 ;;;###autoload
 (defun oops--move-lines (step)
@@ -263,9 +173,7 @@
                   (point))
             line-num (count-lines (region-beginning) (region-end))
             point-excursion (- (point) end)
-            mark-excursion (- (mark) (point))
-            )
-      )
+            mark-excursion (- (mark) (point))))
     ;; Extract region.
     (setq text (delete-and-extract-region beg end))
     ;; Move upward/downward and insert the cut region.
@@ -277,24 +185,19 @@
     (when mark-active
       (deactivate-mark)
       (set-mark (+ (point) mark-excursion))
-      (setq deactivate-mark nil)
-      )
-    )
-  )
+      (setq deactivate-mark nil))))
 
 ;;;###autoload
 (defun oops-move-lines-up ()
   "Move the current line or the lines covered by region upward without modifying `kill-ring'."
   (interactive)
-  (oops--move-lines -1)
-  )
+  (oops--move-lines -1))
 
 ;;;###autoload
 (defun oops-move-lines-down ()
   "Move the current line or the lines covered by region downward without modifying `kill-ring'."
   (interactive)
-  (oops--move-lines 1)
-  )
+  (oops--move-lines 1))
 
 ;;;###autoload
 (defun oops-indent-or-company ()
@@ -319,13 +222,7 @@ For Python, it doesn't support yet."
    ;; lisp
    ((memq major-mode (list 'emacs-lisp-mode
                            'lisp-interaction-mode))
-    (oops-lisp-jump-to-definition-atpt)
-    )
-   ;; c
-   ;; c++
-   ;; python
-   )
-  )
+    (oops-lisp-jump-to-definition-atpt))))
 
 ;;;###autoload
 (defun oops-goto-global-symbol ()
@@ -334,13 +231,7 @@ For Python, it doesn't support yet."
   (cond
    ;; lisp
    ((memq major-mode (list 'emacs-lisp-mode
-                           'lisp-interaction-mode))
-    )
-   ;; c
-   ;; c++
-   ;; python
-   )
-  )
+                           'lisp-interaction-mode)))))
 
 ;;;###autoload
 (defun oops-goto-local-symbol ()
@@ -349,13 +240,7 @@ For Python, it doesn't support yet."
    ;; lisp
    ((memq major-mode (list 'emacs-lisp-mode
                            'lisp-interaction-mode))
-    (oops-lisp-goto-lsymb)
-    )
-   ;; c
-   ;; c++
-   ;; python
-   )
-  )
+    (oops-lisp-goto-lsymb))))
 
 ;;;###autoload
 (defun oops-common-escape ()
@@ -383,27 +268,5 @@ or go back to just one window (by deleting all but the selected window)."
     (bury-buffer))
    ((featurep 'company)
     (company-cancel))))
-
-;;; Others =====================================================================
-
-;;;###autoload
-(define-minor-mode oops-mode
-  ""
-  :lighter " Oops"
-  :global t
-
-  (dolist (l oops--hooks)
-    (remove-hook (car l) (cdr l))
-    )
-  (oops--init-idtimer -1)
-  (oops-win-mode -1)
-  (when oops-mode
-    (dolist (l oops--hooks)
-      (add-hook (car l) (cdr l))
-      )
-    (oops--init-idtimer 1)
-    (oops-win-mode 1)
-    )
-  )
 
 (provide 'oops)

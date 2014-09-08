@@ -151,7 +151,6 @@ The `base' should be a directory string and the `exclude' should be a list that 
 (require 'sos)
 (require 'prj)
 (require 'oops)
-(oops-mode 1)
 (unless (prj-load-recent-project)
   (prj-load-project))
 
