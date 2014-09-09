@@ -30,6 +30,8 @@
 ;; 2014-10-01 (0.0.1)
 ;;    Initial release.
 
+(require 'thingatpt)
+
 ;;;###autoload
 (defun sos-definition-buffer-frontend (command)
   (case command
@@ -124,9 +126,28 @@
   "Cache the current content of definition buffer when navigating into deeper.")
 
 ;; TODO: keymap.
-(defvar sos-navigation-map nil)
-(defvar sos-goto-file-map nil)
-(defvar sos-goto-file-linum-map nil)
+(defvar sos-navigation-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [left] (lambda ()
+                             (interactive)
+                             (forward-symbol -1)))
+    (define-key map [right] (lambda ()
+                              (interactive)
+                              (forward-symbol 1)))
+    (define-key map [return] (lambda ()
+                               (interactive)
+                               (message "\"Jump to definition\" is yet supported!")))
+    map))
+
+(defvar sos-goto-file-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [mode-line mouse-1] 'beginning-of-defun)
+    (define-key map [mode-line mouse-3] 'end-of-defun)
+    map))
+(defvar sos-goto-file-linum-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [mode-line mouse-1] 'beginning-of-defun)
+    map))
 
 (defmacro sos-with-definition-buffer (&rest body)
   "Get definition buffer and window ready then interpret the `body'."
@@ -206,22 +227,25 @@
       "  There're multiple candidates (implementing).")))
 
 (defun sos-button-mode-line (&optional desc file line)
-  ;; (setq sos-file-name file
-  ;;       sos-file-linum linum)
-  `(,(propertize "  %b "
+  `(,(propertize "  *Definition* "
                  'face 'mode-line-buffer-id)
     (:eval (and ,desc
                 (concat "| " ,desc)))
     (:eval (and ,file (file-exists-p ,file)
-                (concat "| file:" (propertize (abbreviate-file-name ,file)
-                                              'local-map sos-goto-file-map
-                                              'face 'link
-                                              'mouse-face 'link)
+                (concat "| file:"
+                        (propertize (abbreviate-file-name ,file)
+                                    'local-map sos-goto-file-map
+                                    'face 'link
+                                    'mouse-face 'link
+                                    'help-echo "mouse-1: Open the file.\n\
+mouse-3: Copy the path.")
                         (and ,line
-                             (concat ", line:" (propertize (format "%d" ,line)
-                                                           'local-map sos-goto-file-linum-map
-                                                           'face 'link
-                                                           'mouse-face 'link)))
+                             (concat ", line:"
+                                     (propertize (format "%d" ,line)
+                                                 'local-map sos-goto-file-linum-map
+                                                 'face 'link
+                                                 'mouse-face 'link
+                                                 'help-echo "mouse-1: Back to the line.")))
                         ", function:(yet supported)")))))
 
 ;;;###autoload
@@ -231,7 +255,7 @@
   :group 'sos-group
   (if sos-navigation-mode
       (progn
-        )
+        (use-local-map sos-navigation-map))
     ))
 
 (provide 'sos-basic-frontend)

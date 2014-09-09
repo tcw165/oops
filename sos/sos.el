@@ -134,6 +134,7 @@ Return value will be cached to `sos-candidates'.
 (defvar sos-timer nil)
 
 (defvar sos-cached-buffer nil)
+(defvar sos-cached-window nil)
 
 (defvar sos-backend nil
   "The back-end which takes control of current session in the back-ends list.")
@@ -228,8 +229,9 @@ If you want to skip additional commands, try example:
 
      ;; Something ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
      (t
-      (if (and (equal symb sos-symbol)
-               (equal (current-buffer) sos-cached-buffer))
+      (if (and (eq symb sos-symbol)
+               (eq (current-buffer) sos-cached-buffer)
+               (eq (current-buffer) sos-cached-window))
           (progn
             ;; If return symbol string is equal to `sos-symbol', ask front-ends
             ;; to do `:update' task.
@@ -246,7 +248,8 @@ If you want to skip additional commands, try example:
               (sos-call-frontends :show))
           ;; (message "(%s) sos-normal-process: hide" (current-time))
           (sos-call-frontends :hide)))
-      (setq sos-cached-buffer (current-buffer))))))
+      (setq sos-cached-buffer (current-buffer)
+            sos-cached-window (selected-window))))))
 
 (defun sos-kill-local-variables ()
   (mapc 'kill-local-variable '(sos-backend
