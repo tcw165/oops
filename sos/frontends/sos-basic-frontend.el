@@ -170,19 +170,21 @@
      (set-window-buffer sos-def-win sos-def-buf t)
      (with-selected-window sos-def-win
        (with-current-buffer sos-def-buf
-         ;; Make it read-writeable.
-         (setq buffer-read-only nil)
-         ;; Overlays
-         (unless (and sos-hl-overlay
-                      (buffer-live-p (overlay-buffer sos-hl-overlay)))
-           (setq sos-hl-overlay (make-overlay 1 1)))
-         (overlay-put sos-hl-overlay 'face sos-hl-face)
-         ;; `body' >>>
-         (ignore-errors
-           (progn ,@body))
-         ;; Make it read-only.
-         (setq buffer-read-only t)
-         (sos-navigation-mode 1)))))
+         (let (ret)
+           ;; Make it read-writeable.
+           (setq buffer-read-only nil)
+           ;; Overlays
+           (unless (and sos-hl-overlay
+                        (buffer-live-p (overlay-buffer sos-hl-overlay)))
+             (setq sos-hl-overlay (make-overlay 1 1)))
+           (overlay-put sos-hl-overlay 'face sos-hl-face)
+           ;; `body' >>>
+           (ignore-errors
+             (setq ret (progn ,@body)))
+           ;; Make it read-only.
+           (setq buffer-read-only t)
+           (sos-navigation-mode 1)
+           ret)))))
 
 (defun sos-toggle-definition-buffer&window (toggle)
   "Display or hide the `sos-def-buf' and `sos-def-win'."
@@ -218,24 +220,62 @@
                   (propertize (format "%s" linum)
                               'face 'font-lock-string-face)))))
 
+(defun sos-ml-info ()
+  "Get file and line number from definition buffer's `mode-line-format'.
+Return (FILE . LINUM) struct."
+  (sos-with-definition-buffer
+    (let* ((text (pp-to-string mode-line-format))
+           (beg (string-match "(file-exists-p \".+\")" text))
+           (end (match-end 0))
+           (file (and beg end
+                      (substring text
+                                 (+ beg 16)
+                                 (- end 2))))
+           (beg (string-match "(integerp [0-9]+)" text))
+           (end (match-end 0))
+           (linum (and beg end
+                       (string-to-int
+                        (substring text
+                                   (+ beg 10)
+                                   (- end 1))))))
+      ;; (message "%s" text)
+      ;; (message "%s-%s %s:%s" beg end file linum)
+      (cons file linum))))
+
 (defun sos-ml-open-file ()
   "Open file refer to `mode-line-format'."
   (interactive)
-  (sos-with-definition-buffer
-    (let ()
-      (message "%s" mode-line-format))))
+  (let* ((info (sos-ml-info))
+         (file (car info))
+         (linum (cdr info)))
+    (and (file-exists-p file)
+         (integerp linum)
+         (window-live-p sos-cached-window)
+         (with-selected-window sos-cached-window
+           (find-file file)
+           (goto-line linum)
+           (recenter 3)))))
 
 (defun sos-ml-copy-path ()
   "Copy file path refer to `mode-line-format'."
   (interactive)
-  (let ()
-    ))
+  (let* ((info (sos-ml-info))
+         (file (car info)))
+    (and file
+         (with-temp-buffer
+           (insert file)
+           (clipboard-kill-ring-save 1 (point-max))
+           (message "File path is copied to clipboard!")))))
 
 (defun sos-ml-goto-line ()
   "Go to line refer to `mode-line-format'."
   (interactive)
-  (let ()
-    ))
+  (let* ((info (sos-ml-info))
+         (linum (cdr info)))
+    (and (integerp linum)
+         (sos-with-definition-buffer
+           (goto-line linum)
+           (recenter 3)))))
 
 (defun sos-header-mode-line ()
   (when (sos-is-multiple-candidates)
@@ -252,7 +292,7 @@
                  'face 'mode-line-buffer-id)
     (:eval (and ,desc
                 (concat "| " ,desc)))
-    (:eval (and ,file (file-exists-p ,file)
+    (:eval (and (file-exists-p ,file)
                 (concat "| file:"
                         (propertize (abbreviate-file-name ,file)
                                     'local-map sos-goto-file-map
@@ -260,7 +300,7 @@
                                     'mouse-face 'link
                                     'help-echo "mouse-1: Open the file.\n\
 mouse-3: Copy the path.")
-                        (and ,line
+                        (and (integerp ,line)
                              (concat ", line:"
                                      (propertize (format "%d" ,line)
                                                  'local-map sos-goto-file-linum-map

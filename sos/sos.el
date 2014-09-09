@@ -131,10 +131,14 @@ Return value will be cached to `sos-candidates'.
   "The idle delay in seconds until sos starts automatically."
   :type '(number :tag "Seconds"))
 
-(defvar sos-timer nil)
+(defvar sos-timer nil
+  "The idle timer to call `sos-idle-begin'.")
 
-(defvar sos-cached-buffer nil)
-(defvar sos-cached-window nil)
+(defvar sos-cached-buffer nil
+  "The current source code buffer.")
+
+(defvar sos-cached-window nil
+  "The current window where the source code buffer is at.")
 
 (defvar sos-backend nil
   "The back-end which takes control of current session in the back-ends list.")
