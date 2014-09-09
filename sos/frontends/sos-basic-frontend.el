@@ -30,35 +30,128 @@
 ;; 2014-10-01 (0.0.1)
 ;;    Initial release.
 
-(defvar sos-definition-buffer nil)
+;;;###autoload
+(defun sos-definition-buffer-frontend (command)
+  (case command
+    (:init (sos-toggle-definition-buffer&window 1))
+    (:destroy
+     (and (window-live-p sos-def-win)
+          (setq sos-def-win-height (window-height sos-def-win)))
+     (sos-toggle-definition-buffer&window -1))
+    (:show
+     (let* ((candidate (nth sos-index sos-candidates))
+            (doc (plist-get candidate :doc))
+            (file (plist-get candidate :file))
+            (linum (plist-get candidate :linum))
+            (hl-word (plist-get candidate :hl-word))
+            (mode-line (plist-get candidate :mode-line))
+            (header-mode-line (sos-header-mode-line))
+            (button-mode-line (sos-button-mode-line mode-line file linum)))
+       (sos-toggle-definition-buffer&window 1)
+       ;; TODO: remember user choice at last session in the prj.
+       (setq sos-def-stack nil
+             sos-index 0)
+       (cond
+        ;; A file ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+        ((and (stringp file)
+              (file-exists-p file))
+         (sos-with-definition-buffer
+           (insert-file-contents file nil nil nil t)
+           ;; Find a appropriate major-mode for it.
+           (dolist (mode auto-mode-alist)
+             (and (not (null (cdr mode)))
+                  (string-match (car mode) file)
+                  (funcall (cdr mode))))
+           (and (featurep 'hl-line)
+                (hl-line-unhighlight))
+           ;; Move point and recenter.
+           (and (integerp linum)
+                (goto-char (point-min))
+                (forward-line (- linum 1)))
+           (recenter 3)
+           ;; Highlight word.
+           (sos-hl-word hl-word)
+           ;; Set header line and button line.
+           (setq header-line-format header-mode-line
+                 mode-line-format button-mode-line)))
 
-(defvar sos-definition-window nil)
+        ;; A document string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+        ((stringp doc)
+         (sos-with-definition-buffer
+           (erase-buffer)
+           (fundamental-mode)
+           (and (featurep 'hl-line)
+                (hl-line-unhighlight))
+           (insert doc)
+           ;; Move point
+           (goto-char (point-min))
+           ;; Highlight word.
+           (sos-hl-word hl-word)
+           ;; Set header line and button line.
+           (setq header-line-format header-mode-line
+                 mode-line-format button-mode-line))))))))
 
-(defvar sos-definition-window-height 0)
+;;;###autoload
+(defun sos-tips-frontend (command)
+  (and sos-tips (memq command '(:show :update))
+       (let* ((tips (nth sos-index sos-tips)))
+         (and tips
+              ;; (message tips)
+              ))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defface sos-hl
+  '((t (:background "yellow" :foreground "black" :weight bold :height 2.0)))
+  "Default face for highlighting keyword in definition window."
+  :group 'sos-group)
+
+(defvar sos-hl-face 'sos-hl)
+
+(defvar sos-hl-overlay nil
+  "The overlay for `sos-definition-buffer'.")
+
+(defvar sos-def-buf nil
+  "Definition buffer.")
+
+(defvar sos-def-win nil
+  "Definition window.")
+
+(defvar sos-def-win-height 0
+  "The height of definition window.")
+
+(defvar sos-def-stack nil
+  "Cache the current content of definition buffer when navigating into deeper.")
+
+;; TODO: keymap.
+(defvar sos-navigation-map nil)
+(defvar sos-goto-file-map nil)
+(defvar sos-goto-file-linum-map nil)
 
 (defmacro sos-with-definition-buffer (&rest body)
   "Get definition buffer and window ready then interpret the `body'."
   (declare (indent 0) (debug t))
   `(progn
-     (unless sos-definition-buffer
-       (setq sos-definition-buffer (get-buffer-create "*Definition*")))
-     (unless (window-live-p sos-definition-window)
+     (unless sos-def-buf
+       (setq sos-def-buf (get-buffer-create "*Definition*")))
+     (unless (window-live-p sos-def-win)
        (let* ((win (cond
                     ;; Outline window is present ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                     ;; Default ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                     (t (frame-root-window))))
-              (height (or (and (> sos-definition-window-height 0)
-                               (- 0 sos-definition-window-height))
+              (height (or (and (> sos-def-win-height 0)
+                               (- 0 sos-def-win-height))
                           (and win
                                (/ (window-height win) -3)))))
          (and win height
-              (setq sos-definition-window (split-window win height 'below)))))
+              (setq sos-def-win (split-window win height 'below)))))
      ;; Bind definition buffer to definition window.
-     (set-window-buffer sos-definition-window sos-definition-buffer t)
-     (with-selected-window sos-definition-window
-       (with-current-buffer sos-definition-buffer
-         ;; Disable minor modes (read-write enabled, ...etc) and update buffer.
-         (sos-navigation-mode -1)
+     (set-window-buffer sos-def-win sos-def-buf t)
+     (with-selected-window sos-def-win
+       (with-current-buffer sos-def-buf
+         (setq buffer-read-only nil
+               header-line-format (sos-header-mode-line)
+               mode-line-format (sos-button-mode-line))
          ;; Overlays
          (unless (and sos-hl-overlay
                       (buffer-live-p (overlay-buffer sos-hl-overlay)))
@@ -67,23 +160,27 @@
          ;; `body' >>>
          (ignore-errors
            (progn ,@body))
-         ;; Enable minor modes (read-only, ...etc).
+         (setq buffer-read-only t)
          (sos-navigation-mode 1)))))
 
 (defun sos-toggle-definition-buffer&window (toggle)
-  "Display or hide the `sos-definition-buffer' and `sos-definition-window'."
+  "Display or hide the `sos-def-buf' and `sos-def-win'."
   (let ((enabled (or (and (booleanp toggle) toggle)
                      (and (numberp toggle)
                           (> toggle 0)))))
     (if enabled
         (sos-with-definition-buffer)
-      (when (windowp sos-definition-window)
-        (delete-window sos-definition-window))
-      (when (bufferp sos-definition-buffer)
-        (kill-buffer sos-definition-buffer))
-      (setq sos-definition-buffer nil
-            sos-definition-window nil
+      (when (windowp sos-def-win)
+        (delete-window sos-def-win))
+      (when (bufferp sos-def-buf)
+        (kill-buffer sos-def-buf))
+      (setq sos-def-buf nil
+            sos-def-win nil
             sos-hl-overlay nil))))
+
+(defun sos-is-defintion-buffer&window ()
+  (or (eq (current-buffer) sos-def-buf)
+      (eq (selected-window) sos-def-win)))
 
 (defun sos-hl-word (hl-word)
   (move-overlay sos-hl-overlay 1 1)
@@ -98,95 +195,8 @@
                   (propertize (format "%s" linum)
                               'face 'font-lock-string-face)))))
 
-;;;###autoload
-(defun sos-definition-buffer-frontend (command)
-  (case command
-    (:init (sos-toggle-definition-buffer&window 1))
-    (:destroy
-     (and (window-live-p sos-definition-window)
-          (setq sos-definition-window-height (window-height sos-definition-window)))
-     (sos-toggle-definition-buffer&window -1))
-    (:show
-     (sos-toggle-definition-buffer&window 1)
-     (setq sos-index (if (sos-is-single-candidate)
-                         0
-                       ;; TODO: remember user choice at last session in the prj.
-                       0))
-     (when sos-candidates
-       (let* ((candidate (nth sos-index sos-candidates))
-              (doc (plist-get candidate :doc))
-              (file (plist-get candidate :file))
-              (linum (plist-get candidate :linum))
-              (hl-word (plist-get candidate :hl-word))
-              (mode-line (plist-get candidate :mode-line))
-              (header-mode-line (sos-header-mode-line))
-              (button-mode-line (sos-button-mode-line mode-line file linum))
-              (func (plist-get candidate :funcall)))
-         (cond
-          ;; A file ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-          ((and (stringp file)
-                (file-exists-p file))
-           (sos-with-definition-buffer
-             (insert-file-contents file nil nil nil t)
-             ;; Find a appropriate major-mode for it.
-             (dolist (mode auto-mode-alist)
-               (and (not (null (cdr mode)))
-                    (string-match (car mode) file)
-                    (funcall (cdr mode))))
-             (and (featurep 'hl-line)
-                  (hl-line-unhighlight))
-             ;; Move point and recenter.
-             (and (integerp linum)
-                  (goto-char (point-min))
-                  (forward-line (- linum 1)))
-             (recenter 3)
-             ;; Highlight word.
-             (sos-hl-word hl-word)
-             ;; Set header line and button line.
-             (setq header-line-format header-mode-line
-                   mode-line-format button-mode-line)))
-
-          ;; A document string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-          ((stringp doc)
-           (sos-with-definition-buffer
-             (erase-buffer)
-             (fundamental-mode)
-             (and (featurep 'hl-line)
-                  (hl-line-unhighlight))
-             (insert doc)
-             ;; Move point
-             (goto-char (point-min))
-             ;; Highlight word.
-             (sos-hl-word hl-word)
-             ;; Set header line and button line.
-             (setq header-line-format header-mode-line
-                   mode-line-format button-mode-line)
-             ;; Apply function provided by back-end.
-             (and (functionp func)
-                  (funcall func))))))))))
-
-;;;###autoload
-(defun sos-tips-frontend (command)
-  (and sos-tips (memq command '(:show :update))
-       (let* ((tips (nth sos-index sos-tips)))
-         (and tips
-              ;; (message tips)
-              ))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defcustom sos-navigation-mode-hook '()
-  "Hook run when entering `prj-grep-mode' mode."
-  :type 'hook
-  :group 'sos-group)
-
-;; TODO: keymap.
-(defvar sos-navigation-map nil)
-(defvar sos-goto-file-map nil)
-(defvar sos-goto-file-linum-map nil)
-
 (defun sos-header-mode-line ()
-  (unless (sos-is-single-candidate)
+  (when (sos-is-multiple-candidates)
     `(,(propertize " < "
                    'face 'button
                    'mouse-face 'button)
@@ -221,9 +231,7 @@
   :group 'sos-group
   (if sos-navigation-mode
       (progn
-        (setq buffer-read-only t))
-    (setq buffer-read-only nil)
-    (mapc 'kill-local-variable '(header-line-format
-                                 mode-line-format))))
+        )
+    ))
 
 (provide 'sos-basic-frontend)

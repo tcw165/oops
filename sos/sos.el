@@ -43,11 +43,6 @@
 meaningful information around the point."
   :tag "Sos")
 
-(defface sos-hl
-  '((t (:background "yellow" :foreground "black" :weight bold :height 2.0)))
-  "Default face for highlighting the current line in Hl-Line mode."
-  :group 'sos-group)
-
 (defcustom sos-frontends '(sos-definition-buffer-frontend
                            sos-tips-frontend)
   "The list of front-ends for the purpose of visualization.
@@ -116,13 +111,16 @@ Return value will be cached to `sos-candidates'.
  ### If candidate is a file...
  ((:file STRING
    :linum INTEGER
+   :type STRING
    :hl-word STRING
    :mode-line STRING) (...) ...)
 
  ### If candidate is a document string...
  ((:doc STRING
-   :mode-line STRING
-   :funcall FUNCTION) (...) ...)
+   :linum INTEGER
+   :type STRING
+   :hl-word STRING
+   :mode-line STRING) (...) ...)
 
 ### Optional commands:
 `:tips': ."
@@ -136,11 +134,6 @@ Return value will be cached to `sos-candidates'.
 (defvar sos-timer nil)
 
 (defvar sos-cached-buffer nil)
-
-(defvar sos-hl-face 'sos-hl)
-
-(defvar sos-hl-overlay nil
-  "The overlay for `sos-definition-buffer'.")
 
 (defvar sos-backend nil
   "The back-end which takes control of current session in the back-ends list.")
@@ -181,8 +174,8 @@ If you want to skip additional commands, try example:
                          ;; Additional commands.
                          ,@commands)))
 
-(defun sos-is-single-candidate ()
-  (= (length sos-candidates) 1))
+(defun sos-is-multiple-candidates ()
+  (> (length sos-candidates) 1))
 
 (defun sos-pre-command ()
   (when sos-timer
@@ -201,8 +194,7 @@ If you want to skip additional commands, try example:
 
 (defun sos-is-idle-begin ()
   (not (or (active-minibuffer-window)
-           (eq (current-buffer) sos-definition-buffer)
-           (eq (selected-window) sos-definition-window)
+           (sos-is-defintion-buffer&window)
            (sos-is-skip-command))))
 
 (defun sos-idle-begin ()
@@ -280,8 +272,7 @@ If you want to skip additional commands, try example:
 (define-minor-mode sos-definition-window-mode
   "This local minor mode gethers symbol returned from backends around the point 
 and show the reference visually through frontends. Usually frontends output the 
-result to the `sos-definition-buffer' displayed in the `sos-definition-window'. 
-Show or hide these buffer and window are controlled by `sos-watchdog-mode'."
+result to the `sos-def-buf' displayed in the `sos-def-win'."
   :lighter " SOS:def"
   :global t
   :group 'sos-group

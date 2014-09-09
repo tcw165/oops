@@ -69,7 +69,7 @@ LIBRARY should be a string (the name of the library)."
                                   (or find-function-source-path load-path)
                                   load-file-rep-suffixes)))
            (linum (sos-elisp-count-lines file name sos-elisp-find-feature-regexp)))
-      `(:file ,file :linum ,linum :hl-word ,name))))
+      `(:file ,file :linum ,linum :type "feature" :hl-word ,name))))
 
 (defun sos-elisp-find-function (symb)
   "Return the candidate pointing to the definition of `symb'. It was written 
@@ -94,13 +94,13 @@ refer to `find-function-noselect', `find-function-search-for-symbol' and
               (princ usage)
               (terpri)(terpri)
               (princ doc)
-              `(:doc ,(buffer-string) :linum 1 :hl-word ,name
+              `(:doc ,(buffer-string) :linum 1 :type "function" :hl-word ,name
                      :mode-line ,(format "%s is a built-in Elisp function."
                                          (propertize name 'face 'link)))))
         ;; File struct ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
         (let* ((file (sos-elisp-normalize-path (symbol-file real-symb 'defun)))
                (linum (sos-elisp-count-lines file name find-function-regexp)))
-          `(:file ,file :linum ,linum :hl-word ,name
+          `(:file ,file :linum ,linum :type "function" :hl-word ,name
                   :mode-line ,(unless (eq real-symb symb)
                                 (format "%s is an alias of %s "
                                         (propertize (symbol-name symb)
@@ -119,7 +119,7 @@ refer to `find-variable-noselect', `find-function-search-for-symbol' and
           ;; File struct ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           (let* ((file (sos-elisp-normalize-path file))
                  (linum (sos-elisp-count-lines file name find-variable-regexp)))
-            `(:file ,file :linum ,linum :hl-word ,name))
+            `(:file ,file :linum ,linum :type "variable" :hl-word ,name))
         ;; Document struct ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
         (let ((doc (documentation-property symb 'variable-documentation))
               val locus)
@@ -212,7 +212,7 @@ file-local variable.\n")
                            (format "`%s'.\n" safe-var))))
                 (and extra-line (terpri)))
               (princ (format "Documentation:\n%s" doc))
-              `(:doc ,(buffer-string) :linum 1 :hl-word ,name
+              `(:doc ,(buffer-string) :linum 1 :type "variable" :hl-word ,name
                      :mode-line ,(format "%s is a built-in Elisp variable."
                                          (propertize name 'face 'link))))))))))
 
@@ -226,7 +226,7 @@ file-local variable.\n")
            (name (symbol-name symb))
            (file (sos-elisp-normalize-path file))
            (linum (sos-elisp-count-lines file name find-face-regexp)))
-      `(:file ,file :linum ,linum :hl-word ,name))))
+      `(:file ,file :linum ,linum :type "face" :hl-word ,name))))
 
 (defun sos-elisp-thingatpt ()
   "Find symbol string around the point or text selection."
