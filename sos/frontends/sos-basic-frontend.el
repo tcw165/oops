@@ -141,12 +141,12 @@
 
 (defvar sos-goto-file-map
   (let ((map (make-sparse-keymap)))
-    (define-key map [mode-line mouse-1] 'beginning-of-defun)
-    (define-key map [mode-line mouse-3] 'end-of-defun)
+    (define-key map [mode-line mouse-1] 'sos-ml-open-file)
+    (define-key map [mode-line mouse-3] 'sos-ml-copy-path)
     map))
 (defvar sos-goto-file-linum-map
   (let ((map (make-sparse-keymap)))
-    (define-key map [mode-line mouse-1] 'beginning-of-defun)
+    (define-key map [mode-line mouse-1] 'sos-ml-goto-line)
     map))
 
 (defmacro sos-with-definition-buffer (&rest body)
@@ -170,9 +170,8 @@
      (set-window-buffer sos-def-win sos-def-buf t)
      (with-selected-window sos-def-win
        (with-current-buffer sos-def-buf
-         (setq buffer-read-only nil
-               header-line-format (sos-header-mode-line)
-               mode-line-format (sos-button-mode-line))
+         ;; Make it read-writeable.
+         (setq buffer-read-only nil)
          ;; Overlays
          (unless (and sos-hl-overlay
                       (buffer-live-p (overlay-buffer sos-hl-overlay)))
@@ -181,6 +180,7 @@
          ;; `body' >>>
          (ignore-errors
            (progn ,@body))
+         ;; Make it read-only.
          (setq buffer-read-only t)
          (sos-navigation-mode 1)))))
 
@@ -190,7 +190,9 @@
                      (and (numberp toggle)
                           (> toggle 0)))))
     (if enabled
-        (sos-with-definition-buffer)
+        (sos-with-definition-buffer
+          (setq header-line-format (sos-header-mode-line)
+                mode-line-format (sos-button-mode-line)))
       (when (windowp sos-def-win)
         (delete-window sos-def-win))
       (when (bufferp sos-def-buf)
@@ -215,6 +217,25 @@
                               'face 'font-lock-string-face)
                   (propertize (format "%s" linum)
                               'face 'font-lock-string-face)))))
+
+(defun sos-ml-open-file ()
+  "Open file refer to `mode-line-format'."
+  (interactive)
+  (sos-with-definition-buffer
+    (let ()
+      (message "%s" mode-line-format))))
+
+(defun sos-ml-copy-path ()
+  "Copy file path refer to `mode-line-format'."
+  (interactive)
+  (let ()
+    ))
+
+(defun sos-ml-goto-line ()
+  "Go to line refer to `mode-line-format'."
+  (interactive)
+  (let ()
+    ))
 
 (defun sos-header-mode-line ()
   (when (sos-is-multiple-candidates)
