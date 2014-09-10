@@ -139,12 +139,13 @@
                                (message "\"Jump to definition\" is yet supported!")))
     map))
 
-(defvar sos-goto-file-map
+(defvar sos-ml-open-file-map
   (let ((map (make-sparse-keymap)))
     (define-key map [mode-line mouse-1] 'sos-ml-open-file)
     (define-key map [mode-line mouse-3] 'sos-ml-copy-path)
     map))
-(defvar sos-goto-file-linum-map
+
+(defvar sos-ml-goto-linum-map
   (let ((map (make-sparse-keymap)))
     (define-key map [mode-line mouse-1] 'sos-ml-goto-line)
     map))
@@ -248,13 +249,14 @@ Return (FILE . LINUM) struct."
   (let* ((info (sos-ml-info))
          (file (car info))
          (linum (cdr info)))
-    (and (file-exists-p file)
-         (integerp linum)
-         (window-live-p sos-cached-window)
-         (with-selected-window sos-cached-window
-           (find-file file)
-           (goto-line linum)
-           (recenter 3)))))
+    (when (and (file-exists-p file)
+               (integerp linum)
+               (window-live-p sos-cached-window))
+      (with-selected-window sos-cached-window
+        (find-file file)
+        (goto-line linum)
+        (recenter 3))
+      (select-window sos-cached-window))))
 
 (defun sos-ml-copy-path ()
   "Copy file path refer to `mode-line-format'."
@@ -295,7 +297,7 @@ Return (FILE . LINUM) struct."
     (:eval (and (file-exists-p ,file)
                 (concat "| file:"
                         (propertize (abbreviate-file-name ,file)
-                                    'local-map sos-goto-file-map
+                                    'local-map sos-ml-open-file-map
                                     'face 'link
                                     'mouse-face 'link
                                     'help-echo "mouse-1: Open the file.\n\
@@ -303,7 +305,7 @@ mouse-3: Copy the path.")
                         (and (integerp ,line)
                              (concat ", line:"
                                      (propertize (format "%d" ,line)
-                                                 'local-map sos-goto-file-linum-map
+                                                 'local-map sos-ml-goto-linum-map
                                                  'face 'link
                                                  'mouse-face 'link
                                                  'help-echo "mouse-1: Back to the line.")))
