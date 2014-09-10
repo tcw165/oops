@@ -41,57 +41,13 @@
           (setq sos-def-win-height (window-height sos-def-win)))
      (sos-toggle-definition-buffer&window -1))
     (:show
-     (let* ((candidate (nth sos-index sos-candidates))
-            (doc (plist-get candidate :doc))
-            (file (plist-get candidate :file))
-            (linum (plist-get candidate :linum))
-            (hl-word (plist-get candidate :hl-word))
-            (mode-line (plist-get candidate :mode-line))
-            (header-mode-line (sos-header-mode-line))
-            (button-mode-line (sos-button-mode-line mode-line file linum)))
-       (sos-toggle-definition-buffer&window 1)
-       ;; TODO: remember user choice at last session in the prj.
-       (setq sos-def-stack nil
-             sos-index 0)
-       (cond
-        ;; A file ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-        ((and (stringp file)
-              (file-exists-p file))
-         (sos-with-definition-buffer
-           (insert-file-contents file nil nil nil t)
-           ;; Find a appropriate major-mode for it.
-           (dolist (mode auto-mode-alist)
-             (and (not (null (cdr mode)))
-                  (string-match (car mode) file)
-                  (funcall (cdr mode))))
-           (and (featurep 'hl-line)
-                (hl-line-unhighlight))
-           ;; Move point and recenter.
-           (and (integerp linum)
-                (goto-char (point-min))
-                (forward-line (- linum 1)))
-           (recenter 3)
-           ;; Highlight word.
-           (sos-hl-word hl-word)
-           ;; Set header line and button line.
-           (setq header-line-format header-mode-line
-                 mode-line-format button-mode-line)))
-
-        ;; A document string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-        ((stringp doc)
-         (sos-with-definition-buffer
-           (erase-buffer)
-           (fundamental-mode)
-           (and (featurep 'hl-line)
-                (hl-line-unhighlight))
-           (insert doc)
-           ;; Move point
-           (goto-char (point-min))
-           ;; Highlight word.
-           (sos-hl-word hl-word)
-           ;; Set header line and button line.
-           (setq header-line-format header-mode-line
-                 mode-line-format button-mode-line))))))))
+     ;; TODO: remember user choice at last session in the prj.
+     (setq sos-def-stack nil
+           sos-index 0)
+     (sos-toggle-definition-buffer&window 1)
+     (if (sos-is-multiple-candidates)
+         (sos-show-multiple-candidates)
+       (sos-show-candidate)))))
 
 ;;;###autoload
 (defun sos-tips-frontend (command)
@@ -194,7 +150,7 @@
                           (> toggle 0)))))
     (if enabled
         (sos-with-definition-buffer
-          (setq header-line-format (sos-header-mode-line)
+          (setq header-line-format nil
                 mode-line-format (sos-button-mode-line)))
       (when (windowp sos-def-win)
         (delete-window sos-def-win))
@@ -220,6 +176,78 @@
                               'face 'font-lock-string-face)
                   (propertize (format "%s" linum)
                               'face 'font-lock-string-face)))))
+
+(defun sos-show-candidate ()
+  "Show single candidate prompt."
+  (let* ((candidate (nth sos-index sos-candidates))
+         (file (plist-get candidate :file))
+         (doc (plist-get candidate :doc))
+         (linum (plist-get candidate :linum))
+         (hl-word (plist-get candidate :hl-word))
+         (mode-line (plist-get candidate :mode-line))
+         (button-mode-line (sos-button-mode-line mode-line file linum)))
+    (cond
+     ;; A file ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+     ((and (stringp file)
+           (file-exists-p file))
+      (sos-with-definition-buffer
+        (insert-file-contents file nil nil nil t)
+        ;; Find a appropriate major-mode for it.
+        (dolist (mode auto-mode-alist)
+          (and (not (null (cdr mode)))
+               (string-match (car mode) file)
+               (funcall (cdr mode))))
+        (and (featurep 'hl-line)
+             (hl-line-unhighlight))
+        ;; Move point and recenter.
+        (and (integerp linum)
+             (goto-char (point-min))
+             (forward-line (- linum 1)))
+        (recenter 3)
+        ;; Highlight word.
+        (sos-hl-word hl-word)
+        ;; Set header line and button line.
+        (setq header-line-format nil
+              mode-line-format button-mode-line)))
+
+     ;; A document string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+     ((stringp doc)
+      (sos-with-definition-buffer
+        (erase-buffer)
+        (fundamental-mode)
+        (and (featurep 'hl-line)
+             (hl-line-unhighlight))
+        (insert doc)
+        ;; Move point
+        (goto-char (point-min))
+        ;; Highlight word.
+        (sos-hl-word hl-word)
+        ;; Set header line and button line.
+        (setq header-line-format nil
+              mode-line-format button-mode-line))))))
+
+;; Test: `sos-navigation-mode'
+(defun sos-show-multiple-candidates ()
+  "Show multiple candidates prompt."
+  (sos-with-definition-buffer
+    (erase-buffer)
+    (dolist (candidate sos-candidates)
+      (let* ((file (plist-get candidate :file))
+             (doc (plist-get candidate :doc))
+             (linum (plist-get candidate :linum))
+             (hl-word (plist-get candidate :hl-word))
+             ;; (header-mode-line (sos-header-mode-line))
+             ;; (button-mode-line (sos-button-mode-line mode-line file linum))
+             )
+        ))
+    ;; Major-mode.
+    (fundamental-mode)
+    (and (featurep 'hl-line)
+         (hl-line-unhighlight))
+    ;; Set header line and button line.
+    ;; (setq header-line-format header-mode-line
+    ;;       mode-line-format button-mode-line)
+    ))
 
 (defun sos-ml-info ()
   "Get file and line number from definition buffer's `mode-line-format'.
@@ -253,9 +281,14 @@ Return (FILE . LINUM) struct."
                (integerp linum)
                (window-live-p sos-cached-window))
       (with-selected-window sos-cached-window
-        (find-file file)
-        (goto-line linum)
-        (recenter 3))
+        (unless (string= file (buffer-file-name (window-buffer)))
+          (and (featurep 'history)
+               (his-add-position-type-history))
+          (find-file file)
+          (goto-line linum)
+          (and (featurep 'history)
+               (his-add-position-type-history))
+          (recenter 3)))
       (select-window sos-cached-window))))
 
 (defun sos-ml-copy-path ()
@@ -280,14 +313,13 @@ Return (FILE . LINUM) struct."
            (recenter 3)))))
 
 (defun sos-header-mode-line ()
-  (when (sos-is-multiple-candidates)
-    `(,(propertize " < "
-                   'face 'button
-                   'mouse-face 'button)
-      ,(propertize " > "
-                   'face 'button
-                   'mouse-face 'button)
-      "  There're multiple candidates (implementing).")))
+  `(,(propertize " < "
+                 'face 'button
+                 'mouse-face 'button)
+    ,(propertize " > "
+                 'face 'button
+                 'mouse-face 'button)
+    "  There're multiple candidates (implementing)."))
 
 (defun sos-button-mode-line (&optional desc file line)
   `(,(propertize "  *Definition* "
@@ -314,7 +346,7 @@ mouse-3: Copy the path.")
 ;;;###autoload
 (define-minor-mode sos-navigation-mode
   "Minor mode for *Definition* buffers."
-  :lighter " SOS:Navigation"
+  :lighter " SOS:navigation"
   :group 'sos-group
   (if sos-navigation-mode
       (progn
