@@ -130,7 +130,7 @@ refer to `find-variable-noselect', `find-function-search-for-symbol' and
                       locus (variable-binding-locus symb))))
             (with-temp-buffer
               (setq standard-output (current-buffer))
-              (princ (format "%s value is " symb))
+              (princ (format "%s\nvalue is " symb))
               (prin1 val)
               (terpri)(terpri)
               ;; Print standard value if any.

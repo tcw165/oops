@@ -42,19 +42,18 @@
          (save-excursion
            (beginning-of-line)
            (if (search-forward-regexp "^.+:[0-9]+:" (line-end-position) t)
-               ;; Return FILEPATH?NUM string.
+               ;; Return (FILEPATH . NUM) struct.
                (let* ((text (buffer-substring-no-properties (line-beginning-position) (- (point) 1)))
                       (offset (string-match ":[0-9]+$" text))
                       (file (substring text 0 offset))
-                      (linum (substring text (1+ offset)))
-                      (symb (concat file "?" linum)))
-                 symb)
+                      (linum (string-to-int (substring text (1+ offset)))))
+                 (cons file linum))
              :stop)))))
     (:candidates
-     ;; 1st argument is FILEPATH?NUM string.
-     (let* ((strings (split-string arg "?" t))
-            (file (nth 0 strings))
-            (linum (string-to-int (nth 1 strings)))
+     ;; 1st argument is (FILEPATH . NUM) struct.
+     (let* ((symb arg)
+            (file (car symb))
+            (linum (cdr symb))
             (keyword (save-excursion
                        (search-backward-regexp (concat "^" sos-grep-prefix ".+$") nil t)
                        (buffer-substring-no-properties (+ (length sos-grep-prefix) (point)) (line-end-position)))))
