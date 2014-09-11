@@ -34,7 +34,7 @@
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
  '(link ((t (:foreground "blue" :underline t :weight bold))))
- '(tooltip ((t (:background "systeminfowindow" :foreground "systeminfotext" :family "Courier New")))))
+ '(tooltip ((t (:background "cornsilk" :foreground "Black" :weight bold :family "Monaco")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                                   load-path                                ;;

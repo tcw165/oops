@@ -246,13 +246,12 @@
           (princ (format "document")))
         (terpri)))
     ;; TODO: alignment.
-    (align 1 (point-max))
     (goto-char (point-min))
     ;; Major-mode.
     (sos-multiple-candidates-mode)
     ;; Minor-modes.
     (linum-mode 1)
-    (hl-line-mode 1)
+    ;; (hl-line-mode 1)
     ;; Set header line and button line.
     (setq header-line-format (sos-header-mode-line)
           mode-line-format (sos-button-mode-line
@@ -374,6 +373,24 @@ Return (FILE . LINUM) struct."
       (progn
         (use-local-map sos-navigation-mode-map))
     ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;###autoload
+(defun sos-definition-next-candidate ()
+  "Copy file path refer to `mode-line-format'."
+  (interactive)
+  (sos-with-definition-buffer
+    (forward-line 1)
+    (hl-line-highlight)))
+
+;;;###autoload
+(defun sos-definition-previous-candidate ()
+  "Copy file path refer to `mode-line-format'."
+  (interactive)
+  (sos-with-definition-buffer
+    (forward-line -1)
+    (hl-line-highlight)))
 
 ;;;###autoload
 (define-derived-mode sos-multiple-candidates-mode nil "SOS:mcand"

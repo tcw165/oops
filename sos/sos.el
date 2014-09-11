@@ -235,7 +235,7 @@ If you want to skip additional commands, try example:
      (t
       (if (and (eq symb sos-symbol)
                (eq (current-buffer) sos-cached-buffer)
-               (eq (current-buffer) sos-cached-window))
+               (eq (selected-window) sos-cached-window))
           (progn
             ;; If return symbol string is equal to `sos-symbol', ask front-ends
             ;; to do `:update' task.
@@ -251,9 +251,9 @@ If you want to skip additional commands, try example:
               ;; (message "(%s) sos-normal-process: show" (current-time))
               (sos-call-frontends :show))
           ;; (message "(%s) sos-normal-process: hide" (current-time))
-          (sos-call-frontends :hide)))
-      (setq sos-cached-buffer (current-buffer)
-            sos-cached-window (selected-window))))))
+          (sos-call-frontends :hide)))))
+    (setq sos-cached-buffer (current-buffer)
+          sos-cached-window (selected-window))))
 
 (defun sos-kill-local-variables ()
   (mapc 'kill-local-variable '(sos-backend
