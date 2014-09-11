@@ -80,7 +80,6 @@
 (defvar sos-def-stack nil
   "Cache the current content of definition buffer when navigating into deeper.")
 
-;; TODO: keymap.
 (defvar sos-navigation-map
   (let ((map (make-sparse-keymap)))
     (define-key map [left] (lambda ()
@@ -94,15 +93,15 @@
                                (message "\"Jump to definition\" is yet supported!")))
     map))
 
-(defvar sos-ml-open-file-map
+(defvar sos-definition-file-map
   (let ((map (make-sparse-keymap)))
-    (define-key map [mode-line mouse-1] 'sos-ml-open-file)
-    (define-key map [mode-line mouse-3] 'sos-ml-copy-path)
+    (define-key map [mode-line mouse-1] 'sos-definition-open-file)
+    (define-key map [mode-line mouse-3] 'sos-definition-copy-path)
     map))
 
-(defvar sos-ml-goto-linum-map
+(defvar sos-definition-linum-map
   (let ((map (make-sparse-keymap)))
-    (define-key map [mode-line mouse-1] 'sos-ml-goto-line)
+    (define-key map [mode-line mouse-1] 'sos-definition-goto-line)
     map))
 
 (defmacro sos-with-definition-buffer (&rest body)
@@ -283,7 +282,40 @@ Return (FILE . LINUM) struct."
       ;; (message "%s-%s %s:%s" beg end file linum)
       (cons file linum))))
 
-(defun sos-ml-open-file ()
+(defun sos-header-mode-line ()
+  `(,(propertize " Back "
+                 'face 'button
+                 'mouse-face 'button)
+    " "
+    ,(propertize " Next "
+                 'face 'button
+                 'mouse-face 'button)
+    "  There're multiple candidates (implementing)."))
+
+(defun sos-button-mode-line (&optional desc file line)
+  `(,(propertize "  *Definition* "
+                 'face 'mode-line-buffer-id)
+    (:eval (and ,desc
+                (concat "| " ,desc)))
+    (:eval (and (file-exists-p ,file)
+                (concat "| file:"
+                        (propertize (abbreviate-file-name ,file)
+                                    'local-map sos-definition-file-map
+                                    'face 'link
+                                    'mouse-face 'link
+                                    'help-echo "mouse-1: Open the file.\n\
+mouse-3: Copy the path.")
+                        (and (integerp ,line)
+                             (concat ", line:"
+                                     (propertize (format "%d" ,line)
+                                                 'local-map sos-definition-linum-map
+                                                 'face 'link
+                                                 'mouse-face 'link
+                                                 'help-echo "mouse-1: Back to the line.")))
+                        ", function:(yet supported)")))))
+
+;;;###autoload
+(defun sos-definition-open-file ()
   "Open file refer to `mode-line-format'."
   (interactive)
   (let* ((info (sos-ml-info))
@@ -303,7 +335,8 @@ Return (FILE . LINUM) struct."
           (recenter 3)))
       (select-window sos-cached-window))))
 
-(defun sos-ml-copy-path ()
+;;;###autoload
+(defun sos-definition-copy-path ()
   "Copy file path refer to `mode-line-format'."
   (interactive)
   (let* ((info (sos-ml-info))
@@ -314,7 +347,8 @@ Return (FILE . LINUM) struct."
            (clipboard-kill-ring-save 1 (point-max))
            (message "File path is copied to clipboard!")))))
 
-(defun sos-ml-goto-line ()
+;;;###autoload
+(defun sos-definition-goto-line ()
   "Go to line refer to `mode-line-format'."
   (interactive)
   (let* ((info (sos-ml-info))
@@ -323,38 +357,6 @@ Return (FILE . LINUM) struct."
          (sos-with-definition-buffer
            (goto-line linum)
            (recenter 3)))))
-
-(defun sos-header-mode-line ()
-  `(,(propertize " Back "
-                 'face 'button
-                 'mouse-face 'button)
-    " "
-    ,(propertize " Next "
-                 'face 'button
-                 'mouse-face 'button)
-    "  There're multiple candidates (implementing)."))
-
-(defun sos-button-mode-line (&optional desc file line)
-  `(,(propertize "  *Definition* "
-                 'face 'mode-line-buffer-id)
-    (:eval (and ,desc
-                (concat "| " ,desc)))
-    (:eval (and (file-exists-p ,file)
-                (concat "| file:"
-                        (propertize (abbreviate-file-name ,file)
-                                    'local-map sos-ml-open-file-map
-                                    'face 'link
-                                    'mouse-face 'link
-                                    'help-echo "mouse-1: Open the file.\n\
-mouse-3: Copy the path.")
-                        (and (integerp ,line)
-                             (concat ", line:"
-                                     (propertize (format "%d" ,line)
-                                                 'local-map sos-ml-goto-linum-map
-                                                 'face 'link
-                                                 'mouse-face 'link
-                                                 'help-echo "mouse-1: Back to the line.")))
-                        ", function:(yet supported)")))))
 
 ;;;###autoload
 (define-minor-mode sos-candidate-mode
