@@ -30,6 +30,9 @@
 ;; 2014-10-01 (0.0.1)
 ;;    Initial release.
 
+(require 'cus-edit)
+(require 'hl-line)
+(require 'linum)
 (require 'thingatpt)
 
 ;;;###autoload
@@ -80,7 +83,7 @@
 (defvar sos-def-stack nil
   "Cache the current content of definition buffer when navigating into deeper.")
 
-(defvar sos-navigation-map
+(defvar sos-navigation-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map [left] (lambda ()
                              (interactive)
@@ -194,8 +197,7 @@
           (and (not (null (cdr mode)))
                (string-match (car mode) file)
                (funcall (cdr mode))))
-        (and (featurep 'hl-line)
-             (hl-line-unhighlight))
+        (hl-line-unhighlight)
         ;; Move point and recenter.
         (and (integerp linum)
              (goto-char (point-min))
@@ -214,8 +216,7 @@
       (sos-with-definition-buffer
         (erase-buffer)
         (fundamental-mode)
-        (and (featurep 'hl-line)
-             (hl-line-unhighlight))
+        (hl-line-unhighlight)
         (insert doc)
         ;; Move point
         (goto-char (point-min))
@@ -240,12 +241,18 @@
              (linum (plist-get candidate :linum))
              (type (plist-get candidate :type))
              (hl-word (plist-get candidate :hl-word)))
-        (prin1 candidate)
+        (if file
+            (princ (format "%s line:%s file:%s" type linum file))
+          (princ (format "document")))
         (terpri)))
+    ;; TODO: alignment.
+    (align 1 (point-max))
+    (goto-char (point-min))
     ;; Major-mode.
     (sos-multiple-candidates-mode)
-    (and (featurep 'hl-line)
-         (hl-line-unhighlight))
+    ;; Minor-modes.
+    (linum-mode 1)
+    (hl-line-mode 1)
     ;; Set header line and button line.
     (setq header-line-format (sos-header-mode-line)
           mode-line-format (sos-button-mode-line
@@ -260,36 +267,14 @@
                                     (propertize " ENTER "
                                                 'face 'tooltip))))))
 
-(defun sos-ml-info ()
-  "Get file and line number from definition buffer's `mode-line-format'.
-Return (FILE . LINUM) struct."
-  (sos-with-definition-buffer
-    (let* ((text (pp-to-string mode-line-format))
-           (beg (string-match "(file-exists-p \".+\")" text))
-           (end (match-end 0))
-           (file (and beg end
-                      (substring text
-                                 (+ beg 16)
-                                 (- end 2))))
-           (beg (string-match "(integerp [0-9]+)" text))
-           (end (match-end 0))
-           (linum (and beg end
-                       (string-to-int
-                        (substring text
-                                   (+ beg 10)
-                                   (- end 1))))))
-      ;; (message "%s" text)
-      ;; (message "%s-%s %s:%s" beg end file linum)
-      (cons file linum))))
-
 (defun sos-header-mode-line ()
   `(,(propertize " Back "
-                 'face 'button
-                 'mouse-face 'button)
+                 'face 'custom-button
+                 'mouse-face 'custom-button-mouse)
     " "
     ,(propertize " Next "
-                 'face 'button
-                 'mouse-face 'button)
+                 'face 'custom-button
+                 'mouse-face 'custom-button-mouse)
     "  There're multiple candidates (implementing)."))
 
 (defun sos-button-mode-line (&optional desc file line)
@@ -313,6 +298,28 @@ mouse-3: Copy the path.")
                                                  'mouse-face 'link
                                                  'help-echo "mouse-1: Back to the line.")))
                         ", function:(yet supported)")))))
+
+(defun sos-ml-info ()
+  "Get file and line number from definition buffer's `mode-line-format'.
+Return (FILE . LINUM) struct."
+  (sos-with-definition-buffer
+    (let* ((text (pp-to-string mode-line-format))
+           (beg (string-match "(file-exists-p \".+\")" text))
+           (end (match-end 0))
+           (file (and beg end
+                      (substring text
+                                 (+ beg 16)
+                                 (- end 2))))
+           (beg (string-match "(integerp [0-9]+)" text))
+           (end (match-end 0))
+           (linum (and beg end
+                       (string-to-int
+                        (substring text
+                                   (+ beg 10)
+                                   (- end 1))))))
+      ;; (message "%s" text)
+      ;; (message "%s-%s %s:%s" beg end file linum)
+      (cons file linum))))
 
 ;;;###autoload
 (defun sos-definition-open-file ()
@@ -365,7 +372,7 @@ mouse-3: Copy the path.")
   :group 'sos-group
   (if sos-candidate-mode
       (progn
-        (use-local-map sos-navigation-map))
+        (use-local-map sos-navigation-mode-map))
     ))
 
 ;;;###autoload
