@@ -96,17 +96,18 @@ refer to `find-function-noselect', `find-function-search-for-symbol' and
               (princ doc)
               `(:doc ,(buffer-string) :linum 1 :type "function" :hl-word ,name
                      :mode-line ,(format "%s is a built-in Elisp function."
-                                         (propertize name 'face 'link)))))
+                                         (propertize (concat " " name " ")
+                                          'face 'tooltip)))))
         ;; File struct ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
         (let* ((file (sos-elisp-normalize-path (symbol-file real-symb 'defun)))
                (linum (sos-elisp-count-lines file name find-function-regexp)))
           `(:file ,file :linum ,linum :type "function" :hl-word ,name
                   :mode-line ,(unless (eq real-symb symb)
                                 (format "%s is an alias of %s "
-                                        (propertize (symbol-name symb)
-                                                    'face 'link)
-                                        (propertize (symbol-name real-symb)
-                                                    'face 'link)))))))))
+                                        (propertize (concat " " (symbol-name symb) " ")
+                                                    'face 'tooltip)
+                                        (propertize (concat " " (symbol-name real-symb) " ")
+                                                    'face 'tooltip)))))))))
 
 (defun sos-elisp-find-variable (symb)
   "Return the candidate pointing to the definition of `symb'. It was written 

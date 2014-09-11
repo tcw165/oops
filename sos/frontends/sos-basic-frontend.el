@@ -63,7 +63,6 @@
   '((t (:background "yellow" :foreground "black" :weight bold :height 2.0)))
   "Default face for highlighting keyword in definition window."
   :group 'sos-group)
-
 (defvar sos-hl-face 'sos-hl)
 
 (defvar sos-hl-overlay nil
@@ -125,9 +124,9 @@
               (setq sos-def-win (split-window win height 'below)))))
      ;; Bind definition buffer to definition window.
      (set-window-buffer sos-def-win sos-def-buf t)
-     (with-selected-window sos-def-win
-       (with-current-buffer sos-def-buf
-         (let (ret)
+     (let (ret)
+       (with-selected-window sos-def-win
+         (with-current-buffer sos-def-buf
            ;; Make it read-writeable.
            (setq buffer-read-only nil)
            ;; Overlays
@@ -140,7 +139,6 @@
              (setq ret (progn ,@body)))
            ;; Make it read-only.
            (setq buffer-read-only t)
-           (sos-navigation-mode 1)
            ret)))))
 
 (defun sos-toggle-definition-buffer&window (toggle)
@@ -208,7 +206,9 @@
         (sos-hl-word hl-word)
         ;; Set header line and button line.
         (setq header-line-format nil
-              mode-line-format button-mode-line)))
+              mode-line-format button-mode-line)
+        ;; Minor mode.
+        (sos-candidate-mode 1)))
 
      ;; A document string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
      ((stringp doc)
@@ -224,30 +224,42 @@
         (sos-hl-word hl-word)
         ;; Set header line and button line.
         (setq header-line-format nil
-              mode-line-format button-mode-line))))))
+              mode-line-format button-mode-line)
+        ;; Minor mode.
+        (sos-candidate-mode 1))))))
 
-;; Test: `sos-navigation-mode'
+;; Test: `sos-candidate-mode'
 (defun sos-show-multiple-candidates ()
   "Show multiple candidates prompt."
   (sos-with-definition-buffer
+    (setq standard-output (current-buffer))
     (erase-buffer)
-    (dolist (candidate sos-candidates)
+    (dolist (candidate (with-current-buffer sos-cached-buffer
+                         sos-candidates))
       (let* ((file (plist-get candidate :file))
              (doc (plist-get candidate :doc))
              (linum (plist-get candidate :linum))
-             (hl-word (plist-get candidate :hl-word))
-             ;; (header-mode-line (sos-header-mode-line))
-             ;; (button-mode-line (sos-button-mode-line mode-line file linum))
-             )
-        ))
+             (type (plist-get candidate :type))
+             (hl-word (plist-get candidate :hl-word)))
+        (prin1 candidate)
+        (terpri)))
     ;; Major-mode.
-    (fundamental-mode)
+    (sos-multiple-candidates-mode)
     (and (featurep 'hl-line)
          (hl-line-unhighlight))
     ;; Set header line and button line.
-    ;; (setq header-line-format header-mode-line
-    ;;       mode-line-format button-mode-line)
-    ))
+    (setq header-line-format (sos-header-mode-line)
+          mode-line-format (sos-button-mode-line
+                            (format "%s and %s to navigate the candidates,\
+ %s or %s to open it"
+                                    (propertize " UP "
+                                                'face 'tooltip)
+                                    (propertize " DOWN "
+                                                'face 'tooltip)
+                                    (propertize " CLICK "
+                                                'face 'tooltip)
+                                    (propertize " ENTER "
+                                                'face 'tooltip))))))
 
 (defun sos-ml-info ()
   "Get file and line number from definition buffer's `mode-line-format'.
@@ -313,10 +325,11 @@ Return (FILE . LINUM) struct."
            (recenter 3)))))
 
 (defun sos-header-mode-line ()
-  `(,(propertize " < "
+  `(,(propertize " Back "
                  'face 'button
                  'mouse-face 'button)
-    ,(propertize " > "
+    " "
+    ,(propertize " Next "
                  'face 'button
                  'mouse-face 'button)
     "  There're multiple candidates (implementing)."))
@@ -344,13 +357,20 @@ mouse-3: Copy the path.")
                         ", function:(yet supported)")))))
 
 ;;;###autoload
-(define-minor-mode sos-navigation-mode
+(define-minor-mode sos-candidate-mode
   "Minor mode for *Definition* buffers."
   :lighter " SOS:navigation"
   :group 'sos-group
-  (if sos-navigation-mode
+  (if sos-candidate-mode
       (progn
         (use-local-map sos-navigation-map))
     ))
+
+;;;###autoload
+(define-derived-mode sos-multiple-candidates-mode nil "SOS:mcand"
+  "Major mode for multiple candidates buffer."
+  :group 'prj-group
+  ;; TODO: highlight words behind ">>>>>".
+  )
 
 (provide 'sos-basic-frontend)
