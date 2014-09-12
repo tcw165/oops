@@ -30,6 +30,7 @@
 ;; 2014-10-01 (0.0.1)
 ;;    Initial release.
 
+(require 'align)
 (require 'cus-edit)
 (require 'hl-line)
 (require 'linum)
@@ -234,6 +235,8 @@
   (sos-with-definition-buffer
     (setq standard-output (current-buffer))
     (erase-buffer)
+    (princ (format "type | line | file"))
+    (terpri)
     (dolist (candidate (with-current-buffer sos-cached-buffer
                          sos-candidates))
       (let* ((file (plist-get candidate :file))
@@ -242,11 +245,12 @@
              (type (plist-get candidate :type))
              (hl-word (plist-get candidate :hl-word)))
         (if file
-            (princ (format "%s line:%s file:%s" type linum file))
-          (princ (format "document")))
+            (princ (format "%s | %s | %s" type linum file))
+          (princ (format "document | n/a | n/a")))
         (terpri)))
     ;; TODO: alignment.
-    (goto-char (point-min))
+    ;; (align-regexp (point-min) (point-max) " | ")
+    ;; (goto-char (point-min))
     ;; Major-mode.
     (sos-multiple-candidates-mode)
     ;; Minor-modes.
