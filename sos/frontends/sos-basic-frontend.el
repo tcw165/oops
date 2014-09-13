@@ -246,11 +246,14 @@
              (hl-word (plist-get candidate :hl-word)))
         (if file
             (princ (format "%s | %s | %s" type linum file))
-          (princ (format "document | n/a | n/a")))
+          (princ (format "document | n | n")))
         (terpri)))
-    ;; TODO: alignment.
-    ;; (align-regexp (point-min) (point-max) " | ")
-    ;; (goto-char (point-min))
+    ;; Alignment.
+    (align-region 1 (point-max) 'entire
+                  `((sos-multiple-candidates
+                     (regexp . "^\\(\\w\\)+\\s-\|\\s-\\([0-9line]\\)+\\s-\|\\s-\\(.\\)+$")
+                     (group . (1 2 3))))
+                  nil)
     ;; Major-mode.
     (sos-multiple-candidates-mode)
     ;; Minor-modes.
