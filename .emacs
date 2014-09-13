@@ -9,7 +9,6 @@
  ;; If there is more than one, they won't work right.
  '(column-number-mode t)
  '(cua-mode t nil (cua-base))
- '(cursor-in-non-selected-windows nil)
  '(electric-indent-mode t)
  '(electric-pair-mode t)
  '(emacs-lisp-mode-hook (quote (hl-paren-mode imenu-add-menubar-index linum-mode hl-line-mode)))
@@ -22,7 +21,9 @@
  '(make-backup-files nil)
  '(mouse-wheel-follow-mouse t)
  '(mouse-wheel-scroll-amount (quote (1 ((shift) . 1))))
+ '(normal-erase-is-backspace t)
  '(package-archives (quote (("gnu" . "http://elpa.gnu.org/packages/") ("elpa" . "http://melpa.milkbox.net/packages/") ("marmalade" . "http://marmalade-repo.org/packages/"))))
+ '(parse-sexp-ignore-comments t)
  '(scroll-step 1)
  '(show-paren-mode nil)
  '(standard-indent 2)

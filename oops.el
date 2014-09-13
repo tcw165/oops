@@ -44,19 +44,9 @@
 ;;; Oops library ===============================================================
 (require 'sos)
 (require 'prj)
-(require 'oops-win)
 (require 'oops-lisp-lib)
 
-;; TODO: customization.
-(defconst oops--hooks
-  '(;; GNU mode
-    (emacs-lisp-mode-hook . imenu-add-menubar-index)
-    (lisp-interaction-mode-hook . hl-paren-mode)
-    ;; 3rd-party
-    (emacs-lisp-mode-hook . hl-paren-mode))
-  "An association list that indicates the bindings of major mode and minor mode. Its format should be (MAJOR-MODE-HOOK . MINOR-MODE-HOOK)")
-
-;;; Text Operation =============================================================
+;;; Text ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
 (defun oops-undo ()
@@ -208,7 +198,7 @@
       (indent-for-tab-command)
     (company-complete)))
 
-;;; Navigation =================================================================
+;;; Navigation ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
 (defun oops-jump-to-definition-atpt ()
@@ -268,5 +258,36 @@ or go back to just one window (by deleting all but the selected window)."
     (bury-buffer))
    ((featurep 'company)
     (company-cancel))))
+
+;;; Window ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;###autoload
+(defun oops-windmove-left ()
+  "Select the window to the left of the current one."
+  (interactive)
+  (windmove-left))
+
+;;;###autoload
+(defun oops-windmove-right ()
+  "Select the window to the right of the current one."
+  (interactive)
+  (windmove-right))
+
+;;;###autoload
+(defun oops-windmove-up ()
+  "Select the window to the above of the current one."
+  (interactive)
+  (windmove-up))
+
+;;;###autoload
+(defun oops-windmove-down ()
+  "Select the window to the below of the current one."
+  (interactive)
+  (windmove-down))
+
+;;;###autoload
+(defun oops-hsplit-window ()
+  (interactive)
+  (split-window (selected-window) nil 'right))
 
 (provide 'oops)

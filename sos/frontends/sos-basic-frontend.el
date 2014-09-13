@@ -93,7 +93,7 @@
   "The highlight for line in `sos-definition-buffer'.")
 (make-variable-buffer-local 'sos-hl-line-overlay)
 
-(defvar sos-navigation-mode-map
+(defvar sos-candidate-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map [left] (lambda ()
                              (interactive)
@@ -187,16 +187,12 @@
                   (propertize (format "%s" linum)
                               'face 'font-lock-string-face)))))
 
-(defun sos-hl-line (linum)
+(defun sos-hl-line ()
   (unless sos-hl-line-overlay
     (setq sos-hl-line-overlay (make-overlay 1 1))
     (overlay-put sos-hl-line-overlay 'face 'sos-hl-line-face))
-  (move-overlay sos-hl-line-overlay 1 1)
-  (when (integerp linum)
-    (goto-char 1)
-    (forward-line (1- linum))
-    (move-overlay sos-hl-line-overlay (line-beginning-position)
-                  (line-beginning-position 2))))
+  (move-overlay sos-hl-line-overlay (line-beginning-position)
+                (line-beginning-position 2)))
 
 (defun sos-show-candidate ()
   "Show single candidate prompt."
@@ -277,7 +273,8 @@
     (sos-candidates-mode 1)
     (linum-mode 1)
     ;; Highlight line.
-    (sos-hl-line 1)
+    (goto-char 1)
+    (sos-hl-line)
     ;; Set header line and button line.
     (setq header-line-format (sos-header-mode-line)
           mode-line-format (sos-button-mode-line
@@ -397,37 +394,53 @@ Return (FILE . LINUM) struct."
   :group 'sos-group
   (if sos-candidate-mode
       (progn
-        (use-local-map sos-navigation-mode-map))
+        (use-local-map sos-candidate-mode-map))
     ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun sos-multiple-candidates-post-command ()
-  )
+(defvar sos-candidates-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [up] 'sos-prev-candidate)
+    (define-key map [down] 'sos-next-candidate)
+    (define-key map [return] 'sos-jump-in-candidate)
+    map))
 
 ;;;###autoload
-(defun sos-definition-next-candidate ()
-  "Copy file path refer to `mode-line-format'."
+(defun sos-jump-in-candidate ()
   (interactive)
-  (sos-with-definition-buffer
-    (forward-line 1)))
+  (message "\"Jump to definition\" is yet supported!"))
 
 ;;;###autoload
-(defun sos-definition-previous-candidate ()
-  "Copy file path refer to `mode-line-format'."
+(defun sos-jump-out-candidate ()
+  (interactive))
+
+;;;###autoload
+(defun sos-next-candidate ()
   (interactive)
-  (sos-with-definition-buffer
-    (forward-line -1)))
+  (with-selected-window sos-def-win
+    (with-current-buffer sos-def-buf
+      (when sos-candidates-mode
+        (next-line)
+        (sos-hl-line)))))
+
+;;;###autoload
+(defun sos-prev-candidate ()
+  (interactive)
+  (with-selected-window sos-def-win
+    (with-current-buffer sos-def-buf
+      (when sos-candidates-mode
+        (previous-line)
+        (sos-hl-line)))))
 
 ;;;###autoload
 (define-minor-mode sos-candidates-mode
   "Minor mode for *Definition* buffers."
   :lighter " SOS:mcand"
   :group 'sos-group
-  ;; (if sos-candidates-mode
-  ;;     (progn
-  ;;       (add-hook post-command-hook sos-multiple-candidates-post-command t t))
-  ;;   (remove-hook post-command-hook sos-multiple-candidates-post-command t))
-  )
+  (if sos-candidates-mode
+      (progn
+        (use-local-map sos-candidates-mode-map))
+    ))
 
 (provide 'sos-basic-frontend)
