@@ -63,14 +63,15 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defface sos-hl
+(defface sos-hl-face
   '((t (:background "yellow" :foreground "black" :weight bold :height 2.0)))
   "Default face for highlighting keyword in definition window."
   :group 'sos-group)
-(defvar sos-hl-face 'sos-hl)
 
-(defvar sos-hl-overlay nil
-  "The overlay for `sos-definition-buffer'.")
+(defface sos-hl-line-face
+  '((t (:background "yellow" :foreground "black" :weight bold :height 1.0)))
+  "Default face for highlighting line in definition window."
+  :group 'sos-group)
 
 (defvar sos-def-buf nil
   "Definition buffer.")
@@ -83,6 +84,14 @@
 
 (defvar sos-def-stack nil
   "Cache the current content of definition buffer when navigating into deeper.")
+
+(defvar sos-hl-overlay nil
+  "The highlight for keyword in `sos-definition-buffer'.")
+(make-variable-buffer-local 'sos-hl-overlay)
+
+(defvar sos-hl-line-overlay nil
+  "The highlight for line in `sos-definition-buffer'.")
+(make-variable-buffer-local 'sos-hl-line-overlay)
 
 (defvar sos-navigation-mode-map
   (let ((map (make-sparse-keymap)))
@@ -130,13 +139,11 @@
      (let (ret)
        (with-selected-window sos-def-win
          (with-current-buffer sos-def-buf
+           (kill-all-local-variables)
+           (remove-overlays)
+           (fundamental-mode)
            ;; Make it read-writeable.
            (setq buffer-read-only nil)
-           ;; Overlays
-           (unless (and sos-hl-overlay
-                        (buffer-live-p (overlay-buffer sos-hl-overlay)))
-             (setq sos-hl-overlay (make-overlay 1 1)))
-           (overlay-put sos-hl-overlay 'face sos-hl-face)
            ;; `body' >>>
            (ignore-errors
              (setq ret (progn ,@body)))
@@ -158,14 +165,16 @@
       (when (bufferp sos-def-buf)
         (kill-buffer sos-def-buf))
       (setq sos-def-buf nil
-            sos-def-win nil
-            sos-hl-overlay nil))))
+            sos-def-win nil))))
 
 (defun sos-is-defintion-buffer&window ()
   (or (eq (current-buffer) sos-def-buf)
       (eq (selected-window) sos-def-win)))
 
 (defun sos-hl-word (hl-word)
+  (unless sos-hl-overlay
+    (setq sos-hl-overlay (make-overlay 1 1))
+    (overlay-put sos-hl-overlay 'face 'sos-hl-face))
   (move-overlay sos-hl-overlay 1 1)
   (and (stringp hl-word) (> (length hl-word) 0)
        (if (search-forward hl-word (line-end-position) t)
@@ -177,6 +186,17 @@
                               'face 'font-lock-string-face)
                   (propertize (format "%s" linum)
                               'face 'font-lock-string-face)))))
+
+(defun sos-hl-line (linum)
+  (unless sos-hl-line-overlay
+    (setq sos-hl-line-overlay (make-overlay 1 1))
+    (overlay-put sos-hl-line-overlay 'face 'sos-hl-line-face))
+  (move-overlay sos-hl-line-overlay 1 1)
+  (when (integerp linum)
+    (goto-char 1)
+    (forward-line (1- linum))
+    (move-overlay sos-hl-line-overlay (line-beginning-position)
+                  (line-beginning-position 2))))
 
 (defun sos-show-candidate ()
   "Show single candidate prompt."
@@ -193,11 +213,13 @@
            (file-exists-p file))
       (sos-with-definition-buffer
         (insert-file-contents file nil nil nil t)
-        ;; Find a appropriate major-mode for it.
+        ;; Major mode.
         (dolist (mode auto-mode-alist)
           (and (not (null (cdr mode)))
                (string-match (car mode) file)
                (funcall (cdr mode))))
+        ;; Minor mode.
+        (sos-candidate-mode 1)
         (hl-line-unhighlight)
         ;; Move point and recenter.
         (and (integerp linum)
@@ -209,25 +231,22 @@
         ;; Set header line and button line.
         (setq header-line-format nil
               mode-line-format button-mode-line)
-        ;; Minor mode.
-        (sos-candidate-mode 1)))
+        ))
 
      ;; A document string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
      ((stringp doc)
       (sos-with-definition-buffer
         (erase-buffer)
-        (fundamental-mode)
-        (hl-line-unhighlight)
         (insert doc)
-        ;; Move point
-        (goto-char (point-min))
+        ;; Minor mode.
+        (sos-candidate-mode 1)
+        (hl-line-unhighlight)
         ;; Highlight word.
+        (goto-char 1)
         (sos-hl-word hl-word)
         ;; Set header line and button line.
         (setq header-line-format nil
-              mode-line-format button-mode-line)
-        ;; Minor mode.
-        (sos-candidate-mode 1))))))
+              mode-line-format button-mode-line))))))
 
 ;; Test: `sos-candidate-mode'
 (defun sos-show-multiple-candidates ()
@@ -235,8 +254,8 @@
   (sos-with-definition-buffer
     (setq standard-output (current-buffer))
     (erase-buffer)
-    (princ (format "type | line | file"))
-    (terpri)
+    ;; (princ (format "type | line | file"))
+    ;; (terpri)
     (dolist (candidate (with-current-buffer sos-cached-buffer
                          sos-candidates))
       (let* ((file (plist-get candidate :file))
@@ -246,19 +265,19 @@
              (hl-word (plist-get candidate :hl-word)))
         (if file
             (princ (format "%s | %s | %s" type linum file))
-          (princ (format "document | n | n")))
+          (princ (format "document | no | no")))
         (terpri)))
     ;; Alignment.
     (align-region 1 (point-max) 'entire
                   `((sos-multiple-candidates
-                     (regexp . "^\\(\\w\\)+\\s-\|\\s-\\([0-9line]\\)+\\s-\|\\s-\\(.\\)+$")
+                     (regexp . "^\\(\\w\\)+\\s-\|\\s-\\([0-9no]\\)+\\s-\|\\s-\\(.\\)+$")
                      (group . (1 2 3))))
                   nil)
-    ;; Major-mode.
-    (sos-multiple-candidates-mode)
     ;; Minor-modes.
+    (sos-candidates-mode 1)
     (linum-mode 1)
-    ;; (hl-line-mode 1)
+    ;; Highlight line.
+    (sos-hl-line 1)
     ;; Set header line and button line.
     (setq header-line-format (sos-header-mode-line)
           mode-line-format (sos-button-mode-line
@@ -383,27 +402,32 @@ Return (FILE . LINUM) struct."
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defun sos-multiple-candidates-post-command ()
+  )
+
 ;;;###autoload
 (defun sos-definition-next-candidate ()
   "Copy file path refer to `mode-line-format'."
   (interactive)
   (sos-with-definition-buffer
-    (forward-line 1)
-    (hl-line-highlight)))
+    (forward-line 1)))
 
 ;;;###autoload
 (defun sos-definition-previous-candidate ()
   "Copy file path refer to `mode-line-format'."
   (interactive)
   (sos-with-definition-buffer
-    (forward-line -1)
-    (hl-line-highlight)))
+    (forward-line -1)))
 
 ;;;###autoload
-(define-derived-mode sos-multiple-candidates-mode nil "SOS:mcand"
-  "Major mode for multiple candidates buffer."
-  :group 'prj-group
-  ;; TODO: highlight words behind ">>>>>".
+(define-minor-mode sos-candidates-mode
+  "Minor mode for *Definition* buffers."
+  :lighter " SOS:mcand"
+  :group 'sos-group
+  ;; (if sos-candidates-mode
+  ;;     (progn
+  ;;       (add-hook post-command-hook sos-multiple-candidates-post-command t t))
+  ;;   (remove-hook post-command-hook sos-multiple-candidates-post-command t))
   )
 
 (provide 'sos-basic-frontend)
