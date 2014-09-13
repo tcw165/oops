@@ -185,7 +185,8 @@
                   (propertize (concat "\"" hl-word "\"")
                               'face 'font-lock-string-face)
                   (propertize (format "%s" linum)
-                              'face 'font-lock-string-face)))))
+                              'face 'font-lock-string-face))))
+  (end-of-line))
 
 (defun sos-hl-line ()
   (unless sos-hl-line-overlay
@@ -219,7 +220,7 @@
         (hl-line-unhighlight)
         ;; Move point and recenter.
         (and (integerp linum)
-             (goto-char (point-min))
+             (goto-char 1)
              (forward-line (- linum 1)))
         (recenter 3)
         ;; Highlight word.
@@ -242,16 +243,16 @@
         (sos-hl-word hl-word)
         ;; Set header line and button line.
         (setq header-line-format nil
-              mode-line-format button-mode-line))))))
+              mode-line-format button-mode-line
+              cursor-type nil))))))
 
-;; Test: `sos-candidate-mode'
+;; `message'
+;; `sos-candidate-mode'
 (defun sos-show-multiple-candidates ()
   "Show multiple candidates prompt."
   (sos-with-definition-buffer
     (setq standard-output (current-buffer))
     (erase-buffer)
-    ;; (princ (format "type | line | file"))
-    ;; (terpri)
     (dolist (candidate (with-current-buffer sos-cached-buffer
                          sos-candidates))
       (let* ((file (plist-get candidate :file))
@@ -259,9 +260,14 @@
              (linum (plist-get candidate :linum))
              (type (plist-get candidate :type))
              (hl-word (plist-get candidate :hl-word)))
-        (if file
-            (princ (format "%s | %s | %s" type linum file))
-          (princ (format "document | no | no")))
+        (when file
+          (princ (format "%s | %s | %s" type linum file)))
+        (when doc
+          (let* ((end (string-match "\n" doc))
+                 (doc-line1 (substring-no-properties doc 0 (or (and (< end 48)
+                                                                    end)
+                                                               48))))
+            (princ (format "document | 0 | %s ..." doc-line1))))
         (terpri)))
     ;; Alignment.
     (align-region 1 (point-max) 'entire
@@ -287,7 +293,8 @@
                                     (propertize " CLICK "
                                                 'face 'tooltip)
                                     (propertize " ENTER "
-                                                'face 'tooltip))))))
+                                                'face 'tooltip)))
+          cursor-type nil)))
 
 (defun sos-header-mode-line ()
   `(,(propertize " Back "
@@ -401,10 +408,13 @@ Return (FILE . LINUM) struct."
 
 (defvar sos-candidates-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map [up] 'sos-prev-candidate)
-    (define-key map [down] 'sos-next-candidate)
     (define-key map [return] 'sos-jump-in-candidate)
     map))
+
+(defun sos-candidates-post-command ()
+  (when (eobp)
+    (backward-char))
+  (sos-hl-line))
 
 ;;;###autoload
 (defun sos-jump-in-candidate ()
@@ -422,7 +432,7 @@ Return (FILE . LINUM) struct."
     (with-current-buffer sos-def-buf
       (when sos-candidates-mode
         (next-line)
-        (sos-hl-line)))))
+        (sos-candidates-post-command)))))
 
 ;;;###autoload
 (defun sos-prev-candidate ()
@@ -431,7 +441,7 @@ Return (FILE . LINUM) struct."
     (with-current-buffer sos-def-buf
       (when sos-candidates-mode
         (previous-line)
-        (sos-hl-line)))))
+        (sos-candidates-post-command)))))
 
 ;;;###autoload
 (define-minor-mode sos-candidates-mode
@@ -440,7 +450,8 @@ Return (FILE . LINUM) struct."
   :group 'sos-group
   (if sos-candidates-mode
       (progn
-        (use-local-map sos-candidates-mode-map))
-    ))
+        (use-local-map sos-candidates-mode-map)
+        (add-hook 'post-command-hook 'sos-candidates-post-command t t))
+    (remove-hook 'post-command-hook 'sos-candidates-post-command t)))
 
 (provide 'sos-basic-frontend)
