@@ -290,8 +290,8 @@
     ;; Set header line and button line.
     (setq header-line-format (sos-header-mode-line)
           mode-line-format (sos-bottom-mode-line
-                            (format "%s and %s to navigate the candidates,\
- %s or %s to open it"
+                            (format "%s and %s to choose the options,\
+ %s or %s to open it, %s to back to options."
                                     (propertize " UP "
                                                 'face 'tooltip)
                                     (propertize " DOWN "
@@ -299,6 +299,8 @@
                                     (propertize " CLICK "
                                                 'face 'tooltip)
                                     (propertize " ENTER "
+                                                'face 'tooltip)
+                                    (propertize " q "
                                                 'face 'tooltip)))
           cursor-type nil)))
 
@@ -478,7 +480,7 @@ Return (FILE . LINUM) struct."
     map))
 
 (defun sos-header-mode-line ()
-  `("  *Multiple definitions* | "
+  `("  Multiple Definitions | "
     (:eval (when sos-candidates-mode
              (format "Choose options: %s %s "
                      (propertize " Up "
@@ -490,12 +492,12 @@ Return (FILE . LINUM) struct."
                                  'mouse-face 'custom-button-mouse
                                  'local-map sos-next-candidate-button-map))))
     (:eval (if sos-candidates-stack
-               (format "Jump back: %s "
+               (format "Back to options: %s "
                        (propertize " Back "
                                    'face 'custom-button
                                    'mouse-face 'custom-button-mouse
                                    'local-map sos-jump-out-button-map))
-             (format "Jump to definition: %s "
+             (format "Open definition: %s "
                      (propertize " Go "
                                  'face 'custom-button
                                  'mouse-face 'custom-button-mouse
@@ -513,7 +515,7 @@ Return (FILE . LINUM) struct."
     map))
 
 (defun sos-bottom-mode-line (&optional desc file line)
-  `(,(propertize "  *Definition* "
+  `(,(propertize "  Definition "
                  'face 'mode-line-buffer-id)
     (:eval (and ,desc
                 (concat "| " ,desc)))
