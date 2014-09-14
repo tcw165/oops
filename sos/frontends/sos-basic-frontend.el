@@ -32,6 +32,7 @@
 
 (require 'align)
 (require 'cus-edit)
+(require 'font-lock)
 (require 'hl-line)
 (require 'linum)
 (require 'thingatpt)
@@ -69,7 +70,7 @@
   :group 'sos-group)
 
 (defface sos-hl-line-face
-  '((t (:background "yellow" :foreground "black" :weight bold :height 1.0)))
+  '((t (:background "yellow" :weight bold)))
   "Default face for highlighting line in definition window."
   :group 'sos-group)
 
@@ -86,8 +87,9 @@
   "A list caching the current content of definition buffer when navigating to 
 its definition.
 The format:
-  ((
-   )
+  ((:candidates LIST
+    :buffer STRING)
+    :point INTEGER
    ...)")
 
 (defvar sos-hl-overlay nil
@@ -213,9 +215,9 @@ The format:
       (sos-with-definition-buffer
         (kill-all-local-variables)
         (remove-overlays)
-        (fundamental-mode)
         (insert-file-contents file nil nil nil t)
         ;; Major mode.
+        (fundamental-mode)
         (dolist (mode auto-mode-alist)
           (and (not (null (cdr mode)))
                (string-match (car mode) file)
@@ -241,8 +243,9 @@ The format:
         (erase-buffer)
         (kill-all-local-variables)
         (remove-overlays)
-        (fundamental-mode)
         (insert doc)
+        ;; Major mode.
+        (fundamental-mode)
         ;; Minor mode.
         (sos-candidate-mode 1)
         (hl-line-unhighlight)
@@ -260,10 +263,9 @@ The format:
   "Show multiple candidates prompt."
   (sos-with-definition-buffer
     (setq standard-output (current-buffer))
-    (erase-buffer)
     (kill-all-local-variables)
     (remove-overlays)
-    (fundamental-mode)
+    (erase-buffer)
     (dolist (candidate (with-current-buffer sos-cached-buffer
                          sos-candidates))
       (let* ((file (plist-get candidate :file))
@@ -271,22 +273,37 @@ The format:
              (linum (plist-get candidate :linum))
              (type (plist-get candidate :type))
              (hl-word (plist-get candidate :hl-word)))
-        (when file
-          (princ (format "%s | %s | %s" type linum file)))
-        (when doc
+        (cond
+         (file
+          (insert (format "%s | %s | %s\n"
+                          (propertize type
+                                      'face 'font-lock-string-face)
+                          (propertize (number-to-string linum)
+                                      'face 'font-lock-constant-face)
+                          (propertize file
+                                      'face 'link))))
+         (doc
           (let* ((end (string-match "\n" doc))
                  (doc-line1 (substring-no-properties doc 0 (or (and (< end 48)
                                                                     end)
                                                                48))))
-            (princ (format "document | 0 | %s ..." doc-line1))))
-        (terpri)))
+            (insert (format "%s | %s | %s\n"
+                            (propertize "document"
+                                        'face 'font-lock-string-face)
+                            (propertize "0"
+                                        'face 'font-lock-constant-face)
+                            (propertize (concat doc-line1 " ...")
+                                        'face 'link))))))))
     ;; Alignment.
     (align-region 1 (point-max) 'entire
                   `((sos-multiple-candidates
                      (regexp . "^\\(\\w\\)+\\s-\|\\s-\\([0-9no]\\)+\\s-\|\\s-\\(.\\)+$")
                      (group . (1 2 3))))
                   nil)
-    ;; Minor-modes.
+    (delete-trailing-whitespace)
+    ;; Major mode.
+    (fundamental-mode)
+    ;; Minor modes.
     (sos-candidates-mode 1)
     (linum-mode 1)
     ;; Highlight line.
@@ -425,7 +442,19 @@ Return (FILE . LINUM) struct."
 (defun sos-candidates-post-command ()
   (when (eobp)
     (backward-char))
+  (end-of-line)
   (sos-hl-line))
+
+;; `message'
+(defun sos-candidates-text-props-init ()
+  (save-excursion
+    (goto-char 1)
+    )
+  ;; (add-text-properties 1 (point-max)
+  ;;                      (let (prop)
+  ;;                        (setq prop (plist-put prop 'face 'link)
+  ;;                              prop (plist-put prop 'mouse-face 'highlight))))
+  )
 
 ;;;###autoload
 (defun sos-jump-in-candidate ()
@@ -459,7 +488,9 @@ Return (FILE . LINUM) struct."
   :group 'sos-group
   (if sos-candidates-mode
       (progn
-        (use-local-map sos-candidates-mode-map)
+        ;; (use-local-map sos-candidates-mode-map)
+        ;; TODO: add link to file path.
+        (sos-candidates-text-props-init)
         (add-hook 'post-command-hook 'sos-candidates-post-command t t))
     (remove-hook 'post-command-hook 'sos-candidates-post-command t)))
 
