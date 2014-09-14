@@ -94,6 +94,7 @@
   "The highlight for line in `sos-definition-buffer'.")
 (make-variable-buffer-local 'sos-hl-line-overlay)
 
+;; Test: `message'
 (defvar sos-candidate-mode-map
   (let ((map (make-sparse-keymap)))
     ;; (define-key map [left] (lambda ()
@@ -102,6 +103,8 @@
     ;; (define-key map [right] (lambda ()
     ;;                           (interactive)
     ;;                           (forward-symbol 1)))
+    ;; TODO: let q become return function.
+    (define-key map (kbd "q") 'sos-jump-out-candidate)
     (define-key map [return] (lambda ()
                                (interactive)
                                (message "\"Jump to definition\" is yet supported!")))
