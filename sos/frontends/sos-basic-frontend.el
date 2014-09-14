@@ -96,12 +96,12 @@
 
 (defvar sos-candidate-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map [left] (lambda ()
-                             (interactive)
-                             (forward-symbol -1)))
-    (define-key map [right] (lambda ()
-                              (interactive)
-                              (forward-symbol 1)))
+    ;; (define-key map [left] (lambda ()
+    ;;                          (interactive)
+    ;;                          (forward-symbol -1)))
+    ;; (define-key map [right] (lambda ()
+    ;;                           (interactive)
+    ;;                           (forward-symbol 1)))
     (define-key map [return] (lambda ()
                                (interactive)
                                (message "\"Jump to definition\" is yet supported!")))
@@ -146,7 +146,7 @@
     (if enabled
         (sos-with-definition-buffer
           (setq header-line-format nil
-                mode-line-format (sos-button-mode-line)))
+                mode-line-format (sos-bottom-mode-line)))
       (when (windowp sos-def-win)
         (delete-window sos-def-win))
       (when (bufferp sos-def-buf)
@@ -175,13 +175,6 @@
                               'face 'font-lock-string-face))))
   (end-of-line))
 
-(defun sos-hl-line ()
-  (unless sos-hl-line-overlay
-    (setq sos-hl-line-overlay (make-overlay 1 1))
-    (overlay-put sos-hl-line-overlay 'face 'sos-hl-line-face))
-  (move-overlay sos-hl-line-overlay (line-beginning-position)
-                (line-beginning-position 2)))
-
 (defun sos-show-candidate ()
   "Show single candidate prompt."
   (let* ((candidate (nth sos-index (sos-get-local sos-candidates)))
@@ -190,7 +183,7 @@
          (linum (plist-get candidate :linum))
          (hl-word (plist-get candidate :hl-word))
          (mode-line (plist-get candidate :mode-line))
-         (button-mode-line (sos-button-mode-line mode-line file linum)))
+         (button-mode-line (sos-bottom-mode-line mode-line file linum)))
     (cond
      ;; A file ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
      ((and (stringp file)
@@ -293,7 +286,7 @@
     (sos-hl-line)
     ;; Set header line and button line.
     (setq header-line-format (sos-header-mode-line)
-          mode-line-format (sos-button-mode-line
+          mode-line-format (sos-bottom-mode-line
                             (format "%s and %s to navigate the candidates,\
  %s or %s to open it"
                                     (propertize " UP "
@@ -387,6 +380,13 @@ Return (FILE . LINUM) struct."
     (define-key map [return] 'sos-jump-in-candidate)
     (define-key map [mouse-1] 'sos-jump-in-candidate)
     map))
+
+(defun sos-hl-line ()
+  (unless sos-hl-line-overlay
+    (setq sos-hl-line-overlay (make-overlay 1 1))
+    (overlay-put sos-hl-line-overlay 'face 'sos-hl-line-face))
+  (move-overlay sos-hl-line-overlay (line-beginning-position)
+                (line-beginning-position 2)))
 
 (defun sos-candidates-post-command ()
   (when (eobp)
@@ -509,7 +509,7 @@ Return (FILE . LINUM) struct."
     (define-key map [mode-line mouse-1] 'sos-goto-definition-line)
     map))
 
-(defun sos-button-mode-line (&optional desc file line)
+(defun sos-bottom-mode-line (&optional desc file line)
   `(,(propertize "  *Definition* "
                  'face 'mode-line-buffer-id)
     (:eval (and ,desc
@@ -519,7 +519,7 @@ Return (FILE . LINUM) struct."
                         (propertize (abbreviate-file-name ,file)
                                     'local-map sos-file-path-map
                                     'face 'link
-                                    'mouse-face 'link
+                                    'mouse-face 'highlight
                                     'help-echo "mouse-1: Open the file.\n\
 mouse-3: Copy the path.")
                         (and (integerp ,line)
@@ -527,7 +527,7 @@ mouse-3: Copy the path.")
                                      (propertize (format "%d" ,line)
                                                  'local-map sos-linum-map
                                                  'face 'link
-                                                 'mouse-face 'link
+                                                 'mouse-face 'highlight
                                                  'help-echo "mouse-1: Back to the line.")))
                         ", function:(yet supported)")))))
 
