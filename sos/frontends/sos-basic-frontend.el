@@ -487,18 +487,17 @@ Return (FILE . LINUM) struct."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun sos-header-mode-line ()
-  `("  "
-    ;; (:eval (when (sos-with-definition-buffer
-    ;;                sos-candidates-mode)
-    ;;          (format "Choose options: %s %s "
-    ;;                  (propertize " Up "
-    ;;                              'face 'custom-button
-    ;;                              'mouse-face 'custom-button-mouse
-    ;;                              'local-map sos-prev-candidate-button-map)
-    ;;                  (propertize " Down "
-    ;;                              'face 'custom-button
-    ;;                              'mouse-face 'custom-button-mouse
-    ;;                              'local-map sos-next-candidate-button-map))))
+  `("  *Multiple definitions* | "
+    (:eval (when sos-candidates-mode
+             (format "Choose options: %s %s "
+                     (propertize " Up "
+                                 'face 'custom-button
+                                 'mouse-face 'custom-button-mouse
+                                 'local-map sos-prev-candidate-button-map)
+                     (propertize " Down "
+                                 'face 'custom-button
+                                 'mouse-face 'custom-button-mouse
+                                 'local-map sos-next-candidate-button-map))))
     (:eval (if sos-candidates-stack
                (format "Jump back: %s "
                        (propertize " Back "
