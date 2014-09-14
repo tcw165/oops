@@ -441,7 +441,6 @@ Return (FILE . LINUM) struct."
 ;;;###autoload
 (defun sos-jump-in-candidate ()
   (interactive)
-  (message "jump in definition.")
   (sos-push-candidates-stack)
   (let ((index (1- (sos-with-definition-buffer
                      (line-number-at-pos)))))
@@ -451,7 +450,6 @@ Return (FILE . LINUM) struct."
 ;;;###autoload
 (defun sos-jump-out-candidate ()
   (interactive)
-  (message "jump out definition.")
   (let ((candidates (sos-pop-candidates-stack)))
     (when candidates
       (sos-set-local sos-candidates candidates)
@@ -501,17 +499,18 @@ Return (FILE . LINUM) struct."
     ;;                              'face 'custom-button
     ;;                              'mouse-face 'custom-button-mouse
     ;;                              'local-map sos-next-candidate-button-map))))
-    ;; (:eval (when sos-candidates-stack
-    ;;          (format "Jump back: %s "
-    ;;                  (propertize " Back "
-    ;;                              'face 'custom-button
-    ;;                              'mouse-face 'custom-button-mouse
-    ;;                              'local-map sos-jump-out-button-map))))
-    "Jump to definition: "
-    ,(propertize " Go "
-                 'face 'custom-button
-                 'mouse-face 'custom-button-mouse
-                 'local-map sos-jump-in-button-map)))
+    (:eval (if sos-candidates-stack
+               (format "Jump back: %s "
+                       (propertize " Back "
+                                   'face 'custom-button
+                                   'mouse-face 'custom-button-mouse
+                                   'local-map sos-jump-out-button-map))
+             (format "Jump to definition: %s "
+                     (propertize " Go "
+                                 'face 'custom-button
+                                 'mouse-face 'custom-button-mouse
+                                 'local-map sos-jump-in-button-map))))
+    ))
 
 (defun sos-button-mode-line (&optional desc file line)
   `(,(propertize "  *Definition* "

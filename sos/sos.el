@@ -169,16 +169,18 @@ into the stack when user navigate to deeper definition in the definition window.
 (defmacro sos-get-local (symb)
   "Get buffer-localed variable of source code buffer. e.g. `sos-backend', 
 `sos-symbol', `sos-candidates', `sos-index' and `sos-tips'."
-  (and sos-source-buffer
-       `(with-current-buffer sos-source-buffer
-          ,symb)))
+  `(progn
+     (and sos-source-buffer
+          (with-current-buffer sos-source-buffer
+            ,symb))))
 
 (defmacro sos-set-local (symb value)
   "Set buffer-localed variable of source code buffer. e.g. `sos-backend', 
 `sos-symbol', `sos-candidates', `sos-index' and `sos-tips'."
-  (and sos-source-buffer
-       `(with-current-buffer sos-source-buffer
-          (setq ,symb ,value))))
+  `(progn
+     (and sos-source-buffer
+          (with-current-buffer sos-source-buffer
+            (setq ,symb ,value)))))
 
 (defun sos-is-skip-command (&rest commands)
   "Return t if `this-command' should be skipped.
