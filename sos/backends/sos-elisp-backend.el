@@ -134,7 +134,7 @@ refer to `find-function-noselect', `find-function-search-for-symbol' and
               (terpri)(terpri)
               (princ doc)
               `(:doc ,(buffer-string) :linum 1 :type "function" :hl-word ,name
-                     :mode-line ,(format "%s is a built-in Elisp function."
+                     :mode-line ,(format "%s is a built-in Elisp function. "
                                          (propertize (concat " " name " ")
                                           'face 'tooltip)))))
         ;; File struct ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

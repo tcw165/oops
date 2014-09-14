@@ -54,7 +54,7 @@
            sos-candidates-stack nil)
      (sos-toggle-definition-buffer&window 1)
      (if (> (length sos-candidates) 1)
-         (sos-show-multiple-candidates)
+         (sos-show-candidates)
        (sos-show-candidate)))))
 
 ;;;###autoload
@@ -94,7 +94,6 @@
   "The highlight for line in `sos-definition-buffer'.")
 (make-variable-buffer-local 'sos-hl-line-overlay)
 
-;; Test: `message'
 (defvar sos-candidate-mode-map
   (let ((map (make-sparse-keymap)))
     ;; (define-key map [left] (lambda ()
@@ -119,6 +118,7 @@
      (unless (window-live-p sos-def-win)
        (let* ((win (cond
                     ;; Outline window is present ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                    ;; TODO:
                     ;; Default ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                     (t (frame-root-window))))
               (height (or (and (> sos-def-win-height 0)
@@ -186,7 +186,12 @@
          (linum (plist-get candidate :linum))
          (hl-word (plist-get candidate :hl-word))
          (mode-line (plist-get candidate :mode-line))
-         (button-mode-line (sos-bottom-mode-line mode-line file linum)))
+         (nav-tooltips (and sos-candidates-stack
+                            (format "%s to back to options. "
+                                    (propertize " q "
+                                                'face 'tooltip))))
+         (tooltips (concat mode-line nav-tooltips))
+         (button-mode-line (sos-bottom-mode-line tooltips file linum)))
     (cond
      ;; A file ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
      ((and (stringp file)
@@ -238,7 +243,7 @@
               ;; Hide the cursor.
               cursor-type nil))))))
 
-(defun sos-show-multiple-candidates ()
+(defun sos-show-candidates ()
   "Show multiple candidates prompt."
   (sos-with-definition-buffer
     (setq standard-output (current-buffer))
@@ -290,17 +295,8 @@
     ;; Set header line and button line.
     (setq header-line-format (sos-header-mode-line)
           mode-line-format (sos-bottom-mode-line
-                            (format "%s and %s to choose the options,\
- %s or %s to open it, %s to back to options."
-                                    (propertize " UP "
-                                                'face 'tooltip)
-                                    (propertize " DOWN "
-                                                'face 'tooltip)
-                                    (propertize " CLICK "
-                                                'face 'tooltip)
+                            (format "%s to open it."
                                     (propertize " ENTER "
-                                                'face 'tooltip)
-                                    (propertize " q "
                                                 'face 'tooltip)))
           cursor-type nil)))
 
@@ -427,7 +423,7 @@ Return (FILE . LINUM) struct."
     (when candidates
       (sos-set-local sos-candidates candidates)
       (if (sos-is-multiple-candidates)
-          (sos-show-multiple-candidates)
+          (sos-show-candidates)
         (sos-show-candidate)))))
 
 ;;;###autoload
@@ -517,23 +513,20 @@ Return (FILE . LINUM) struct."
 (defun sos-bottom-mode-line (&optional desc file line)
   `(,(propertize "  Definition "
                  'face 'mode-line-buffer-id)
-    (:eval (and ,desc
-                (concat "| " ,desc)))
-    (:eval (and (file-exists-p ,file)
-                (concat "| file:"
+    (:eval (and (file-exists-p ,file) (integerp ,line)
+                (format "| file:%s, line:%s, function:(yet supported) "
                         (propertize (abbreviate-file-name ,file)
-                                    'local-map sos-file-path-map
                                     'face 'link
                                     'mouse-face 'highlight
                                     'help-echo "mouse-1: Open the file.\n\
-mouse-3: Copy the path.")
-                        (and (integerp ,line)
-                             (concat ", line:"
-                                     (propertize (format "%d" ,line)
-                                                 'local-map sos-linum-map
-                                                 'face 'link
-                                                 'mouse-face 'highlight
-                                                 'help-echo "mouse-1: Back to the line.")))
-                        ", function:(yet supported)")))))
+mouse-3: Copy the path."
+                                    'local-map sos-file-path-map)
+                        (propertize (number-to-string ,line)
+                                    'face 'link
+                                    'mouse-face 'highlight
+                                    'help-echo "mouse-1: Back to the line."
+                                    'local-map sos-linum-map))))
+    (:eval (and ,desc (> (length ,desc) 0)
+                (format "| %s " ,desc)))))
 
 (provide 'sos-basic-frontend)
