@@ -83,15 +83,6 @@
 (defvar sos-def-win-height 0
   "The height of definition window.")
 
-(defvar sos-def-stack nil
-  "A list caching the current content of definition buffer when navigating to 
-its definition.
-The format:
-  ((:candidates LIST
-    :buffer STRING)
-    :point INTEGER
-   ...)")
-
 (defvar sos-hl-overlay nil
   "The highlight for keyword in `sos-definition-buffer'.")
 (make-variable-buffer-local 'sos-hl-overlay)
@@ -459,7 +450,8 @@ Return (FILE . LINUM) struct."
 ;;;###autoload
 (defun sos-jump-in-candidate ()
   (interactive)
-  (message "\"Jump to definition\" is yet supported!"))
+  (push (sos-local-variable sos-candidates) sos-candidates-stack)
+  (message "\"Jump to candidate\" is yet supported!"))
 
 ;;;###autoload
 (defun sos-jump-out-candidate ()

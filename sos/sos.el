@@ -140,6 +140,15 @@ Return value will be cached to `sos-candidates'.
 (defvar sos-cached-window nil
   "The current window where the source code buffer is at.")
 
+(defvar sos-candidates-stack nil
+  "A list caching the current content of definition buffer when navigating to 
+its definition.
+The format:
+  ((:candidates LIST
+    :buffer STRING)
+    :point INTEGER
+   ...)")
+
 (defvar sos-backend nil
   "The back-end which takes control of current session in the back-ends list.")
 (make-variable-buffer-local 'sos-backend)
