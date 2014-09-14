@@ -83,7 +83,12 @@
   "The height of definition window.")
 
 (defvar sos-def-stack nil
-  "Cache the current content of definition buffer when navigating into deeper.")
+  "A list caching the current content of definition buffer when navigating to 
+its definition.
+The format:
+  ((
+   )
+   ...)")
 
 (defvar sos-hl-overlay nil
   "The highlight for keyword in `sos-definition-buffer'.")
@@ -139,9 +144,6 @@
      (let (ret)
        (with-selected-window sos-def-win
          (with-current-buffer sos-def-buf
-           (kill-all-local-variables)
-           (remove-overlays)
-           (fundamental-mode)
            ;; Make it read-writeable.
            (setq buffer-read-only nil)
            ;; `body' >>>
@@ -209,6 +211,9 @@
      ((and (stringp file)
            (file-exists-p file))
       (sos-with-definition-buffer
+        (kill-all-local-variables)
+        (remove-overlays)
+        (fundamental-mode)
         (insert-file-contents file nil nil nil t)
         ;; Major mode.
         (dolist (mode auto-mode-alist)
@@ -234,6 +239,9 @@
      ((stringp doc)
       (sos-with-definition-buffer
         (erase-buffer)
+        (kill-all-local-variables)
+        (remove-overlays)
+        (fundamental-mode)
         (insert doc)
         ;; Minor mode.
         (sos-candidate-mode 1)
@@ -253,6 +261,9 @@
   (sos-with-definition-buffer
     (setq standard-output (current-buffer))
     (erase-buffer)
+    (kill-all-local-variables)
+    (remove-overlays)
+    (fundamental-mode)
     (dolist (candidate (with-current-buffer sos-cached-buffer
                          sos-candidates))
       (let* ((file (plist-get candidate :file))
@@ -428,20 +439,18 @@ Return (FILE . LINUM) struct."
 ;;;###autoload
 (defun sos-next-candidate ()
   (interactive)
-  (with-selected-window sos-def-win
-    (with-current-buffer sos-def-buf
-      (when sos-candidates-mode
-        (next-line)
-        (sos-candidates-post-command)))))
+  (sos-with-definition-buffer
+    (when sos-candidates-mode
+      (next-line)
+      (sos-candidates-post-command))))
 
 ;;;###autoload
 (defun sos-prev-candidate ()
   (interactive)
-  (with-selected-window sos-def-win
-    (with-current-buffer sos-def-buf
-      (when sos-candidates-mode
-        (previous-line)
-        (sos-candidates-post-command)))))
+  (sos-with-definition-buffer
+    (when sos-candidates-mode
+      (previous-line)
+      (sos-candidates-post-command))))
 
 ;;;###autoload
 (define-minor-mode sos-candidates-mode
