@@ -32,6 +32,45 @@
 
 (defconst sos-elisp-find-feature-regexp "^\\s-*(provide '%s)")
 
+;;;###autoload
+(defun sos-elisp-backend (command &optional arg)
+  (case command
+    (:symbol
+     (when (member major-mode '(emacs-lisp-mode
+                                lisp-interaction-mode))
+       (let ((symb (sos-elisp-thingatpt)))
+         (or (and symb (intern-soft symb))
+             :stop))))
+    (:candidates
+     (when arg
+       (let ((symb arg)
+             candidates)
+         ;; TODO: use tag system.
+         ;; The last one gets the top priority.
+         (dolist (cand (list (sos-elisp-find-feature symb)
+                             (sos-elisp-find-face symb)
+                             (sos-elisp-find-variable symb)
+                             (sos-elisp-find-function symb)
+                             (sos-elisp-find-let-variable symb)))
+           (and cand
+                (push cand candidates)))
+         candidates)))
+    (:tips
+     (when arg
+       (list (format "%s" arg))))))
+
+(defun sos-elisp-thingatpt ()
+  "Find symbol string around the point or text selection."
+  (if mark-active
+      (buffer-substring-no-properties (region-beginning) (region-end))
+    ;; Skip string and comment.
+    (unless (memq (get-text-property (point) 'face) '(font-lock-doc-face
+                                                      font-lock-string-face
+                                                      font-lock-comment-face))
+      (let* ((bound (bounds-of-thing-at-point 'symbol)))
+        (and bound
+             (buffer-substring-no-properties (car bound) (cdr bound)))))))
+
 (defun sos-elisp-normalize-path (file)
   ;; Convert extension from .elc to .el.
   (when (string-match "\\.el\\(c\\)\\'" file)
@@ -228,43 +267,5 @@ file-local variable.\n")
            (file (sos-elisp-normalize-path file))
            (linum (sos-elisp-count-lines file name find-face-regexp)))
       `(:file ,file :linum ,linum :type "face" :hl-word ,name))))
-
-(defun sos-elisp-thingatpt ()
-  "Find symbol string around the point or text selection."
-  (if mark-active
-      (buffer-substring-no-properties (region-beginning) (region-end))
-    ;; Skip string and comment.
-    (unless (memq (get-text-property (point) 'face) '(font-lock-doc-face
-                                                      font-lock-string-face
-                                                      font-lock-comment-face))
-      (let* ((bound (bounds-of-thing-at-point 'symbol)))
-        (and bound
-             (buffer-substring-no-properties (car bound) (cdr bound)))))))
-
-;;;###autoload
-(defun sos-elisp-backend (command &optional arg)
-  (case command
-    (:symbol
-     (when (member major-mode '(emacs-lisp-mode
-                                lisp-interaction-mode))
-       (let ((symb (sos-elisp-thingatpt)))
-         (or (and symb (intern-soft symb))
-             :stop))))
-    (:candidates
-     (when arg
-       (let ((symb arg)
-             candidates)
-         ;; TODO: use tag system.
-         (dolist (cand (list (sos-elisp-find-function symb)
-                             (sos-elisp-find-let-variable symb)
-                             (sos-elisp-find-variable symb)
-                             (sos-elisp-find-face symb)
-                             (sos-elisp-find-feature symb)))
-           (and cand
-                (push cand candidates)))
-         (reverse candidates))))
-    (:tips
-     (when arg
-       (list (format "%s" arg))))))
 
 (provide 'sos-elisp-backend)
