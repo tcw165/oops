@@ -134,10 +134,10 @@ Return value will be cached to `sos-candidates'.
 (defvar sos-timer nil
   "The idle timer to call `sos-idle-begin'.")
 
-(defvar sos-cached-buffer nil
+(defvar sos-source-buffer nil
   "The current source code buffer.")
 
-(defvar sos-cached-window nil
+(defvar sos-source-window nil
   "The current window where the source code buffer is at.")
 
 (defvar sos-candidates-stack nil
@@ -169,15 +169,15 @@ into the stack when user navigate to deeper definition in the definition window.
 (defmacro sos-get-local (symb)
   "Get buffer-localed variable of source code buffer. e.g. `sos-backend', 
 `sos-symbol', `sos-candidates', `sos-index' and `sos-tips'."
-  (and sos-cached-buffer (buffer-live-p sos-cached-buffer)
-       `(with-current-buffer sos-cached-buffer
+  (and sos-source-buffer
+       `(with-current-buffer sos-source-buffer
           ,symb)))
 
 (defmacro sos-set-local (symb value)
   "Set buffer-localed variable of source code buffer. e.g. `sos-backend', 
 `sos-symbol', `sos-candidates', `sos-index' and `sos-tips'."
-  (and sos-cached-buffer
-       `(with-current-buffer sos-cached-buffer
+  (and sos-source-buffer
+       `(with-current-buffer sos-source-buffer
           (setq ,symb ,value))))
 
 (defun sos-is-skip-command (&rest commands)
@@ -186,12 +186,12 @@ If you want to skip additional commands, try example:
 
   (sos-is-skip-command 'self-insert-command 'previous-line 'next-line
                        'left-char right-char)"
-  (member this-command `(mwheel-scroll
-                         save-buffer
-                         eval-buffer
-                         eval-last-sexp
-                         ;; Additional commands.
-                         ,@commands)))
+  (memq this-command `(mwheel-scroll
+                       save-buffer
+                       eval-buffer
+                       eval-last-sexp
+                       ;; Additional commands.
+                       ,@commands)))
 
 (defun sos-is-multiple-candidates ()
   (> (length (sos-get-local sos-candidates)) 1))
@@ -200,7 +200,7 @@ If you want to skip additional commands, try example:
   (push (sos-get-local sos-candidates) sos-candidates-stack))
 
 (defun sos-pop-candidates-stack ()
-  (push (sos-get-local sos-candidates) sos-candidates-stack))
+  (pop sos-candidates-stack))
 
 (defun sos-pre-command ()
   (when sos-timer
@@ -209,8 +209,8 @@ If you want to skip additional commands, try example:
 
 (defun sos-post-command ()
   (when (sos-is-idle-begin)
-    (setq sos-cached-buffer (current-buffer)
-          sos-cached-window (selected-window))
+    (setq sos-source-buffer (current-buffer)
+          sos-source-window (selected-window))
     (setq sos-timer (run-with-timer sos-idle-delay nil
                                     'sos-idle-begin))))
 
@@ -251,8 +251,8 @@ If you want to skip additional commands, try example:
      ;; Something ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
      (t
       (if (and (eq symb sos-symbol)
-               (eq (current-buffer) sos-cached-buffer)
-               (eq (selected-window) sos-cached-window))
+               (eq (current-buffer) sos-source-buffer)
+               (eq (selected-window) sos-source-window))
           (progn
             ;; If return symbol string is equal to `sos-symbol', ask front-ends
             ;; to do `:update' task.

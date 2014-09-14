@@ -51,7 +51,7 @@
            ;; Clean the stack.
            sos-candidates-stack nil)
      (sos-toggle-definition-buffer&window 1)
-     (if (sos-is-multiple-candidates)
+     (if (> (length sos-candidates) 1)
          (sos-show-multiple-candidates)
        (sos-show-candidate)))))
 
@@ -315,38 +315,6 @@
                                                 'face 'tooltip)))
           cursor-type nil)))
 
-(defun sos-header-mode-line ()
-  `(,(propertize " Back "
-                 'face 'custom-button
-                 'mouse-face 'custom-button-mouse)
-    " "
-    ,(propertize " Next "
-                 'face 'custom-button
-                 'mouse-face 'custom-button-mouse)
-    "  There're multiple candidates (implementing)."))
-
-(defun sos-button-mode-line (&optional desc file line)
-  `(,(propertize "  *Definition* "
-                 'face 'mode-line-buffer-id)
-    (:eval (and ,desc
-                (concat "| " ,desc)))
-    (:eval (and (file-exists-p ,file)
-                (concat "| file:"
-                        (propertize (abbreviate-file-name ,file)
-                                    'local-map sos-definition-file-map
-                                    'face 'link
-                                    'mouse-face 'link
-                                    'help-echo "mouse-1: Open the file.\n\
-mouse-3: Copy the path.")
-                        (and (integerp ,line)
-                             (concat ", line:"
-                                     (propertize (format "%d" ,line)
-                                                 'local-map sos-definition-linum-map
-                                                 'face 'link
-                                                 'mouse-face 'link
-                                                 'help-echo "mouse-1: Back to the line.")))
-                        ", function:(yet supported)")))))
-
 (defun sos-ml-info ()
   "Get file and line number from definition buffer's `mode-line-format'.
 Return (FILE . LINUM) struct."
@@ -431,6 +399,26 @@ Return (FILE . LINUM) struct."
     (define-key map [mouse-1] 'sos-jump-in-candidate)
     map))
 
+(defvar sos-next-candidate-button-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [header-line mouse-1] 'sos-next-candidate)
+    map))
+
+(defvar sos-prev-candidate-button-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [header-line mouse-1] 'sos-prev-candidate)
+    map))
+
+(defvar sos-jump-in-button-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [header-line mouse-1] 'sos-jump-in-candidate)
+    map))
+
+(defvar sos-jump-out-button-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [header-line mouse-1] 'sos-jump-out-candidate)
+    map))
+
 (defun sos-candidates-post-command ()
   (when (eobp)
     (backward-char))
@@ -453,18 +441,23 @@ Return (FILE . LINUM) struct."
 ;;;###autoload
 (defun sos-jump-in-candidate ()
   (interactive)
+  (message "jump in definition.")
   (sos-push-candidates-stack)
   (let ((index (1- (sos-with-definition-buffer
                      (line-number-at-pos)))))
     (sos-set-local sos-candidates `(,(nth index sos-candidates)))
-    (sos-push-candidates-stack)
     (sos-show-candidate)))
 
 ;;;###autoload
 (defun sos-jump-out-candidate ()
   (interactive)
-  ;; TODO:
-  )
+  (message "jump out definition.")
+  (let ((candidates (sos-pop-candidates-stack)))
+    (when candidates
+      (sos-set-local sos-candidates candidates)
+      (if (sos-is-multiple-candidates)
+          (sos-show-multiple-candidates)
+        (sos-show-candidate)))))
 
 ;;;###autoload
 (defun sos-next-candidate ()
@@ -492,5 +485,54 @@ Return (FILE . LINUM) struct."
         (sos-add-text-button)
         (add-hook 'post-command-hook 'sos-candidates-post-command t t))
     (remove-hook 'post-command-hook 'sos-candidates-post-command t)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun sos-header-mode-line ()
+  `("  "
+    ;; (:eval (when (sos-with-definition-buffer
+    ;;                sos-candidates-mode)
+    ;;          (format "Choose options: %s %s "
+    ;;                  (propertize " Up "
+    ;;                              'face 'custom-button
+    ;;                              'mouse-face 'custom-button-mouse
+    ;;                              'local-map sos-prev-candidate-button-map)
+    ;;                  (propertize " Down "
+    ;;                              'face 'custom-button
+    ;;                              'mouse-face 'custom-button-mouse
+    ;;                              'local-map sos-next-candidate-button-map))))
+    ;; (:eval (when sos-candidates-stack
+    ;;          (format "Jump back: %s "
+    ;;                  (propertize " Back "
+    ;;                              'face 'custom-button
+    ;;                              'mouse-face 'custom-button-mouse
+    ;;                              'local-map sos-jump-out-button-map))))
+    "Jump to definition: "
+    ,(propertize " Go "
+                 'face 'custom-button
+                 'mouse-face 'custom-button-mouse
+                 'local-map sos-jump-in-button-map)))
+
+(defun sos-button-mode-line (&optional desc file line)
+  `(,(propertize "  *Definition* "
+                 'face 'mode-line-buffer-id)
+    (:eval (and ,desc
+                (concat "| " ,desc)))
+    (:eval (and (file-exists-p ,file)
+                (concat "| file:"
+                        (propertize (abbreviate-file-name ,file)
+                                    'local-map sos-definition-file-map
+                                    'face 'link
+                                    'mouse-face 'link
+                                    'help-echo "mouse-1: Open the file.\n\
+mouse-3: Copy the path.")
+                        (and (integerp ,line)
+                             (concat ", line:"
+                                     (propertize (format "%d" ,line)
+                                                 'local-map sos-definition-linum-map
+                                                 'face 'link
+                                                 'mouse-face 'link
+                                                 'help-echo "mouse-1: Back to the line.")))
+                        ", function:(yet supported)")))))
 
 (provide 'sos-basic-frontend)
