@@ -37,6 +37,8 @@
 (require 'linum)
 (require 'thingatpt)
 
+(require 'history)
+
 ;;;###autoload
 (defun sos-definition-buffer-frontend (command)
   (case command
@@ -103,17 +105,6 @@
     (define-key map [return] (lambda ()
                                (interactive)
                                (message "\"Jump to definition\" is yet supported!")))
-    map))
-
-(defvar sos-definition-file-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map [mode-line mouse-1] 'sos-definition-open-file)
-    (define-key map [mode-line mouse-3] 'sos-definition-copy-path)
-    map))
-
-(defvar sos-definition-linum-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map [mode-line mouse-1] 'sos-definition-goto-line)
     map))
 
 (defmacro sos-with-definition-buffer (&rest body)
@@ -338,7 +329,7 @@ Return (FILE . LINUM) struct."
       (cons file linum))))
 
 ;;;###autoload
-(defun sos-definition-open-file ()
+(defun sos-open-definition-file ()
   "Open file refer to `mode-line-format'."
   (interactive)
   (let* ((info (sos-ml-info))
@@ -346,20 +337,18 @@ Return (FILE . LINUM) struct."
          (linum (cdr info)))
     (when (and (file-exists-p file)
                (integerp linum)
-               (window-live-p sos-cached-window))
-      (with-selected-window sos-cached-window
+               (window-live-p sos-source-window))
+      (with-selected-window sos-source-window
         (unless (string= file (buffer-file-name (window-buffer)))
-          (and (featurep 'history)
-               (his-add-position-type-history))
+          (his-add-position-type-history)
           (find-file file)
           (goto-line linum)
-          (and (featurep 'history)
-               (his-add-position-type-history))
+          (his-add-position-type-history)
           (recenter 3)))
-      (select-window sos-cached-window))))
+      (select-window sos-source-window))))
 
 ;;;###autoload
-(defun sos-definition-copy-path ()
+(defun sos-copy-definition-file-path ()
   "Copy file path refer to `mode-line-format'."
   (interactive)
   (let* ((info (sos-ml-info))
@@ -367,11 +356,11 @@ Return (FILE . LINUM) struct."
     (and file
          (with-temp-buffer
            (insert file)
-           (clipboard-kill-ring-save 1 (point-max))
-           (message "File path is copied to clipboard!")))))
+           (clipboard-kill-ring-save 1 (point-max)))
+         (message "File path is copied to clipboard!"))))
 
 ;;;###autoload
-(defun sos-definition-goto-line ()
+(defun sos-goto-definition-line ()
   "Go to line refer to `mode-line-format'."
   (interactive)
   (let* ((info (sos-ml-info))
@@ -399,26 +388,6 @@ Return (FILE . LINUM) struct."
     (define-key map [mouse-1] 'sos-jump-in-candidate)
     map))
 
-(defvar sos-next-candidate-button-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map [header-line mouse-1] 'sos-next-candidate)
-    map))
-
-(defvar sos-prev-candidate-button-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map [header-line mouse-1] 'sos-prev-candidate)
-    map))
-
-(defvar sos-jump-in-button-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map [header-line mouse-1] 'sos-jump-in-candidate)
-    map))
-
-(defvar sos-jump-out-button-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map [header-line mouse-1] 'sos-jump-out-candidate)
-    map))
-
 (defun sos-candidates-post-command ()
   (when (eobp)
     (backward-char))
@@ -437,7 +406,6 @@ Return (FILE . LINUM) struct."
                              `(keymap ,sos-candidates-mode-map)))
       (forward-line))))
 
-;; `message'
 ;;;###autoload
 (defun sos-jump-in-candidate ()
   (interactive)
@@ -486,6 +454,26 @@ Return (FILE . LINUM) struct."
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defvar sos-next-candidate-button-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [header-line mouse-1] 'sos-next-candidate)
+    map))
+
+(defvar sos-prev-candidate-button-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [header-line mouse-1] 'sos-prev-candidate)
+    map))
+
+(defvar sos-jump-in-button-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [header-line mouse-1] 'sos-jump-in-candidate)
+    map))
+
+(defvar sos-jump-out-button-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [header-line mouse-1] 'sos-jump-out-candidate)
+    map))
+
 (defun sos-header-mode-line ()
   `("  *Multiple definitions* | "
     (:eval (when sos-candidates-mode
@@ -508,8 +496,18 @@ Return (FILE . LINUM) struct."
                      (propertize " Go "
                                  'face 'custom-button
                                  'mouse-face 'custom-button-mouse
-                                 'local-map sos-jump-in-button-map))))
-    ))
+                                 'local-map sos-jump-in-button-map))))))
+
+(defvar sos-file-path-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [mode-line mouse-1] 'sos-open-definition-file)
+    (define-key map [mode-line mouse-3] 'sos-copy-definition-file-path)
+    map))
+
+(defvar sos-linum-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [mode-line mouse-1] 'sos-goto-definition-line)
+    map))
 
 (defun sos-button-mode-line (&optional desc file line)
   `(,(propertize "  *Definition* "
@@ -519,7 +517,7 @@ Return (FILE . LINUM) struct."
     (:eval (and (file-exists-p ,file)
                 (concat "| file:"
                         (propertize (abbreviate-file-name ,file)
-                                    'local-map sos-definition-file-map
+                                    'local-map sos-file-path-map
                                     'face 'link
                                     'mouse-face 'link
                                     'help-echo "mouse-1: Open the file.\n\
@@ -527,7 +525,7 @@ mouse-3: Copy the path.")
                         (and (integerp ,line)
                              (concat ", line:"
                                      (propertize (format "%d" ,line)
-                                                 'local-map sos-definition-linum-map
+                                                 'local-map sos-linum-map
                                                  'face 'link
                                                  'mouse-face 'link
                                                  'help-echo "mouse-1: Back to the line.")))
