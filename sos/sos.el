@@ -208,13 +208,11 @@ If you want to skip additional commands, try example:
     (setq sos-timer nil)))
 
 (defun sos-post-command ()
-  (and (sos-is-idle-begin)
-       ;;;;;; Begin instantly.
-       (or (and (= sos-idle-delay 0)
-                (sos-idle-begin))
-           ;; Begin with delay `sos-idle-delay'
-           (setq sos-timer (run-with-timer sos-idle-delay nil
-                                           'sos-idle-begin)))))
+  (when (sos-is-idle-begin)
+    (setq sos-cached-buffer (current-buffer)
+          sos-cached-window (selected-window))
+    (setq sos-timer (run-with-timer sos-idle-delay nil
+                                    'sos-idle-begin))))
 
 (defun sos-is-idle-begin ()
   (not (or (active-minibuffer-window)
@@ -224,8 +222,6 @@ If you want to skip additional commands, try example:
 (defun sos-idle-begin ()
   (condition-case err
       (progn
-        (setq sos-cached-buffer (current-buffer)
-              sos-cached-window (selected-window))
         (if (null sos-backend)
             (sos-1st-process)
           (sos-normal-process sos-backend)))
