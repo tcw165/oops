@@ -141,13 +141,8 @@ Return value will be cached to `sos-candidates'.
   "The current window where the source code buffer is at.")
 
 (defvar sos-candidates-stack nil
-  "A list caching the current content of definition buffer when navigating to 
-its definition.
-The format:
-  ((:candidates LIST
-    :buffer STRING)
-    :point INTEGER
-   ...)")
+  "A list containing `sos-candidates'. Engine will push the current candidates 
+into the stack when user navigate to deeper definition in the definition window.")
 
 (defvar sos-backend nil
   "The back-end which takes control of current session in the back-ends list.")
@@ -171,21 +166,26 @@ The format:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defmacro sos-local-variable (symb)
-  (and sos-cached-buffer
+(defmacro sos-get-local (symb)
+  "Get buffer-localed variable of source code buffer. e.g. `sos-backend', 
+`sos-symbol', `sos-candidates', `sos-index' and `sos-tips'."
+  (and sos-cached-buffer (buffer-live-p sos-cached-buffer)
        `(with-current-buffer sos-cached-buffer
           ,symb)))
+
+(defmacro sos-set-local (symb value)
+  "Set buffer-localed variable of source code buffer. e.g. `sos-backend', 
+`sos-symbol', `sos-candidates', `sos-index' and `sos-tips'."
+  (and sos-cached-buffer
+       `(with-current-buffer sos-cached-buffer
+          (setq ,symb ,value))))
 
 (defun sos-is-skip-command (&rest commands)
   "Return t if `this-command' should be skipped.
 If you want to skip additional commands, try example:
 
-  (sos-is-skip-command 'self-insert-command
-                       'previous-line
-                       'next-line
-                       'left-char
-                       'right-char)
-"
+  (sos-is-skip-command 'self-insert-command 'previous-line 'next-line
+                       'left-char right-char)"
   (member this-command `(mwheel-scroll
                          save-buffer
                          eval-buffer
@@ -194,7 +194,13 @@ If you want to skip additional commands, try example:
                          ,@commands)))
 
 (defun sos-is-multiple-candidates ()
-  (> (length sos-candidates) 1))
+  (> (length (sos-get-local sos-candidates)) 1))
+
+(defun sos-push-candidates-stack ()
+  (push (sos-get-local sos-candidates) sos-candidates-stack))
+
+(defun sos-pop-candidates-stack ()
+  (push (sos-get-local sos-candidates) sos-candidates-stack))
 
 (defun sos-pre-command ()
   (when sos-timer
@@ -204,8 +210,7 @@ If you want to skip additional commands, try example:
 (defun sos-post-command ()
   (and (sos-is-idle-begin)
        ;;;;;; Begin instantly.
-       (or nil
-           (and (= sos-idle-delay 0)
+       (or (and (= sos-idle-delay 0)
                 (sos-idle-begin))
            ;; Begin with delay `sos-idle-delay'
            (setq sos-timer (run-with-timer sos-idle-delay nil
@@ -218,9 +223,12 @@ If you want to skip additional commands, try example:
 
 (defun sos-idle-begin ()
   (condition-case err
-      (if (null sos-backend)
-          (sos-1st-process)
-        (sos-normal-process sos-backend))
+      (progn
+        (setq sos-cached-buffer (current-buffer)
+              sos-cached-window (selected-window))
+        (if (null sos-backend)
+            (sos-1st-process)
+          (sos-normal-process sos-backend)))
     (error err)))
 
 (defun sos-1st-process ()
@@ -242,7 +250,6 @@ If you want to skip additional commands, try example:
      ;; Return nil ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
      ((null symb)
       ;; (message "(%s) sos-normal-process: hide" (current-time))
-      (sos-kill-local-variables)
       (sos-call-frontends :hide))
 
      ;; Something ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -265,15 +272,7 @@ If you want to skip additional commands, try example:
               ;; (message "(%s) sos-normal-process: show" (current-time))
               (sos-call-frontends :show))
           ;; (message "(%s) sos-normal-process: hide" (current-time))
-          (sos-call-frontends :hide)))))
-    (setq sos-cached-buffer (current-buffer)
-          sos-cached-window (selected-window))))
-
-(defun sos-kill-local-variables ()
-  (mapc 'kill-local-variable '(sos-backend
-                               sos-symbol
-                               sos-candidates
-                               sos-tips)))
+          (sos-call-frontends :hide)))))))
 
 (defun sos-call-frontends (command &rest args)
   "Iterate all the `sos-backends' and pass `command' by order."
@@ -306,8 +305,7 @@ result to the `sos-def-buf' displayed in the `sos-def-win'."
         (add-hook 'post-command-hook 'sos-post-command))
     (sos-call-frontends :destroy)
     (remove-hook 'pre-command-hook 'sos-pre-command)
-    (remove-hook 'post-command-hook 'sos-post-command)
-    (sos-kill-local-variables)))
+    (remove-hook 'post-command-hook 'sos-post-command)))
 
 ;;;###autoload
 (define-minor-mode sos-outline-window-mode

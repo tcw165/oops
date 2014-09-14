@@ -47,8 +47,9 @@
      (sos-toggle-definition-buffer&window -1))
     (:show
      ;; TODO: remember user choice at last session in the prj.
-     (setq sos-def-stack nil
-           sos-index 0)
+     (setq sos-index 0
+           ;; Clean the stack.
+           sos-candidates-stack nil)
      (sos-toggle-definition-buffer&window 1)
      (if (sos-is-multiple-candidates)
          (sos-show-multiple-candidates)
@@ -192,7 +193,7 @@
 
 (defun sos-show-candidate ()
   "Show single candidate prompt."
-  (let* ((candidate (nth sos-index sos-candidates))
+  (let* ((candidate (nth sos-index (sos-get-local sos-candidates)))
          (file (plist-get candidate :file))
          (doc (plist-get candidate :doc))
          (linum (plist-get candidate :linum))
@@ -218,15 +219,15 @@
         (hl-line-unhighlight)
         ;; Move point and recenter.
         (and (integerp linum)
-             (goto-char 1)
+             (goto-char (point-min))
              (forward-line (- linum 1)))
         (recenter 3)
         ;; Highlight word.
         (sos-hl-word hl-word)
         ;; Set header line and button line.
-        (setq header-line-format nil
-              mode-line-format button-mode-line)
-        ))
+        (setq header-line-format (and sos-candidates-stack
+                                      (sos-header-mode-line))
+              mode-line-format button-mode-line)))
 
      ;; A document string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
      ((stringp doc)
@@ -241,11 +242,13 @@
         (sos-candidate-mode 1)
         (hl-line-unhighlight)
         ;; Highlight word.
-        (goto-char 1)
+        (goto-char (point-min))
         (sos-hl-word hl-word)
         ;; Set header line and button line.
-        (setq header-line-format nil
+        (setq header-line-format (and sos-candidates-stack
+                                      (sos-header-mode-line))
               mode-line-format button-mode-line
+              ;; Hide the cursor.
               cursor-type nil))))))
 
 (defun sos-show-multiple-candidates ()
@@ -255,7 +258,7 @@
     (kill-all-local-variables)
     (remove-overlays)
     (erase-buffer)
-    (dolist (candidate (sos-local-variable sos-candidates))
+    (dolist (candidate (sos-get-local sos-candidates))
       (let* ((file (plist-get candidate :file))
              (doc (plist-get candidate :doc))
              (linum (plist-get candidate :linum))
@@ -295,7 +298,7 @@
     (sos-candidates-mode 1)
     (linum-mode 1)
     ;; Highlight line.
-    (goto-char 1)
+    (goto-char (point-min))
     (sos-hl-line)
     ;; Set header line and button line.
     (setq header-line-format (sos-header-mode-line)
@@ -436,8 +439,8 @@ Return (FILE . LINUM) struct."
 
 (defun sos-add-text-button ()
   (save-excursion
-    (goto-char 1)
-    (dolist (cand (sos-local-variable sos-candidates))
+    (goto-char (point-min))
+    (dolist (candidate (sos-get-local sos-candidates))
       (let ((beg (line-beginning-position))
             (end (line-end-position)))
         (add-text-properties beg end
@@ -450,12 +453,18 @@ Return (FILE . LINUM) struct."
 ;;;###autoload
 (defun sos-jump-in-candidate ()
   (interactive)
-  (push (sos-local-variable sos-candidates) sos-candidates-stack)
-  (message "\"Jump to candidate\" is yet supported!"))
+  (sos-push-candidates-stack)
+  (let ((index (1- (sos-with-definition-buffer
+                     (line-number-at-pos)))))
+    (sos-set-local sos-candidates `(,(nth index sos-candidates)))
+    (sos-push-candidates-stack)
+    (sos-show-candidate)))
 
 ;;;###autoload
 (defun sos-jump-out-candidate ()
-  (interactive))
+  (interactive)
+  ;; TODO:
+  )
 
 ;;;###autoload
 (defun sos-next-candidate ()
