@@ -257,8 +257,6 @@ The format:
               mode-line-format button-mode-line
               cursor-type nil))))))
 
-;; `message'
-;; `sos-candidate-mode'
 (defun sos-show-multiple-candidates ()
   "Show multiple candidates prompt."
   (sos-with-definition-buffer
@@ -266,8 +264,7 @@ The format:
     (kill-all-local-variables)
     (remove-overlays)
     (erase-buffer)
-    (dolist (candidate (with-current-buffer sos-cached-buffer
-                         sos-candidates))
+    (dolist (candidate (sos-local-variable sos-candidates))
       (let* ((file (plist-get candidate :file))
              (doc (plist-get candidate :doc))
              (linum (plist-get candidate :linum))
@@ -281,7 +278,7 @@ The format:
                           (propertize (number-to-string linum)
                                       'face 'font-lock-constant-face)
                           (propertize file
-                                      'face 'link))))
+                                      'face 'bold))))
          (doc
           (let* ((end (string-match "\n" doc))
                  (doc-line1 (substring-no-properties doc 0 (or (and (< end 48)
@@ -293,14 +290,14 @@ The format:
                             (propertize "0"
                                         'face 'font-lock-constant-face)
                             (propertize (concat doc-line1 " ...")
-                                        'face 'link))))))))
+                                        'face 'bold))))))))
     ;; Alignment.
     (align-region 1 (point-max) 'entire
                   `((sos-multiple-candidates
                      (regexp . "^\\(\\w\\)+\\s-\|\\s-\\([0-9no]\\)+\\s-\|\\s-\\(.\\)+$")
                      (group . (1 2 3))))
                   nil)
-    (delete-trailing-whitespace)
+    ;; (delete-trailing-whitespace)
     ;; Major mode.
     (fundamental-mode)
     ;; Minor modes.
@@ -437,6 +434,7 @@ Return (FILE . LINUM) struct."
 (defvar sos-candidates-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map [return] 'sos-jump-in-candidate)
+    (define-key map [mouse-1] 'sos-jump-in-candidate)
     map))
 
 (defun sos-candidates-post-command ()
@@ -445,17 +443,19 @@ Return (FILE . LINUM) struct."
   (end-of-line)
   (sos-hl-line))
 
-;; `message'
-(defun sos-candidates-text-props-init ()
+(defun sos-add-text-button ()
   (save-excursion
     (goto-char 1)
-    )
-  ;; (add-text-properties 1 (point-max)
-  ;;                      (let (prop)
-  ;;                        (setq prop (plist-put prop 'face 'link)
-  ;;                              prop (plist-put prop 'mouse-face 'highlight))))
-  )
+    (dolist (cand (sos-local-variable sos-candidates))
+      (let ((beg (line-beginning-position))
+            (end (line-end-position)))
+        (add-text-properties beg end
+                             '(mouse-face highlight))
+        (add-text-properties beg end
+                             `(keymap ,sos-candidates-mode-map)))
+      (forward-line))))
 
+;; `message'
 ;;;###autoload
 (defun sos-jump-in-candidate ()
   (interactive)
@@ -488,9 +488,7 @@ Return (FILE . LINUM) struct."
   :group 'sos-group
   (if sos-candidates-mode
       (progn
-        ;; (use-local-map sos-candidates-mode-map)
-        ;; TODO: add link to file path.
-        (sos-candidates-text-props-init)
+        (sos-add-text-button)
         (add-hook 'post-command-hook 'sos-candidates-post-command t t))
     (remove-hook 'post-command-hook 'sos-candidates-post-command t)))
 

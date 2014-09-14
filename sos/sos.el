@@ -162,6 +162,11 @@ Return value will be cached to `sos-candidates'.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defmacro sos-local-variable (symb)
+  (and sos-cached-buffer
+       `(with-current-buffer sos-cached-buffer
+          ,symb)))
+
 (defun sos-is-skip-command (&rest commands)
   "Return t if `this-command' should be skipped.
 If you want to skip additional commands, try example:
