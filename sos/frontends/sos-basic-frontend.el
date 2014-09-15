@@ -37,8 +37,6 @@
 (require 'linum)
 (require 'thingatpt)
 
-(require 'history)
-
 ;;;###autoload
 (defun sos-definition-buffer-frontend (command)
   (case command
@@ -334,10 +332,12 @@ Return (FILE . LINUM) struct."
                (window-live-p sos-source-window))
       (with-selected-window sos-source-window
         (unless (string= file (buffer-file-name (window-buffer)))
-          (his-add-position-type-history)
+          (and (featurep 'history)
+               (his-add-position-type-history))
           (find-file file)
           (goto-line linum)
-          (his-add-position-type-history)
+          (and (featurep 'history)
+               (his-add-position-type-history))
           (recenter 3)))
       (select-window sos-source-window))))
 

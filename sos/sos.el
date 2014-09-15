@@ -38,6 +38,8 @@
 (require 'sos-elisp-backend)
 (require 'sos-semantic-backend)
 
+(require 'history)
+
 (defgroup sos-group nil
   "A utility to show you documentation at button window by finding some 
 meaningful information around the point."
@@ -285,6 +287,13 @@ If you want to skip additional commands, try example:
 
 (defun sos-init-backend (backend)
   (funcall backend :init))
+
+;;;###autoload
+(defun sos-goto-definition ()
+  (interactive)
+  ;; TODO:
+  (and (featurep 'history)
+       (his-add-position-type-history)))
 
 ;;;###autoload
 (define-minor-mode sos-definition-window-mode
