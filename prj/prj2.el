@@ -91,25 +91,15 @@
   "Maximin elements count in the searh history cache.")
 
 (defvar prj-config nil
-  "A plist which represent project's configuration, it will be exported as format of JSON file.
+  "A plist which represent a project's configuration, it will be exported as format of JSON file.
 list format:
-  (name NAME                                // NAME is a string.
-   filepaths (PATH1 PATH2 ...)              // PATH is a string.
-   doctypes ((DOC_NAME1 DOC_TYPE1)          // e.g. ((\"Emacs Lisp\" \".emacs;*.el\")
-             (DOC_NAME2 DOC_TYPE2))                  (\"Text\" \"*.txt;*.md\")
-             ...)                                    ...).
-   recent-files (FILE1 FILE2 ...)           // FILE is a string.
-   search-history (KEYWORD1 KEYWORD2 ...))  // KEYWORD is a string.
-
-JSON format:
-  {name:NAME,                               // NAME is a string.
-   filepaths:[PATH1, PATH2, ...],           // PATH is a string.
-   doctypes:[[DOC_NAME1, DOC_TYPE1],        // e.g. [[\"Emacs Lisp\", \".emacs;*.el\"],
-             [DOC_NAME2, DOC_TYPE2],                 [\"Text\", \"*.txt;*.md\"],
-             ...],                                   ...].
-   recent-files:[FILE1, FILE2, ...],        // FILE is a string.
-   search-history:[KEYWORD1, KEYWORD2, ...] // KEYWORD is a string.
-  }")
+  (:name NAME                                // NAME is a string.
+   :filepaths (PATH1 PATH2 ...)              // PATH is a string.
+   :doctypes (DOC_NAME1 DOC_TYPE1            // e.g. (\"Emacs Lisp\" \".emacs;*.el\"
+              DOC_NAME2 DOC_TYPE2                     \"Text\" \"*.txt;*.md\"
+              ...)                                    ...).
+   :recent-files (FILE1 FILE2 ...)           // FILE is a string.
+   :search-history (KEYWORD1 KEYWORD2 ...))  // KEYWORD is a string.")
 
 (defmacro prj-plist-put (plist prop val)
   `(setq ,plist (plist-put ,plist ,prop ,val)))
@@ -124,48 +114,50 @@ JSON format:
   (expand-file-name (format "%s/%s/%s" prj-workspace-path (prj-project-name) prj-searchdb-name)))
 
 (defun prj-project-name ()
-  (plist-get prj-config "name"))
+  (plist-get prj-config :name))
 
 (defun prj-project-doctypes ()
-  (plist-get prj-config "doctypes"))
+  (plist-get prj-config :doctypes))
 
 (defun prj-project-filepaths ()
-  (plist-get prj-config "filepaths"))
+  (plist-get prj-config :filepaths))
 
 (defun prj-project-recent-files ()
-  (plist-get prj-config "recent-files"))
+  (plist-get prj-config :recent-files))
 
 (defun prj-project-search-history ()
-  (plist-get prj-config "search-history"))
+  (plist-get prj-config :search-history))
 
 (defun prj-project-p ()
   "Return t if any project was loaded (current project)."
   (and prj-config
-       (plist-get "name" prj-config)))
+       (plist-get :name prj-config)))
 
 (defun prj-new-config ()
   "Return a config template."
   (let (config)
-    (prj-plist-put config "name" "")
-    (prj-plist-put config "filepaths" '())
-    (prj-plist-put config "doctypes" '())
-    (prj-plist-put config "recent-files" '())
-    (prj-plist-put config "search-history" '())
+    (prj-plist-put config :name "")
+    (prj-plist-put config :filepaths '())
+    (prj-plist-put config :doctypes '())
+    (prj-plist-put config :recent-files '())
+    (prj-plist-put config :search-history '())
     config))
 
 (defun prj-export-json (filename data)
   "Export `data' to `filename' file. The saved data can be imported with `prj-import-data'."
   (when (file-writable-p filename)
     (with-temp-file filename
-      (insert (let (print-length)
-		(prin1-to-string data))))))
+      (insert (json-encode-plist data)))))
+;; (prj-export-json "~/test.txt" '(:name "Emacs" :doctypes ("Text" "*.txt;*.md" "Lisp" "*.el" "Python" "*.py") :filepath ("~/.emacs" "~/.emacs.d/elpa" "~/.emacs.d/etc")))
 
 (defun prj-import-json (filename)
   "Read data exported by `prj-export-json' from file `filename'."
   (when (file-exists-p filename)
-    (with-temp-buffer
-      (insert-file-contents filename)
-      (read (buffer-string)))))
+    (let ((json-object-type 'plist)
+          (json-key-type 'keyword)
+          (json-array-type 'list))
+      (json-read-file filename))))
+;; (prj-import-json "~/test.txt")
 
 (defun prj-export-data (filename data)
   "Export `data' to `filename' file. The saved data can be imported with `prj-import-data'."

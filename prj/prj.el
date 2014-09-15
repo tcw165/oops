@@ -36,6 +36,8 @@
 ;;    Initial release.
 
 (require 'ido)
+(require 'json)
+
 (require 'prj-widget)
 (require 'prj-grep)
 

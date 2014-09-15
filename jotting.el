@@ -12,14 +12,16 @@
 (setq json-key-type 'string)
 (setq json-array-type 'list)
 
+;; import json.
 (let* ((json-object-type 'plist)
        (json-key-type 'string)
        (json-array-type 'list)
        (config (json-read-from-string "{\"name\":\"Emacs\", \"filepath\":[\"~/.emacs\", \"~/.emacs.d/elpa\", \"~/.emacs.d/etc\"], \"doctypes\":[[\"Text\", \"*.txt;*.md\"], [\"Lisp\", \"*.el\"], [\"Python\", \"*.py\"]]}")))
   (prin1 config))
-(json-encode-plist '("name" "Emacs"
-                     "doctypes" (("Text" "*.txt;*.md") ("Lisp" "*.el") ("Python" "*.py"))
-                     "filepath" ("~/.emacs" "~/.emacs.d/elpa" "~/.emacs.d/etc")))
+;; export json.
+(princ (json-encode-plist '("name" "Emacs"
+                            "doctypes" (("Text" "*.txt;*.md") ("Lisp" "*.el") ("Python" "*.py"))
+                            "filepath" ("~/.emacs" "~/.emacs.d/elpa" "~/.emacs.d/etc"))))
 
 (json-encode '(("Text" "*.txt;*.md") ("Lisp" ".emacs;*.el")))
 (json-encode-array '(("Text" "*.txt;*.md") ("Lisp" ".emacs;*.el")))
