@@ -202,51 +202,44 @@ format:
     (setq files (reverse files))))
 
 (defun prj2-convert-filepaths (filepaths)
-  (unless (listp filepaths)
-    (error))
-  (let ((path filepaths)
-        paths)
-    (while path
-      (setq paths (concat paths
-                          "\"" (expand-file-name (car path)) "\"")
-            path (cdr path))
-      (and path
-           (setq paths (concat paths " "))))
-    paths))
+  (and (listp filepaths)
+       (let ((path filepaths)
+             paths)
+         (while path
+           (setq paths (concat paths
+                               "\"" (expand-file-name (car path)) "\"")
+                 path (cdr path))
+           (and path
+                (setq paths (concat paths " "))))
+         paths)))
 ;; (prj2-convert-filepaths (prj2-project-filepaths))
 
 (defun prj2-convert-matches (doctype)
-  (unless (stringp doctype)
-    (error))
-  (let ((matches (concat "\"-name\" \"" doctype "\"")))
-    (replace-regexp-in-string ";" "\" \"-o\" \"-name\" \"" matches)))
+  (and (stringp doctype)
+       (let ((matches (concat "\"-name\" \"" doctype "\"")))
+         (replace-regexp-in-string ";" "\" \"-o\" \"-name\" \"" matches))))
 ;; (prj2-convert-matches ".emacs;*.el;*.txt;*.md")
 
 (defun prj2-convert-excludes (doctype)
-  (unless (stringp doctype)
-    (error))
-  (let ((matches (concat "\"!\" \"-name\" \"" doctype "\"")))
-    (replace-regexp-in-string ";" "\" \"!\" \"-name\" \"" matches)))
+  (and (stringp doctype)
+       (let ((matches (concat "\"!\" \"-name\" \"" doctype "\"")))
+         (replace-regexp-in-string ";" "\" \"!\" \"-name\" \"" matches))))
 ;; (prj2-convert-excludes prj2-exclude-types)
 
 (defun prj2-process-find (filepaths matches excludes)
-  (ignore-errors
-    (let ((filepaths (prj2-convert-filepaths filepaths))
-          (matches (prj2-convert-matches matches))
-          (excludes (prj2-convert-excludes excludes))
-          stream)
-      (setq stream (concat "(with-temp-buffer "
-                           "(call-process \"find\" nil (list (current-buffer) nil) nil "
-                           filepaths " "
-                           matches " "
-                           excludes ")"
-                           "(buffer-string))"))
-      ;; (eval (read stream))
-      (prin1 (read stream))
-      )))
+  (let ((filepaths (prj2-convert-filepaths filepaths))
+        (matches (prj2-convert-matches matches))
+        (excludes (prj2-convert-excludes excludes))
+        stream)
+    (and filepaths matches excludes
+         (setq stream (concat "(with-temp-buffer "
+                              "(call-process \"find\" nil (list (current-buffer) nil) nil "
+                              filepaths " "
+                              matches " "
+                              excludes ")"
+                              "(buffer-string))"))
+         (eval (read stream)))))
 ;; (prj2-process-find (prj2-project-filepaths) "*.el;.emacs;*.txt" "*.git;*.svn")
-;; (with-temp-buffer (call-process "find" nil (list nil nil) t "c:/emacs.home/.emacs" "c:/emacs.home/.emacs.d" "c:/emacs-24.3" "-name" "*.el" "-o" "-name" ".emacs" "-o" "-name" "*.txt" "!" "-name" "*.git" "!" "-name" "*.svn") (buffer-string))
-;; (with-temp-buffer (call-process "find" nil (list (current-buffer) nil) t "c:/emacs.home/.emacs.d" "-name" "*.el") (buffer-string))
 
 (defun prj2-build-filedb ()
   "Create a list that contains all the files which should be included in the current project. Export the list to a file."

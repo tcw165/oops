@@ -513,7 +513,7 @@ Return (FILE . LINUM) struct."
 (defun sos-bottom-mode-line (&optional desc file line)
   `(,(propertize "  Definition "
                  'face 'mode-line-buffer-id)
-    (:eval (and (file-exists-p ,file) (integerp ,line)
+    (:eval (and (stringp ,file) (file-exists-p ,file) (integerp ,line)
                 (format "| file:%s, line:%s, function:(yet supported) "
                         (propertize (abbreviate-file-name ,file)
                                     'face 'link
