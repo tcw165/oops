@@ -38,7 +38,7 @@
 (require 'ido)
 (require 'json)
 
-(require 'prj-widget)
+(require 'prj2-widget)
 (require 'prj-grep)
 
 (defgroup prj2-group nil
@@ -78,18 +78,6 @@
   :type '(string :tag "File")
   :group 'prj2-group)
 
-(defconst prj2-config-name "config2.db"
-  "The file name of project configuration.")
-
-(defconst prj2-filedb-name "files2.db"
-  "The file name of project file-list database.")
-
-(defconst prj2-searchdb-name "search2.db"
-  "The simple text file which caches the search result that users have done in the last session.")
-
-(defconst prj2-search-history-max 16
-  "Maximin elements count in the searh history cache.")
-
 (defvar prj2-config nil
   "A plist which represent a project's configuration, it will be exported as format of JSON file.
 format:
@@ -101,6 +89,22 @@ format:
    :recent-files (FILE1 FILE2 ...)           // FILE is a string.
    :search-history (KEYWORD1 KEYWORD2 ...))  // KEYWORD is a string.")
 
+(defconst prj2-config-name "config.db"
+  "The file name of project configuration. see `prj2-config' for detail.")
+
+(defconst prj2-filedb-name "files.db"
+  "The file name of project file-list database. The database is a plist which 
+contains files should be concerned.
+format:
+  (DOCTYPE1 (FILE1_1 FILE1_2 ...)
+   DOCTYPE2 (FILE2_1 FILE2_2 ...))")
+
+(defconst prj2-searchdb-name "search.db"
+  "The simple text file which caches the search result that users have done in the last session.")
+
+(defconst prj2-search-history-max 16
+  "Maximin elements count in the searh history cache.")
+
 (defmacro prj2-plist-put (plist prop val)
   `(setq ,plist (plist-put ,plist ,prop ,val)))
 
@@ -111,10 +115,7 @@ format:
                             prj2-config-name)))
 
 (defun prj2-filedb-path ()
-  "A plist which contains files should be concerned.
-format:
-  (\"doctype1\" (FILE1_1 FILE1_2 ...)
-   \"doctype2\" (FILE2_1 FILE2_2 ...))"
+  ""
   (expand-file-name (format "%s/%s/%s"
                             prj2-workspace-path
                             (prj2-project-name)
@@ -161,7 +162,6 @@ format:
   (when (file-writable-p filename)
     (with-temp-file filename
       (insert (json-encode-plist data)))))
-;; (prj2-export-json "~/.emacs.d/.workspace/Test/config2.db" '(:name "Test" :doctypes ("Emacs Lisp" ".emacs;*.el" "Text" "*.text;*.md;*.xml") :filepaths ("~/.emacs" "~/.emacs.d" "c:/emacs-24.3")))
 
 (defun prj2-import-json (filename)
   "Read data exported by `prj2-export-json' from file `filename'."
@@ -170,7 +170,6 @@ format:
           (json-key-type 'keyword)
           (json-array-type 'list))
       (json-read-file filename))))
-;; (setq prj2-config (prj2-import-json "~/.emacs.d/.workspace/Test/config2.db"))
 
 (defun prj2-export-data (filename data)
   "Export `data' to `filename' file. The saved data can be imported with `prj2-import-data'."
@@ -186,22 +185,9 @@ format:
       (insert-file-contents filename)
       (read (buffer-string)))))
 
-(defun prj2-concat-filepath (dir file)
-  "Return a full path combined with `dir' and `file'. It saves you the worry of whether to append '/' or not."
-  (concat dir
-          (unless (eq (aref dir (1- (length dir))) ?/) "/")
-          file))
-
-(defun prj2-directory-files (dir &optional exclude)
-  "Return a list containing file names under `dir' but exlcudes files that match `exclude'."
-  (let (files)
-    (dolist (file (directory-files dir))
-      (and (not (member file '("." "..")))
-           (not (string-match exclude file))
-           (setq files (cons file files))))
-    (setq files (reverse files))))
-
 (defun prj2-convert-filepaths (filepaths)
+  "Convert FILEPATHS to string as parameters for find.
+e.g. (~/test01\ ~/test02) => test01 test02"
   (and (listp filepaths)
        (let ((path filepaths)
              paths)
@@ -212,19 +198,20 @@ format:
            (and path
                 (setq paths (concat paths " "))))
          paths)))
-;; (prj2-convert-filepaths (prj2-project-filepaths))
 
 (defun prj2-convert-matches (doctype)
+  "Convert DOCTYPE to string as include-path parameter for find.
+e.g. *.md;*.el;*.txt => -name *.md -o -name *.el -o -name *.txt"
   (and (stringp doctype)
        (let ((matches (concat "\"-name\" \"" doctype "\"")))
          (replace-regexp-in-string ";" "\" \"-o\" \"-name\" \"" matches))))
-;; (prj2-convert-matches ".emacs;*.el;*.txt;*.md")
 
 (defun prj2-convert-excludes (doctype)
+  "Convert DOCTYPE to string as exclude-path parameter for find.
+e.g. .git;.svn => ! -name .git ! -name .svn"
   (and (stringp doctype)
        (let ((matches (concat "\"!\" \"-name\" \"" doctype "\"")))
          (replace-regexp-in-string ";" "\" \"!\" \"-name\" \"" matches))))
-;; (prj2-convert-excludes prj2-exclude-types)
 
 (defun prj2-process-find (filepaths matches excludes)
   (let ((filepaths (prj2-convert-filepaths filepaths))
@@ -239,11 +226,11 @@ format:
                               excludes ")"
                               "(buffer-string))"))
          (eval (read stream)))))
-;; (prj2-process-find (prj2-project-filepaths) "*.el;.emacs;*.txt" "*.git;*.svn")
 
 (defun prj2-build-filedb ()
   "Create a list that contains all the files which should be included in the current project. Export the list to a file."
   (let ((filepaths (prj2-project-filepaths))
+        (doctypes (prj2-project-doctypes))
         (excludes prj2-exclude-types)
         db)
     ;; Iterate doctypes.
@@ -256,9 +243,8 @@ format:
       ;; Next.
       (setq doctypes (cddr doctypes)))
     ;; Export database.
-    ;; (prj2-export-data (prj2-filedb-path) db)
+    (prj2-export-data (prj2-filedb-path) db)
     ))
-;; (prj2-build-filedb)
 
 (defun prj2-build-tags ()
   ;; TODO: implemnt it.
@@ -375,12 +361,6 @@ format:
 ;;;###autoload
 (defun prj2-create-project ()
   "Show configuration for creating new project."
-  ;; TODO:
-  ;; (let* ((json-object-type 'plist)
-  ;;      (json-key-type 'string)
-  ;;      (json-array-type 'list)
-  ;;      (config (json-read-from-string "{\"name\":\"Emacs\", \"filepath\":[\"~/.emacs\", \"~/.emacs.d/elpa\", \"~/.emacs.d/etc\"], \"doctypes\":[[\"Text\", \"*.txt;*.md\"], [\"Lisp\", \"*.el\"], [\"Python\", \"*.py\"]]}")))
-  ;; (format "%s" config))
   (interactive)
   (or (and (featurep 'prj2-widget)
            (prj2-setup-create-project-widget))))
