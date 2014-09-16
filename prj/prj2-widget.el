@@ -24,12 +24,26 @@
 (require 'company)
 (require 'company-files)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 (defvar prj2-tmp-string nil)
 (defvar prj2-tmp-list1 nil)
 (defvar prj2-tmp-list2 nil)
 (defvar prj2-tmp-list3 nil)
+
+;;;###autoload
+(defun prj2-create-project-widget-frontend ()
+  )
+
+;;;###autoload
+(defun prj2-delete-project-widget-frontend ()
+  )
+
+;;;###autoload
+(defun prj2-edit-project-widget-frontend ()
+  )
+
+;;;###autoload
+(defun prj2-search-project-widget-frontend ()
+  )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

@@ -163,6 +163,7 @@ format:
     (with-temp-file filename
       (insert (json-encode-plist data)))))
 
+;; (setq prj2-config (prj2-import-json "/Users/Boy/.emacs.d/.workspace/Test/config.db"))
 (defun prj2-import-json (filename)
   "Read data exported by `prj2-export-json' from file `filename'."
   (when (file-exists-p filename)
@@ -184,6 +185,14 @@ format:
     (with-temp-buffer
       (insert-file-contents filename)
       (read (buffer-string)))))
+
+(defun prj2-thingatpt ()
+  "Return a list, (REGEXP_STRING BEG END), on which the point is or just string of selection."
+  (if mark-active
+      (buffer-substring-no-properties (region-beginning) (region-end))
+    (let ((bound (bounds-of-thing-at-point 'symbol)))
+      (and bound
+           (buffer-substring-no-properties (car bound) (cdr bound))))))
 
 (defun prj2-convert-filepaths (filepaths)
   "Convert FILEPATHS to string as parameters for find.
@@ -218,14 +227,19 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
         (matches (prj2-convert-matches matches))
         (excludes (prj2-convert-excludes excludes))
         stream)
-    (and filepaths matches excludes
-         (setq stream (concat "(with-temp-buffer "
-                              "(call-process \"find\" nil (list (current-buffer) nil) nil "
-                              filepaths " "
-                              matches " "
-                              excludes ")"
-                              "(buffer-string))"))
-         (eval (read stream)))))
+    (when (and filepaths matches excludes)
+      (setq stream (concat "(with-temp-buffer "
+                           "(call-process \"find\" nil (list (current-buffer) nil) nil "
+                           filepaths " "
+                           matches " "
+                           excludes ")"
+                           "(buffer-string))"))
+      (let ((output (eval (read stream))))
+        (and output
+             (split-string output "\n" t))))))
+
+(defun prj2-process-find-change ()
+  )
 
 (defun prj2-build-filedb ()
   "Create a list that contains all the files which should be included in the current project. Export the list to a file."
@@ -238,8 +252,7 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
       (let* ((files (prj2-process-find filepaths
                                        (cadr doctypes)
                                        excludes)))
-        (prj2-plist-put db (car doctypes)
-                        (split-string files "\n" t)))
+        (prj2-plist-put db (car doctypes) files))
       ;; Next.
       (setq doctypes (cddr doctypes)))
     ;; Export database.
@@ -249,14 +262,6 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
 (defun prj2-build-tags ()
   ;; TODO: implemnt it.
   )
-
-(defun prj2-thingatpt ()
-  "Return a list, (REGEXP_STRING BEG END), on which the point is or just string of selection."
-  (if mark-active
-      (buffer-substring-no-properties (region-beginning) (region-end))
-    (let ((bound (bounds-of-thing-at-point 'symbol)))
-      (and bound
-           (buffer-substring-no-properties (car bound) (cdr bound))))))
 
 (defun prj2-clean ()
   "Clean search buffer or widget buffers which belongs to other project when user loads a project or unload a project."
@@ -352,6 +357,36 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defcustom prj2-create-project-frontends '(prj2-create-project-widget-frontend)
+  ""
+  :type '(repeat (symbol :tag "Front-end"))
+  :group 'prj2-group)
+
+(defcustom prj2-delete-project-frontends '(prj2-delete-project-widget-frontend)
+  ""
+  :type '(repeat (symbol :tag "Front-end"))
+  :group 'prj2-group)
+
+(defcustom prj2-edit-project-frontends '(prj2-edit-project-widget-frontend)
+  ""
+  :type '(repeat (symbol :tag "Front-end"))
+  :group 'prj2-group)
+
+(defcustom prj2-search-project-frontends '(prj2-search-project-widget-frontend)
+  ""
+  :type '(repeat (symbol :tag "Front-end"))
+  :group 'prj2-group)
+
+(defcustom prj2-find-file-frontends '(prj2-find-file-frontend)
+  ""
+  :type '(repeat (symbol :tag "Front-end"))
+  :group 'prj2-group)
+
+(defun prj2-call-frontends (frontends &rest args)
+  )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 ;;;###autoload
 (defun prj2-preference ()
   "Customize document types."
@@ -362,15 +397,15 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
 (defun prj2-create-project ()
   "Show configuration for creating new project."
   (interactive)
-  (or (and (featurep 'prj2-widget)
-           (prj2-setup-create-project-widget))))
+  (prj2-create-project-internal
+   (prj2-call-frontends prj2-create-project-frontends)))
 
 ;;;###autoload
 (defun prj2-delete-project ()
   "Show configuration for deleting projects."
   (interactive)
-  (or (and (featurep 'prj2-widget)
-           (prj2-setup-delete-project-widget))))
+  (prj2-delete-project-internal
+   (prj2-call-frontends prj2-delete-project-frontends)))
 
 ;;;###autoload
 (defun prj2-edit-project ()
@@ -379,8 +414,8 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
   ;; Load project if wasn't loaded.
   (unless (prj2-project-p)
     (prj2-load-project))
-  (or (and (featurep 'prj2-widget)
-           (prj2-setup-edit-project-widget))))
+  (prj2-edit-project-internal
+   (prj2-call-frontends prj2-edit-project-frontends)))
 
 ;;;###autoload
 (defun prj2-load-project ()
@@ -426,7 +461,7 @@ project to be loaded."
   (interactive)
   (when (prj2-project-p)
     (prj2-clean)
-    (message "[%s] Unload project ...done" (prj2-project-name))
+    (message "Unload [%s] ...done" (prj2-project-name))
     (setq prj2-config (prj2-new-config))))
 
 ;;;###autoload
@@ -466,8 +501,8 @@ project to be loaded."
   ;; Load project if no project was loaded.
   (unless (prj2-project-p)
     (prj2-load-project))
-  (or (and (featurep 'prj2-widget)
-           (prj2-setup-search-project-widget (prj2-thingatpt)))))
+  (prj2-search-project-internal
+   (prj2-call-frontends prj2-search-project-frontends (prj2-thingatpt))))
 
 ;;;###autoload
 (defun prj2-toggle-search-buffer ()
@@ -489,6 +524,9 @@ project to be loaded."
   "Provide convenient menu items and tool-bar items for project feature."
   :lighter " Project"
   :global t
-  )
+  (if prj2-project-mode
+      (progn
+        )
+    ))
 
 (provide 'prj2)
