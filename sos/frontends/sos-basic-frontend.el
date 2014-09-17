@@ -53,7 +53,10 @@
      (sos-toggle-definition-buffer&window 1)
      (if (> (length sos-candidates) 1)
          (sos-show-candidates)
-       (sos-show-candidate)))))
+       (sos-show-candidate)))
+    (:hide
+     (when (string-match "\*\\w+\*" (buffer-name))
+       (sos-toggle-definition-buffer&window -1)))))
 
 ;;;###autoload
 (defun sos-tips-frontend (command)
