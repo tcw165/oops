@@ -66,10 +66,10 @@
                                 ("C/C++ Header" "*.h;*.hxx;*.hpp")
                                 ("C/C++ Source" "*.c;*.cpp")
                                 ("Makfile"      "Makefile;makefile;Configure.ac;configure.ac;*.mk"))
-  "Categorize file names refer to specific matches and give them type names. It is a list of (DOC_NAME . MATCHES). Each matches in MATCHES should be delimit with ';'."
+  "Categorize file names refer to specific matches and give them type names. It is a list of (DOC_NAME MATCHES). Each matches in MATCHES should be delimit with ';'."
   ;; TODO: give GUI a pretty appearance.
-  :type '(repeat (list (string :tag "Type")
-                       (string :tag "File")))
+  :type '(repeat (plist (string :tag "Type")
+                        (string :tag "File")))
   :group 'prj2-group)
 
 (defcustom prj2-exclude-types ".git;.svn"
@@ -382,8 +382,12 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
   :type '(repeat (symbol :tag "Front-end"))
   :group 'prj2-group)
 
-(defun prj2-call-frontends (frontends &rest args)
-  )
+(defun prj2-call-frontends (frontends ok &optional cancel)
+  "Call frontends and pass ok and cancel callback functions to them. If one of 
+them returns non nil, the loop will break."
+  (dolist (frontend frontends)
+    (and (funcall frontend :show ok cancel)
+         (return t))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -397,15 +401,15 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
 (defun prj2-create-project ()
   "Show configuration for creating new project."
   (interactive)
-  (prj2-create-project-internal
-   (prj2-call-frontends prj2-create-project-frontends)))
+  (prj2-call-frontends prj2-create-project-frontends
+                       'prj2-create-project-internal))
 
 ;;;###autoload
 (defun prj2-delete-project ()
   "Show configuration for deleting projects."
   (interactive)
-  (prj2-delete-project-internal
-   (prj2-call-frontends prj2-delete-project-frontends)))
+  (prj2-call-frontends prj2-delete-project-frontends
+                       'prj2-delete-project-internal))
 
 ;;;###autoload
 (defun prj2-edit-project ()
@@ -414,8 +418,8 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
   ;; Load project if wasn't loaded.
   (unless (prj2-project-p)
     (prj2-load-project))
-  (prj2-edit-project-internal
-   (prj2-call-frontends prj2-edit-project-frontends)))
+  (prj2-call-frontends prj2-edit-project-frontends
+                       'prj2-edit-project-internal))
 
 ;;;###autoload
 (defun prj2-load-project ()
@@ -501,8 +505,8 @@ project to be loaded."
   ;; Load project if no project was loaded.
   (unless (prj2-project-p)
     (prj2-load-project))
-  (prj2-search-project-internal
-   (prj2-call-frontends prj2-search-project-frontends (prj2-thingatpt))))
+  (prj2-call-frontends prj2-search-project-frontends
+                       'prj2-search-project-internal))
 
 ;;;###autoload
 (defun prj2-toggle-search-buffer ()
