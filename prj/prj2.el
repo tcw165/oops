@@ -59,23 +59,48 @@
   :set 'prj2-cus-set-workspace
   :group 'prj2-group)
 
-(defcustom prj2-document-types '(("Text"         "*.txt;*.md;*.xml")
-                                ("Emacs Lisp"   ".emacs;*.el")
-                                ("Python"       "*.py")
-                                ("Java"         "*.java")
-                                ("C/C++ Header" "*.h;*.hxx;*.hpp")
-                                ("C/C++ Source" "*.c;*.cpp")
-                                ("Makfile"      "Makefile;makefile;Configure.ac;configure.ac;*.mk"))
-  "Categorize file names refer to specific matches and give them type names. It is a list of (DOC_NAME MATCHES). Each matches in MATCHES should be delimit with ';'."
+(defcustom prj2-document-types '(("Text" . "*.txt;*.md;*.xml")
+                                ("Emacs Lisp" . ".emacs;*.el")
+                                ("Python" . "*.py")
+                                ("Java" . "*.java")
+                                ("C/C++ Header" . "*.h;*.hxx;*.hpp")
+                                ("C/C++ Source" . "*.c;*.cpp")
+                                ("Makfile" . "Makefile;makefile;Configure.ac;configure.ac;*.mk"))
+  "Categorize file names refer to specific matches and give them type names. It is a alist of (DOC_NAME MATCHES). Each matches in MATCHES should be delimit with ';'."
   ;; TODO: give GUI a pretty appearance.
-  :type '(repeat (plist (string :tag "Type")
-                        (string :tag "File")))
+  :type '(repeat (cons (string :tag "Type")
+                       (string :tag "File")))
   :group 'prj2-group)
 
 (defcustom prj2-exclude-types ".git;.svn"
   "Those kinds of file should be excluded in the project. Each matches should be delimit with ';'."
   ;; TODO: give GUI a pretty appearance.
   :type '(string :tag "File")
+  :group 'prj2-group)
+
+(defcustom prj2-create-project-frontends '(prj2-create-project-widget-frontend)
+  ""
+  :type '(repeat (symbol :tag "Front-end"))
+  :group 'prj2-group)
+
+(defcustom prj2-delete-project-frontends '(prj2-delete-project-widget-frontend)
+  ""
+  :type '(repeat (symbol :tag "Front-end"))
+  :group 'prj2-group)
+
+(defcustom prj2-edit-project-frontends '(prj2-edit-project-widget-frontend)
+  ""
+  :type '(repeat (symbol :tag "Front-end"))
+  :group 'prj2-group)
+
+(defcustom prj2-search-project-frontends '(prj2-search-project-widget-frontend)
+  ""
+  :type '(repeat (symbol :tag "Front-end"))
+  :group 'prj2-group)
+
+(defcustom prj2-find-file-frontends '(prj2-find-file-frontend)
+  ""
+  :type '(repeat (symbol :tag "Front-end"))
   :group 'prj2-group)
 
 (defvar prj2-config nil
@@ -105,17 +130,258 @@ format:
 (defconst prj2-search-history-max 16
   "Maximin elements count in the searh history cache.")
 
+(defconst prj2-idle-delay 0.2)
+
+(defvar prj2-timer nil)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;###autoload
+(defun prj2-preference ()
+  "Customize document types."
+  (interactive)
+  (customize-group 'prj2-group))
+
+;;;###autoload
+(defun prj2-create-project ()
+  "Show configuration for creating new project."
+  (interactive)
+  (prj2-call-frontends prj2-create-project-frontends
+                       'prj2-create-project-begin))
+
+;;;###autoload
+(defun prj2-delete-project ()
+  "Show configuration for deleting projects."
+  (interactive)
+  (prj2-call-frontends prj2-delete-project-frontends
+                       'prj2-delete-project-begin))
+
+;;;###autoload
+(defun prj2-edit-project ()
+  "Show configuration for editing project's setting."
+  (interactive)
+  ;; Load project if wasn't loaded.
+  (unless (prj2-project-p)
+    (prj2-load-project))
+  (prj2-call-frontends prj2-edit-project-frontends
+                       'prj2-edit-project-begin))
+
+;;;###autoload
+(defun prj2-load-project (&optional name)
+  "List available prjects in current workspace and let user to choose which 
+project to be loaded."
+  (interactive)
+  (let (choices)
+    (unless name
+      ;; Find available directories which represent a project.
+      (dolist (name (directory-files prj2-workspace-path))
+        (let ((config-file (prj2-config-path name)))
+          (when (and (file-exists-p config-file)
+                     (not (string= name (prj2-project-name))))
+            (setq choices (append choices `(,name))))))
+      ;; Prompt user to create project if no projects is in workspace.
+      (when (= (length choices) 0)
+        (error "No project can be loaded! Please create a project first."))
+      ;; Prompt user to load project.
+      (setq name (ido-completing-read "Load project: " choices nil t)))
+    ;; Read configuration.
+    (prj2-clean)
+    (setq prj2-config (prj2-import-json (prj2-config-path name)))
+    (and (featurep 'sos)
+         (unless sos-definition-window-mode
+           (sos-definition-window-mode 1)))
+    (message "Load [%s] ...done" (prj2-project-name))))
+
+;;;###autoload
+(defun prj2-load-recent-project ()
+  "Load the project which user exits emacs last time."
+  (interactive)
+  ;; TODO:
+  nil)
+
+;;;###autoload
+(defun prj2-unload-project ()
+  "Unload current project."
+  (interactive)
+  (when (prj2-project-p)
+    (prj2-clean)
+    (message "Unload [%s] ...done" (prj2-project-name))
+    (setq prj2-config (prj2-new-config))))
+
+;;;###autoload
+(defun prj2-build-database ()
+  "Build file list and tags."
+  (interactive)
+  (unless (prj2-project-p)
+    (prj2-load-project))
+  ;; Create file list which is the data base of the project's files.
+  (when (prj2-project-p)
+    (message "It might take a minutes, please wait ...")
+    (prj2-build-filedb)
+    (prj2-build-tags)
+    (message "Database is updated!")))
+
+;;;###autoload
+(defun prj2-find-file ()
+  "Open file by the given file name."
+  (interactive)
+  ;; Load project if wasn't loaded.
+  (unless (prj2-project-p)
+    (prj2-load-project))
+  ;; Build database if is wasn't built.
+  (unless (file-exists-p (prj2-filedb-path))
+    (prj2-build-database))
+  ;; Find file.
+  (let ((filedb (prj2-import-data (prj2-filedb-path)))
+	(filelist '()))
+    (dolist (elm (prj2-project-doctypes))
+      (setq filelist (append filelist (gethash elm filedb))))
+    (find-file (ido-completing-read "Find file: " filelist))))
+
+;;;###autoload
+(defun prj2-search-project ()
+  "Search string in the project. Append new search result to the old caches if `new' is nil."
+  (interactive)
+  ;; Load project if no project was loaded.
+  (unless (prj2-project-p)
+    (prj2-load-project))
+  (prj2-call-frontends prj2-search-project-frontends
+                       'prj2-search-project-begin))
+
+;;;###autoload
+(defun prj2-toggle-search-buffer ()
+  (interactive)
+  ;; TODO: bug when user is select definition window and try to toggle search buffer off.
+  (if (equal (buffer-name (current-buffer)) "*Search*")
+      ;; Back to previous buffer of current window.
+      (progn
+        (and (buffer-modified-p)
+             (save-buffer 0))
+        (kill-buffer))
+    ;; Go to search buffer.
+    (unless (prj2-project-p)
+      (prj2-load-project))
+    (prj2-with-search-buffer)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;###autoload
+(define-minor-mode prj2-project-mode
+  "Provide convenient menu items and tool-bar items for project feature."
+  :lighter " Project"
+  :global t
+  (if prj2-project-mode
+      (progn
+        )
+    ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun prj2-call-frontends (frontends ok)
+  "Call frontends and pass ok and cancel callback functions to them. If one of 
+them returns non nil, the loop will break."
+  (dolist (frontend frontends)
+    (and (funcall frontend :show ok)
+         (return t))))
+
+(defun prj2-create-project-begin (name doctypes filepaths)
+  (when prj2-timer
+    (cancel-timer prj2-timer))
+  (setq prj2-timer (run-with-timer prj2-idle-delay nil
+                                   'prj2-create-project-internal
+                                   name doctypes filepaths)))
+
+(defun prj2-create-project-internal (name doctypes filepaths)
+  "Internal function to create project. It might be called by widget or other GUI framework."
+  (let* ((path (prj2-config-path name))
+         (fullpath (expand-file-name path))
+         (dir (file-name-directory fullpath))
+         (config (prj2-new-config)))
+    ;; Prepare project directory.
+    (unless (file-directory-p dir)
+      (make-directory dir))
+    ;; Export configuration.
+    (prj2-plist-put config :name name)
+    (prj2-plist-put config :doctypes doctypes)
+    (prj2-plist-put config :filepaths filepaths)
+    (prj2-export-json path config)
+    ;; Build database.
+    (prj2-build-database)
+    ;; Load project.
+    (prj2-load-project name)))
+
+(defun prj2-edit-project-internal (doctypes filepaths updatedb)
+  "Internal function to edit project. It might be called by widget or other GUI framework."
+  (puthash :version (current-time) prj2-config)
+  (puthash :doctypes doctypes prj2-config)
+  (puthash :filepaths filepaths prj2-config)
+  (prj2-export-json (prj2-config-path) prj2-config)
+  ;; Update file database.
+  (and updatedb
+       (prj2-build-filedb)))
+
+(defun prj2-delete-project-internal (projects)
+  "Internal function to delete project. It might be called by widget or other GUI framework."
+  (dolist (c projects)
+    ;; Unload current project if it is selected.
+    (when (and (prj2-project-p)
+	       (equal c (prj2-project-name)))
+      (prj2-unload-project))
+    ;; Delete directory
+    (delete-directory (format "%s/%s" prj2-workspace-path c) t t))
+  (message "Delet project ...done"))
+
+(defmacro prj2-with-search-buffer (&rest body)
+  "Switch to search buffer and setup specific major mode and minor modes. Create a new one if it doesn't exist."
+  (declare (indent 0) (debug t))
+  `(progn
+     (find-file (prj2-searchdb-path))
+     (rename-buffer "*Search*")
+     (goto-char (point-max))
+     (save-excursion
+       (progn ,@body))
+     (and (buffer-modified-p)
+          (save-buffer 0))
+     ;; TODO: goto last search result.
+     ;; Change major mode.
+     (prj2-grep-mode)))
+
+(defun prj2-search-project-internal (match projects)
+  "Internal function to search project. It might be called by widget or other GUI framework."
+  ;; Cache search string.
+  (let ((cache (prj2-project-search-history)))
+    (push match cache)
+    (and (> (length cache) prj2-search-history-max)
+         (setcdr (nthcdr (1- prj2-search-history-max) cache) nil))
+    (puthash :search-cache cache prj2-config)
+    (prj2-export-json (prj2-config-path) prj2-config))
+  ;; Create search buffer.
+  (prj2-with-search-buffer
+    (let ((db (prj2-import-data (prj2-filedb-path)))
+          (files '()))
+      (insert (format ">>>>> %s\n" match))
+      ;; Prepare file list.
+      (dolist (elm projects)
+        (dolist (f (gethash elm db))
+          (message "[%s] Searching ...%s" (prj2-project-name) f)
+          (goto-char (point-max))
+          (call-process "grep" nil (list (current-buffer) nil) t "-nH" match f)))
+      (insert "<<<<<\n\n")
+      (message (format "[%s] Search ...done" (prj2-project-name))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defmacro prj2-plist-put (plist prop val)
   `(setq ,plist (plist-put ,plist ,prop ,val)))
 
-(defun prj2-config-path ()
+(defun prj2-config-path (&optional name)
   (expand-file-name (format "%s/%s/%s"
                             prj2-workspace-path
-                            (prj2-project-name)
+                            (or name
+                                (prj2-project-name))
                             prj2-config-name)))
 
 (defun prj2-filedb-path ()
-  ""
   (expand-file-name (format "%s/%s/%s"
                             prj2-workspace-path
                             (prj2-project-name)
@@ -273,264 +539,5 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
          (with-current-buffer search
            (save-buffer)
            (kill-buffer)))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defmacro prj2-with-search-buffer (&rest body)
-  "Switch to search buffer and setup specific major mode and minor modes. Create a new one if it doesn't exist."
-  (declare (indent 0) (debug t))
-  `(progn
-     (find-file (prj2-searchdb-path))
-     (rename-buffer "*Search*")
-     (goto-char (point-max))
-     (save-excursion
-       (progn ,@body))
-     (and (buffer-modified-p)
-          (save-buffer 0))
-     ;; TODO: goto last search result.
-     ;; Change major mode.
-     (prj2-grep-mode)))
-
-(defun prj2-create-project-internal (name doctypes filepaths)
-  "Internal function to create project. It might be called by widget or other GUI framework."
-  (let* ((path (format "%s/%s/%s" prj2-workspace-path name prj2-config-name))
-         (fullpath (expand-file-name path))
-         (dir (file-name-directory fullpath))
-         (config (prj2-new-config)))
-    ;; Prepare project directory.
-    (unless (file-directory-p dir)
-      (make-directory dir))
-    ;; Export configuration.
-    (prj2-plist-put config :name name)
-    (prj2-plist-put config :doctypes doctypes)
-    (prj2-plist-put config :filepaths filepaths)
-    (prj2-export-json path config)
-    ;; Load project.
-    (prj2-load-project)
-    ;; Build database if the prject which was just created is present.
-    (and (equal (prj2-project-name) prj2-tmp-string)
-	 (prj2-build-database))))
-
-(defun prj2-edit-project-internal (doctypes filepaths updatedb)
-  "Internal function to edit project. It might be called by widget or other GUI framework."
-  (puthash :version (current-time) prj2-config)
-  (puthash :doctypes doctypes prj2-config)
-  (puthash :filepaths filepaths prj2-config)
-  (prj2-export-json (prj2-config-path) prj2-config)
-  ;; Update file database.
-  (and updatedb
-       (prj2-build-filedb)))
-
-(defun prj2-delete-project-internal (projects)
-  "Internal function to delete project. It might be called by widget or other GUI framework."
-  (dolist (c projects)
-    ;; Unload current project if it is selected.
-    (when (and (prj2-project-p)
-	       (equal c (prj2-project-name)))
-      (prj2-unload-project))
-    ;; Delete directory
-    (delete-directory (format "%s/%s" prj2-workspace-path c) t t))
-  (message "Delet project ...done"))
-
-(defun prj2-search-project-internal (match projects)
-  "Internal function to search project. It might be called by widget or other GUI framework."
-  ;; Cache search string.
-  (let ((cache (prj2-project-search-history)))
-    (push match cache)
-    (and (> (length cache) prj2-search-history-max)
-         (setcdr (nthcdr (1- prj2-search-history-max) cache) nil))
-    (puthash :search-cache cache prj2-config)
-    (prj2-export-json (prj2-config-path) prj2-config))
-  ;; Create search buffer.
-  (prj2-with-search-buffer
-    (let ((db (prj2-import-data (prj2-filedb-path)))
-          (files '()))
-      (insert (format ">>>>> %s\n" match))
-      ;; Prepare file list.
-      (dolist (elm projects)
-        (dolist (f (gethash elm db))
-          (message "[%s] Searching ...%s" (prj2-project-name) f)
-          (goto-char (point-max))
-          (call-process "grep" nil (list (current-buffer) nil) t "-nH" match f)))
-      (insert "<<<<<\n\n")
-      (message (format "[%s] Search ...done" (prj2-project-name))))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defcustom prj2-create-project-frontends '(prj2-create-project-widget-frontend)
-  ""
-  :type '(repeat (symbol :tag "Front-end"))
-  :group 'prj2-group)
-
-(defcustom prj2-delete-project-frontends '(prj2-delete-project-widget-frontend)
-  ""
-  :type '(repeat (symbol :tag "Front-end"))
-  :group 'prj2-group)
-
-(defcustom prj2-edit-project-frontends '(prj2-edit-project-widget-frontend)
-  ""
-  :type '(repeat (symbol :tag "Front-end"))
-  :group 'prj2-group)
-
-(defcustom prj2-search-project-frontends '(prj2-search-project-widget-frontend)
-  ""
-  :type '(repeat (symbol :tag "Front-end"))
-  :group 'prj2-group)
-
-(defcustom prj2-find-file-frontends '(prj2-find-file-frontend)
-  ""
-  :type '(repeat (symbol :tag "Front-end"))
-  :group 'prj2-group)
-
-(defun prj2-call-frontends (frontends ok &optional cancel)
-  "Call frontends and pass ok and cancel callback functions to them. If one of 
-them returns non nil, the loop will break."
-  (dolist (frontend frontends)
-    (and (funcall frontend :show ok cancel)
-         (return t))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;;###autoload
-(defun prj2-preference ()
-  "Customize document types."
-  (interactive)
-  (customize-group 'prj2-group))
-
-;;;###autoload
-(defun prj2-create-project ()
-  "Show configuration for creating new project."
-  (interactive)
-  (prj2-call-frontends prj2-create-project-frontends
-                       'prj2-create-project-internal))
-
-;;;###autoload
-(defun prj2-delete-project ()
-  "Show configuration for deleting projects."
-  (interactive)
-  (prj2-call-frontends prj2-delete-project-frontends
-                       'prj2-delete-project-internal))
-
-;;;###autoload
-(defun prj2-edit-project ()
-  "Show configuration for editing project's setting."
-  (interactive)
-  ;; Load project if wasn't loaded.
-  (unless (prj2-project-p)
-    (prj2-load-project))
-  (prj2-call-frontends prj2-edit-project-frontends
-                       'prj2-edit-project-internal))
-
-;;;###autoload
-(defun prj2-load-project ()
-  "List available prjects in current workspace and let user to choose which 
-project to be loaded."
-  (interactive)
-  (let (choices)
-    ;; Find available directories which represent a project.
-    (dolist (file (directory-files prj2-workspace-path))
-      (let ((config-file (format "%s/%s/%s"
-                                 prj2-workspace-path
-                                 file
-                                 prj2-config-name)))
-	(when (file-exists-p config-file)
-	  (push file choices))))
-    ;; Prompt user to create project if no projects is in workspace.
-    (and (= 0 (length choices))
-         (prj2-create-project))
-    ;; Prompt user to load project.
-    (let ((name (ido-completing-read "Load project: " choices)))
-      (unless (member c choices)
-	(error (format "Can't load project invalid project, %s" name)))
-      (prj2-clean)
-      ;; Read configuration.
-      (setq prj2-config (prj2-import-json (format "%s/%s/%s"
-                                                prj2-workspace-path
-                                                name
-                                                prj2-config-name)))
-      (and (featurep 'sos)
-           (sos-definition-window-mode 1))
-      (message "Load [%s] ...done" (prj2-project-name)))))
-
-;;;###autoload
-(defun prj2-load-recent-project ()
-  "Load the project which user exits emacs last time."
-  (interactive)
-  ;; TODO:
-  nil)
-
-;;;###autoload
-(defun prj2-unload-project ()
-  "Unload current project."
-  (interactive)
-  (when (prj2-project-p)
-    (prj2-clean)
-    (message "Unload [%s] ...done" (prj2-project-name))
-    (setq prj2-config (prj2-new-config))))
-
-;;;###autoload
-(defun prj2-build-database ()
-  "Build file list and tags."
-  (interactive)
-  (unless (prj2-project-p)
-    (prj2-load-project))
-  ;; Create file list which is the data base of the project's files.
-  (when (prj2-project-p)
-    (message "It might take a minutes, please wait ...")
-    (prj2-build-filedb)
-    (prj2-build-tags)
-    (message "Database is updated!")))
-
-;;;###autoload
-(defun prj2-find-file ()
-  "Open file by the given file name."
-  (interactive)
-  ;; Load project if wasn't loaded.
-  (unless (prj2-project-p)
-    (prj2-load-project))
-  ;; Build database if is wasn't built.
-  (unless (file-exists-p (prj2-filedb-path))
-    (prj2-build-database))
-  ;; Find file.
-  (let ((filedb (prj2-import-data (prj2-filedb-path)))
-	(filelist '()))
-    (dolist (elm (prj2-project-doctypes))
-      (setq filelist (append filelist (gethash elm filedb))))
-    (find-file (ido-completing-read "Find file: " filelist))))
-
-;;;###autoload
-(defun prj2-search-project ()
-  "Search string in the project. Append new search result to the old caches if `new' is nil."
-  (interactive)
-  ;; Load project if no project was loaded.
-  (unless (prj2-project-p)
-    (prj2-load-project))
-  (prj2-call-frontends prj2-search-project-frontends
-                       'prj2-search-project-internal))
-
-;;;###autoload
-(defun prj2-toggle-search-buffer ()
-  (interactive)
-  ;; TODO: bug when user is select definition window and try to toggle search buffer off.
-  (if (equal (buffer-name (current-buffer)) "*Search*")
-      ;; Back to previous buffer of current window.
-      (progn
-        (and (buffer-modified-p)
-             (save-buffer 0))
-        (kill-buffer))
-    ;; Go to search buffer.
-    (unless (prj2-project-p)
-      (prj2-load-project))
-    (prj2-with-search-buffer)))
-
-;;;###autoload
-(define-minor-mode prj2-project-mode
-  "Provide convenient menu items and tool-bar items for project feature."
-  :lighter " Project"
-  :global t
-  (if prj2-project-mode
-      (progn
-        )
-    ))
 
 (provide 'prj2)

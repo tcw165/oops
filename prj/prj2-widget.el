@@ -25,6 +25,9 @@
 (require 'company)
 (require 'company-files)
 
+(defvar prj2-ok-func nil)
+(make-variable-buffer-local 'prj2-ok-func)
+
 (defvar prj2-widget-project-name nil)
 (make-variable-buffer-local 'prj2-widget-project-name)
 
@@ -34,46 +37,46 @@
 (defvar prj2-widget-doctypes nil)
 (make-variable-buffer-local 'prj2-widget-doctypes)
 
-(defvar prj2-widget-checkboxes nil)
-(make-variable-buffer-local 'prj2-widget-checkboxes)
-
 ;; (defface prj2-title-face
 ;;   '((t (:background "yellow" :foreground "black" :weight bold :height 2.0)))
 ;;   "Default face for highlighting keyword in definition window."
 ;;   :group 'prj2-group)
 
 ;;;###autoload
-(defun prj2-create-project-widget-frontend (command ok &optional cancel)
+(defun prj2-create-project-widget-frontend (command ok)
+  (setq prj2-ok-func ok)
   (case command
     (:show
      (prj2-with-widget "Create Project"
        ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        (lambda (&rest ignore)
-         ;; ;; Validate file paths.
-         ;; (prj2-validate-filepaths prj2-widget-filepaths)
-         ;; ;; Return if there is an invalid info.
-         ;; (unless (and prj2-widget-project-name
-         ;;              (> (length prj2-tmp-list1) 0)
-         ;;              (> (length prj2-widget-filepaths) 0))
-         ;;   (error "Can't create new project due to invalid information."))
-         ;; ;; Sort the order of doctypes.
-         ;; (prj2-sort-doctypes prj2-tmp-list1 prj2-document-types)
-         ;; ;; Export configuration.
-         ;; (prj2-create-project-internal prj2-widget-project-name prj2-tmp-list1 prj2-widget-filepaths)
-         (kill-buffer))
+         ;; Validate file paths.
+         (let ((name (widget-value prj2-widget-project-name))
+               (doctypes (prj2-widget-doctypes))
+               (filepaths (prj2-widget-filepaths)))
+           (unless (> (length name) 0)
+             (error "Project name is empty!"))
+           (unless (> (length doctypes) 0)
+             (error "No document types is selected!"))
+           (unless (> (length filepaths) 0)
+             (error "No file path!"))
+           (and prj2-ok-func
+                (funcall prj2-ok-func name doctypes filepaths))
+           (kill-buffer)))
 
        ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       ;; Widget for project name.
        (setq prj2-widget-project-name
              (widget-create 'editable-field
                             :format "Project Name: %v"))
        (widget-insert "\n")
        (widget-insert "Document Types (Edit) ") ;; TODO: add customizable link
        (widget-create 'push-button
-                      :notify (prj2-widget-checkbox-select-all prj2-widget-checkboxes)
+                      :notify (prj2-widget-checkbox-select-all prj2-widget-doctypes)
                       "Select All")
        (widget-insert " ")
        (widget-create 'push-button
-                      :notify (prj2-widget-checkbox-deselect-all prj2-widget-checkboxes)
+                      :notify (prj2-widget-checkbox-deselect-all prj2-widget-doctypes)
                       "Deselect All")
        (widget-insert " :\n")
        (let (wid)
@@ -82,9 +85,10 @@
                                     :format (concat "%[%v%] "
                                                     (prj2-format-doctype doctype)
                                                     "\n")))
-           (widget-put wid :value doctype)
-           (setq prj2-widget-checkboxes (append prj2-widget-checkboxes
-                                                `(,wid)))))
+           (widget-put wid :data doctype)
+           ;; Widget for doctypes.
+           (setq prj2-widget-doctypes (append prj2-widget-doctypes
+                                              `(,wid)))))
        (widget-insert "\n")
        (widget-insert "Include Path:\n")
        (widget-insert (propertize "- Button INS to add a path; Button DEL to \
@@ -92,6 +96,7 @@ remove one.\n"
                                   'face 'font-lock-string-face))
        (widget-insert (propertize "- Use TAB to get a path prompt.\n"
                                   'face 'font-lock-string-face))
+       ;; Widget for filepaths.
        (setq prj2-widget-filepaths
              (widget-create 'editable-list
                             :entry-format "%i %d %v"
@@ -100,19 +105,19 @@ remove one.\n"
                             '(editable-field :value "" :company prj2-browse-file-backend)))))))
 
 ;;;###autoload
-(defun prj2-delete-project-widget-frontend (command ok &optional cancel)
+(defun prj2-delete-project-widget-frontend (command ok)
   (case command
     (:show
      )))
 
 ;;;###autoload
-(defun prj2-edit-project-widget-frontend (command ok &optional cancel)
+(defun prj2-edit-project-widget-frontend (command ok)
   (case command
     (:show
      )))
 
 ;;;###autoload
-(defun prj2-search-project-widget-frontend (command ok &optional cancel)
+(defun prj2-search-project-widget-frontend (command ok)
   (case command
     (:show
      )))
@@ -207,6 +212,27 @@ remove one.\n"
            (add-to-list 'company-backends 'prj2-browse-file-backend)
            (add-to-list 'company-backends 'prj2-search-backend))))))
 
+(defun prj2-widget-doctypes ()
+  "Return a plist of selected document types."
+  (let (doctypes)
+    (dolist (checkbox prj2-widget-doctypes)
+      (let ((doctype (and (widget-value checkbox)
+                          (widget-get checkbox :data))))
+        (when doctype
+          (setq doctypes (append doctypes
+                                 `(,(car doctype) ,(cdr doctype)))))))
+    doctypes))
+
+(defun prj2-widget-filepaths ()
+  "Return a list of file paths."
+  (let (filepaths)
+    (dolist (file (widget-value prj2-widget-filepaths))
+      (when (and (> (length file) 2)
+                 (file-exists-p file))
+        (setq filepaths (append filepaths
+                                `(,(expand-file-name file))))))
+    filepaths))
+
 (defun prj2-concat-filepath (dir file)
   "Return a full path combined with `dir' and `file'. It saves you the worry of whether to append '/' or not."
   (concat dir
@@ -246,25 +272,6 @@ remove one.\n"
       (setq regexp (concat regexp el "\\|")))
     (setq regexp (replace-regexp-in-string "\\\\|$" "" regexp)
           regexp (concat "\\(" regexp "\\)"))))
-
-(defmacro prj2-validate-filepaths (paths)
-  "Iterate the file paths in the configuration in order to discard invalid paths."
-  `(let (valid-fp)
-     (dolist (f ,paths)
-       (let ((fp (and (file-exists-p f)
-		      (expand-file-name f))))
-	 (and fp
-	      (push fp valid-fp))))
-     (and valid-fp
-	  (setq ,paths valid-fp))))
-
-(defmacro prj2-sort-doctypes (choices references)
-  `(let (orderlist)
-     (dolist (i ,references)
-       (and (member i ,choices)
-	    (push i orderlist)))
-     (setq orderlist (reverse orderlist)
-	   ,choices orderlist)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -326,7 +333,7 @@ remove one.\n"
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun prj2-format-doctype (doctype)
-  (format "%s (%s)" (car doctype) (cadr doctype)))
+  (format "%s (%s)" (car doctype) (cdr doctype)))
 
 (defun prj2-widget-clean ()
   (dolist (name '("*Create Project*"

@@ -41,10 +41,7 @@
 (defun sos-definition-buffer-frontend (command)
   (case command
     (:init (sos-toggle-definition-buffer&window 1))
-    (:destroy
-     (and (window-live-p sos-def-win)
-          (setq sos-def-win-height (window-height sos-def-win)))
-     (sos-toggle-definition-buffer&window -1))
+    (:destroy (sos-toggle-definition-buffer&window -1))
     (:show
      ;; TODO: remember user choice at last session in the prj.
      (setq sos-index 0
@@ -53,10 +50,10 @@
      (sos-toggle-definition-buffer&window 1)
      (if (> (length sos-candidates) 1)
          (sos-show-candidates)
-       (sos-show-candidate)))
-    (:hide
-     (when (string-match "\*\\w+\*" (buffer-name))
-       (sos-toggle-definition-buffer&window -1)))))
+       (sos-show-candidate))))
+  ;; Save the height of definition window.
+  (and (window-live-p sos-def-win)
+       (setq sos-def-win-height (window-height sos-def-win))))
 
 ;;;###autoload
 (defun sos-tips-frontend (command)

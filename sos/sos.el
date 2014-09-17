@@ -139,6 +139,9 @@ Return value will be cached to `sos-candidates'.
 (defvar sos-source-buffer nil
   "The current source code buffer.")
 
+(defvar sos-source-buffer-tick 0
+  "The current source buffer's tick counter.")
+
 (defvar sos-source-window nil
   "The current window where the source code buffer is at.")
 
@@ -214,8 +217,8 @@ If you want to skip additional commands, try example:
 (defun sos-post-command ()
   (when (sos-is-idle-begin)
     (setq sos-source-buffer (current-buffer)
-          sos-source-window (selected-window))
-    (setq sos-timer (run-with-timer sos-idle-delay nil
+          sos-source-window (selected-window)
+          sos-timer (run-with-timer sos-idle-delay nil
                                     'sos-idle-begin))))
 
 (defun sos-is-idle-begin ()
@@ -228,7 +231,8 @@ If you want to skip additional commands, try example:
       (progn
         (if (null sos-backend)
             (sos-1st-process)
-          (sos-normal-process sos-backend)))
+          (sos-normal-process sos-backend))
+        (setq sos-source-buffer-tick (buffer-modified-tick)))
     (error err)))
 
 (defun sos-1st-process ()
@@ -255,8 +259,7 @@ If you want to skip additional commands, try example:
      ;; Something ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
      (t
       (if (and (eq symb sos-symbol)
-               (eq (current-buffer) sos-source-buffer)
-               (eq (selected-window) sos-source-window))
+               (eq (buffer-modified-tick) sos-source-buffer-tick))
           (progn
             ;; If return symbol string is equal to `sos-symbol', ask front-ends
             ;; to do `:update' task.
