@@ -193,6 +193,8 @@ project to be loaded."
     (prj2-clean-all)
     ;; Read configuration.
     (setq prj2-config (prj2-import-json (prj2-config-path name)))
+    ;; Update database
+    (prj2-build-database)
     (and (featurep 'sos)
          (unless sos-definition-window-mode
            (sos-definition-window-mode 1)))
@@ -548,6 +550,7 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
 
 (defun prj2-build-filedb ()
   "Create a list that contains all the files which should be included in the current project. Export the list to a file."
+  ;; TODO: Find those files which are newer than database, update them.
   (let ((filepaths (prj2-project-filepaths))
         (doctypes (prj2-project-doctypes))
         (excludes prj2-exclude-types)
@@ -566,6 +569,7 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
 
 (defun prj2-build-tags ()
   ;; TODO: implemnt it.
+  ;; TODO: Find those files which are newer than database, update them.
   )
 
 (provide 'prj2)
