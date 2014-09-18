@@ -226,7 +226,57 @@ remove one.\n"
 (defun prj2-search-project-widget-frontend (command &optional ok)
   (case command
     (:show
-     )
+     (prj2-with-widget "*Search Project*"
+       ;; Ok callback ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       ok
+
+       ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       (lambda (&rest ignore)
+         (unless prj2-widget-textfield
+           (error (format "[%s] Please enter something for searching!" (prj2-widget-textfield))))
+         (unless (> (length prj2-tmp-list1) 0)
+           (error (format "[%s] Please select document types for searching!" (prj2-widget-textfield))))
+         (kill-buffer)
+         (prj2-search-project-internal prj2-widget-textfield prj2-tmp-list1))
+
+       ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       (setq prj2-tmp-list1 (copy-list (prj2-project-doctypes)))
+       (and search
+            (setq prj2-widget-textfield search))
+
+       (widget-insert "=== Search Project ===\n\n")
+       (widget-insert (format "Project Name: %s\n\n" (prj2-widget-textfield)))
+       (widget-create 'editable-field
+                      :format "Search: %v"
+                      :value (or search "")
+                      :notify (prj2-widget-common-notify prj2-widget-textfield)
+                      :company 'prj2-search-backend)
+       (widget-insert "\n")
+       (widget-insert "Document Types ")
+       (widget-create 'push-button
+                      :notify (lambda (&rest ignore)
+                                (setq prj2-tmp-list1 nil)
+                                (dolist (box prj2-widget-doctypes)
+                                  (widget-value-set box t))
+                                (dolist (type (prj2-project-doctypes))
+                                  (push type prj2-tmp-list1)))
+                      "Select All")
+       (widget-insert " ")
+       (widget-create 'push-button
+                      :notify (lambda (&rest ignore)
+                                (setq prj2-tmp-list1 nil)
+                                (dolist (box prj2-widget-doctypes)
+                                  (widget-value-set box nil)))
+                      "Deselect All")
+       (widget-insert " :\n")
+       (dolist (type (prj2-project-doctypes))
+         (let (wid)
+           (setq wid (widget-create 'checkbox
+                                    :format (concat "%[%v%] " (prj2-format-doctype type) "\n")
+                                    :value t
+                                    :notify (prj2-widget-checkbox-notify :doctypes prj2-tmp-list1)))
+           (widget-put wid :doctypes type)
+           (push wid prj2-widget-doctypes)))))
     (:hide
      (and (get-buffer "*Search Project*")
           (kill-buffer "*Search Project*")))))
@@ -235,7 +285,16 @@ remove one.\n"
 (defun prj2-find-file-frontend (command &optional ok)
   (case command
     (:show
-     )))
+     (let* ((filedb (prj2-import-data (prj2-filedb-path)))
+            filelist)
+       (while filedb
+         (setq filelist (append filelist (cadr filedb))
+               filedb (cddr filedb)))
+       ;; TOOD: use `sos-source-buffer' and new implementation.
+       ;; call `find-file-begin' -> `find-file'.
+       (funcall ok (ido-completing-read (format "[%s] Find file: "
+                                                (prj2-project-name))
+                                        filelist))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -451,82 +510,5 @@ remove one.\n"
   "The function responds 'candiates for `prj2-search-backend'."
   ;; TODO: use `prj2-search-cache'.
   (all-completions prefix (prj2-search-cache)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defun prj2-setup-delete-project-widget ()
-  (prj2-with-widget "*Delete Project*"
-    ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    (lambda (&rest ignore)
-      (prj2-delete-project-internal prj2-tmp-list1)
-      (kill-buffer))
-
-    ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    (widget-insert "=== Delete Project ===\n")
-    (widget-insert "Use TAB to jump to forward widget; Shift-Tab to jump to backward widget.\n\n")
-    (widget-insert "Select projects to be deleted:\n")
-    (let (choices)
-      (dolist (f (directory-files prj2-workspace-path))
-	(let ((config-file (format "%s/%s/%s" prj2-workspace-path f prj2-config-name)))
-	  (when (file-exists-p config-file)
-	    (push f choices))))
-      (unless choices
-	(kill-buffer)
-	(error "[Prj] No projects can be deleted."))
-      (dolist (c choices)
-	(widget-put (widget-create 'checkbox
-				   :format (concat "%[%v%] " c "\n")
-				   :notify (prj2-widget-checkbox-notify :filepaths prj2-tmp-list1))
-		    :filepaths c)))))
-
-(defun prj2-setup-search-project-widget (search)
-  (prj2-with-widget "*Search Project*"
-    ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    (lambda (&rest ignore)
-      (unless prj2-widget-textfield
-	(error (format "[%s] Please enter something for searching!" (prj2-widget-textfield))))
-      (unless (> (length prj2-tmp-list1) 0)
-	(error (format "[%s] Please select document types for searching!" (prj2-widget-textfield))))
-      (kill-buffer)
-      (prj2-search-project-internal prj2-widget-textfield prj2-tmp-list1))
-
-    ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    (setq prj2-tmp-list1 (copy-list (prj2-project-doctypes)))
-    (and search
-         (setq prj2-widget-textfield search))
-
-    (widget-insert "=== Search Project ===\n\n")
-    (widget-insert (format "Project Name: %s\n\n" (prj2-widget-textfield)))
-    (widget-create 'editable-field
-		   :format "Search: %v"
-                   :value (or search "")
-		   :notify (prj2-widget-common-notify prj2-widget-textfield)
-                   :company 'prj2-search-backend)
-    (widget-insert "\n")
-    (widget-insert "Document Types ")
-    (widget-create 'push-button
-		   :notify (lambda (&rest ignore)
-			     (setq prj2-tmp-list1 nil)
-			     (dolist (box prj2-widget-doctypes)
-			       (widget-value-set box t))
-			     (dolist (type (prj2-project-doctypes))
-			       (push type prj2-tmp-list1)))
-		   "Select All")
-    (widget-insert " ")
-    (widget-create 'push-button
-		   :notify (lambda (&rest ignore)
-			     (setq prj2-tmp-list1 nil)
-			     (dolist (box prj2-widget-doctypes)
-			       (widget-value-set box nil)))
-		   "Deselect All")
-    (widget-insert " :\n")
-    (dolist (type (prj2-project-doctypes))
-      (let (wid)
-	(setq wid (widget-create 'checkbox
-				 :format (concat "%[%v%] " (prj2-format-doctype type) "\n")
-				 :value t
-				 :notify (prj2-widget-checkbox-notify :doctypes prj2-tmp-list1)))
-	(widget-put wid :doctypes type)
-	(push wid prj2-widget-doctypes)))))
 
 (provide 'prj2-widget-frontend)

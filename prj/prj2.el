@@ -236,15 +236,9 @@ project to be loaded."
   ;; Load project if wasn't loaded.
   (unless (prj2-project-p)
     (prj2-load-project))
-  ;; Build database if is wasn't built.
-  (unless (file-exists-p (prj2-filedb-path))
-    (prj2-build-database))
-  ;; Find file.
-  (let ((filedb (prj2-import-data (prj2-filedb-path)))
-	(filelist '()))
-    (dolist (elm (prj2-project-doctypes))
-      (setq filelist (append filelist (gethash elm filedb))))
-    (find-file (ido-completing-read "Find file: " filelist))))
+  (prj2-call-frontends :show
+                       prj2-find-file-frontends
+                       'prj2-find-file-begin))
 
 ;;;###autoload
 (defun prj2-search-project ()
@@ -287,8 +281,8 @@ project to be loaded."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun prj2-call-frontends (command frontends &optional ok)
-  "Call frontends and pass ok and cancel callback functions to them. If one of 
-them returns non nil, the loop will break."
+  "Call frontends and pass ok callback functions to them. If one of them returns 
+non nil, the loop will break."
   (dolist (frontend frontends)
     (and (funcall frontend command ok)
          (return t))))
@@ -384,7 +378,6 @@ them returns non nil, the loop will break."
   (message "Delet project ...done"))
 
 (defmacro prj2-with-search-buffer (&rest body)
-  "Switch to search buffer and setup specific major mode and minor modes. Create a new one if it doesn't exist."
   (declare (indent 0) (debug t))
   `(progn
      (find-file (prj2-searchdb-path))
@@ -398,8 +391,17 @@ them returns non nil, the loop will break."
      ;; Change major mode.
      (prj2-grep-mode)))
 
+(defun prj2-search-project-begin (match projects)
+  (when prj2-timer
+    (cancel-timer prj2-timer)
+    (setq prj2-timer nil))
+  (setq prj2-timer (run-with-timer prj2-idle-delay nil
+                                   'prj2-search-project-internal
+                                   )))
+
 (defun prj2-search-project-internal (match projects)
-  "Internal function to search project. It might be called by widget or other GUI framework."
+  "Internal function to edit project. It is called by functions in the 
+`prj2-search-project-frontends'."
   ;; Cache search string.
   (let ((cache (prj2-project-search-history)))
     (push match cache)
@@ -415,11 +417,18 @@ them returns non nil, the loop will break."
       ;; Prepare file list.
       (dolist (elm projects)
         (dolist (f (gethash elm db))
-          (message "[%s] Searching ...%s" (prj2-project-name) f)
+          (message "Searching ...%s" f)
           (goto-char (point-max))
           (call-process "grep" nil (list (current-buffer) nil) t "-nH" match f)))
       (insert "<<<<<\n\n")
-      (message (format "[%s] Search ...done" (prj2-project-name))))))
+      (message (format "Search ...done")))))
+
+(defun prj2-find-file-begin (file)
+  (and (featurep 'history)
+       (his-add-position-type-history))
+  (find-file file)
+  (and (featurep 'history)
+       (his-add-position-type-history)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
