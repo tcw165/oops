@@ -149,7 +149,11 @@ format:
   (prj2-clean-frontends)
   (prj2-call-frontends :show
                        prj2-create-project-frontends
-                       'prj2-create-project-begin))
+                       (prj2-ok-delay-begin
+                        'prj2-create-project-internal
+                        name
+                        doctypes
+                        filepaths)))
 
 ;;;###autoload
 (defun prj2-delete-project ()
@@ -158,7 +162,9 @@ format:
   (prj2-clean-frontends)
   (prj2-call-frontends :show
                        prj2-delete-project-frontends
-                       'prj2-delete-project-begin))
+                       (prj2-ok-delay-begin
+                        'prj2-delete-project-internal
+                        projects)))
 
 ;;;###autoload
 (defun prj2-edit-project ()
@@ -170,7 +176,10 @@ format:
     (prj2-load-project))
   (prj2-call-frontends :show
                        prj2-edit-project-frontends
-                       'prj2-edit-project-begin))
+                       (prj2-ok-delay-begin
+                        'prj2-edit-project-internal
+                        doctypes
+                        filepaths)))
 
 ;;;###autoload
 (defun prj2-load-project (&optional name)
@@ -181,10 +190,11 @@ project to be loaded."
     (unless name
       ;; Find available directories which represent a project.
       (dolist (name (directory-files prj2-workspace-path))
-        (let ((config-file (prj2-config-path name)))
-          (when (and (file-exists-p config-file)
-                     (not (string= name (prj2-project-name))))
-            (setq choices (append choices `(,name))))))
+        (unless (member name '("." ".."))
+          (let ((config-file (prj2-config-path name)))
+            (when (and (file-exists-p config-file)
+                       (not (string= name (prj2-project-name))))
+              (setq choices (append choices `(,name)))))))
       ;; Prompt user to create project if no projects is in workspace.
       (when (= (length choices) 0)
         (error "No project can be loaded! Please create a project first."))
@@ -238,7 +248,9 @@ project to be loaded."
     (prj2-load-project))
   (prj2-call-frontends :show
                        prj2-find-file-frontends
-                       'prj2-find-file-begin))
+                       (prj2-ok-delay-begin
+                        'prj2-find-file-internal
+                        file)))
 
 ;;;###autoload
 (defun prj2-search-project ()
@@ -249,7 +261,9 @@ project to be loaded."
     (prj2-load-project))
   (prj2-call-frontends :show
                        prj2-search-project-frontends
-                       'prj2-search-project-begin))
+                       (prj2-ok-delay-begin
+                        'prj2-search-project-internal
+                        match)))
 
 ;;;###autoload
 (defun prj2-toggle-search-buffer ()
@@ -280,6 +294,17 @@ project to be loaded."
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defmacro prj2-ok-delay-begin (ok-impl &rest ok-impl-args)
+  "Create a lambda function that call OK-IMPL function with parameters OK-IMPL-ARGS 
+after `prj2-idle-delay' seconds."
+  `(lambda (,@ok-impl-args)
+     (when prj2-timer
+       (cancel-timer prj2-timer)
+       (setq prj2-timer nil))
+     (setq prj2-timer (run-with-timer prj2-idle-delay nil
+                                      ,ok-impl
+                                      ,@ok-impl-args))))
+
 (defun prj2-call-frontends (command frontends &optional ok)
   "Call frontends and pass ok callback functions to them. If one of them returns 
 non nil, the loop will break."
@@ -297,13 +322,8 @@ non nil, the loop will break."
 
 (defun prj2-clean-all ()
   "Clean search buffer or widget buffers which belongs to other project when user loads a project or unload a project."
-  ;; Clean widgets.
-  (dolist (frontends `(,prj2-create-project-frontends
-                       ,prj2-delete-project-frontends
-                       ,prj2-edit-project-frontends
-                       ,prj2-search-project-frontends
-                       ,prj2-find-file-frontends))
-    (prj2-call-frontends :hide frontends))
+  ;; Clean frontends.
+  (prj2-clean-frontends)
   ;; Kill search buffer.
   (let ((search (get-buffer "*Search*")))
     (and search
@@ -312,13 +332,6 @@ non nil, the loop will break."
            (kill-buffer))))
   ;; Reset configuration.
   (setq prj2-config nil))
-
-(defun prj2-create-project-begin (name doctypes filepaths)
-  (when prj2-timer
-    (cancel-timer prj2-timer))
-  (setq prj2-timer (run-with-timer prj2-idle-delay nil
-                                   'prj2-create-project-internal
-                                   name doctypes filepaths)))
 
 (defun prj2-create-project-internal (name doctypes filepaths)
   "Internal function to create project. It is called by functions in the 
@@ -340,14 +353,6 @@ non nil, the loop will break."
     ;; Build database.
     (prj2-build-database)))
 
-(defun prj2-edit-project-begin (doctypes filepaths)
-  (when prj2-timer
-    (cancel-timer prj2-timer)
-    (setq prj2-timer nil))
-  (setq prj2-timer (run-with-timer prj2-idle-delay nil
-                                   'prj2-edit-project-internal
-                                   doctypes filepaths)))
-
 (defun prj2-edit-project-internal (doctypes filepaths)
   "Internal function to edit project. It is called by functions in the 
 `prj2-edit-project-frontends'."
@@ -356,14 +361,6 @@ non nil, the loop will break."
   (prj2-export-json (prj2-config-path) prj2-config)
   ;; Update database.
   (prj2-build-filedb))
-
-(defun prj2-delete-project-begin (projects)
-  (when prj2-timer
-    (cancel-timer prj2-timer)
-    (setq prj2-timer nil))
-  (setq prj2-timer (run-with-timer prj2-idle-delay nil
-                                   'prj2-delete-project-internal
-                                   projects)))
 
 (defun prj2-delete-project-internal (projects)
   "Internal function to delete project. It is called by functions in the 
@@ -391,14 +388,6 @@ non nil, the loop will break."
      ;; Change major mode.
      (prj2-grep-mode)))
 
-(defun prj2-search-project-begin (match)
-  (when prj2-timer
-    (cancel-timer prj2-timer)
-    (setq prj2-timer nil))
-  (setq prj2-timer (run-with-timer prj2-idle-delay nil
-                                   'prj2-search-project-internal
-                                   match)))
-
 (defun prj2-search-project-internal (match)
   "Internal function to edit project. It is called by functions in the 
 `prj2-search-project-frontends'."
@@ -422,14 +411,6 @@ non nil, the loop will break."
           (call-process "grep" nil (list (current-buffer) nil) t "-nH" match f)))
       (insert "<<<<<\n\n")
       (message (format "Search ...done")))))
-
-(defun prj2-find-file-begin (file)
-  (when prj2-timer
-    (cancel-timer prj2-timer)
-    (setq prj2-timer nil))
-  (setq prj2-timer (run-with-timer prj2-idle-delay nil
-                                   'prj2-find-file-internal
-                                   file)))
 
 (defun prj2-find-file-internal (file)
   (and (featurep 'history)
