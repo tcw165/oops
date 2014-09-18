@@ -130,7 +130,7 @@ format:
 (defconst prj2-search-history-max 16
   "Maximin elements count in the searh history cache.")
 
-(defconst prj2-idle-delay 0.5)
+(defconst prj2-idle-delay 0.25)
 
 (defvar prj2-timer nil)
 
@@ -391,15 +391,15 @@ non nil, the loop will break."
      ;; Change major mode.
      (prj2-grep-mode)))
 
-(defun prj2-search-project-begin (match projects)
+(defun prj2-search-project-begin (match)
   (when prj2-timer
     (cancel-timer prj2-timer)
     (setq prj2-timer nil))
   (setq prj2-timer (run-with-timer prj2-idle-delay nil
                                    'prj2-search-project-internal
-                                   )))
+                                   match)))
 
-(defun prj2-search-project-internal (match projects)
+(defun prj2-search-project-internal (match)
   "Internal function to edit project. It is called by functions in the 
 `prj2-search-project-frontends'."
   ;; Cache search string.
@@ -424,6 +424,14 @@ non nil, the loop will break."
       (message (format "Search ...done")))))
 
 (defun prj2-find-file-begin (file)
+  (when prj2-timer
+    (cancel-timer prj2-timer)
+    (setq prj2-timer nil))
+  (setq prj2-timer (run-with-timer prj2-idle-delay nil
+                                   'prj2-find-file-internal
+                                   file)))
+
+(defun prj2-find-file-internal (file)
   (and (featurep 'history)
        (his-add-position-type-history))
   (find-file file)
@@ -480,7 +488,9 @@ non nil, the loop will break."
     (prj2-plist-put config :name "")
     (prj2-plist-put config :filepaths '())
     (prj2-plist-put config :doctypes '())
+    ;; format: (FILE1 FILE2 ...)
     (prj2-plist-put config :recent-files '())
+    ;; format: (POINT (KEYWORD1 KEYWORD2 ...))
     (prj2-plist-put config :search-history '())
     config))
 
@@ -490,7 +500,6 @@ non nil, the loop will break."
     (with-temp-file filename
       (insert (json-encode-plist data)))))
 
-;; (setq prj2-config (prj2-import-json "/Users/Boy/.emacs.d/.workspace/Test/config.db"))
 (defun prj2-import-json (filename)
   "Read data exported by `prj2-export-json' from file `filename'."
   (when (file-exists-p filename)
