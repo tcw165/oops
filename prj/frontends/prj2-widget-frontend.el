@@ -50,7 +50,7 @@
   (case command
     (:show
      (prj2-with-widget "*Create Project*"
-       ;; Ok callback ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       ;; Ok implementation callback ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        ok
 
        ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -118,7 +118,7 @@ remove one.\n"
   (case command
     (:show
      (prj2-with-widget "*Delete Project*"
-       ;; Ok callback ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       ;; Ok implementation callback ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        ok
 
        ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -168,7 +168,7 @@ remove one.\n"
   (case command
     (:show
      (prj2-with-widget "*Edit Project*"
-       ;; Ok callback ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       ;; Ok implementation callback ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        ok
 
        ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -223,11 +223,26 @@ remove one.\n"
           (kill-buffer "*Edit Project*")))))
 
 ;;;###autoload
+(defun prj2-find-file-frontend (command &optional ok)
+  (case command
+    (:show
+     (let* ((filedb (prj2-import-data (prj2-filedb-path)))
+            filelist)
+       (while filedb
+         (setq filelist (append filelist (cadr filedb))
+               filedb (cddr filedb)))
+       ;; TOOD: use `sos-source-buffer' and new implementation.
+       ;; call `find-file-begin' -> `find-file'.
+       (funcall ok (ido-completing-read (format "[%s] Find file: "
+                                                (prj2-project-name))
+                                        filelist))))))
+
+;;;###autoload
 (defun prj2-search-project-widget-frontend (command &optional ok)
   (case command
     (:show
      (prj2-with-widget "*Search Project*"
-       ;; Ok callback ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       ;; Ok implementation callback ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        ok
 
        ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -240,12 +255,6 @@ remove one.\n"
          (prj2-search-project-internal prj2-widget-textfield prj2-tmp-list1))
 
        ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-       (setq prj2-tmp-list1 (copy-list (prj2-project-doctypes)))
-       (and search
-            (setq prj2-widget-textfield search))
-
-       (widget-insert "=== Search Project ===\n\n")
-       (widget-insert (format "Project Name: %s\n\n" (prj2-widget-textfield)))
        (widget-create 'editable-field
                       :format "Search: %v"
                       :value (or search "")
@@ -280,21 +289,6 @@ remove one.\n"
     (:hide
      (and (get-buffer "*Search Project*")
           (kill-buffer "*Search Project*")))))
-
-;;;###autoload
-(defun prj2-find-file-frontend (command &optional ok)
-  (case command
-    (:show
-     (let* ((filedb (prj2-import-data (prj2-filedb-path)))
-            filelist)
-       (while filedb
-         (setq filelist (append filelist (cadr filedb))
-               filedb (cddr filedb)))
-       ;; TOOD: use `sos-source-buffer' and new implementation.
-       ;; call `find-file-begin' -> `find-file'.
-       (funcall ok (ido-completing-read (format "[%s] Find file: "
-                                                (prj2-project-name))
-                                        filelist))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

@@ -35,6 +35,7 @@
 ;; 2014-08-01 (0.0.1)
 ;;    Initial release.
 
+(require 'cl)
 (require 'ido)
 (require 'json)
 
@@ -226,16 +227,16 @@ project to be loaded."
     (message "Unload [%s] ...done" name)))
 
 ;;;###autoload
-(defun prj2-build-database ()
+(defun prj2-build-database (&optional all)
   "Build file list and tags."
-  (interactive)
+  (interactive '(t))
   (unless (prj2-project-p)
     (prj2-load-project))
   ;; Create file list which is the data base of the project's files.
   (when (prj2-project-p)
     (message "Build database might take a minutes, please wait ...")
-    (prj2-build-filedb)
-    (prj2-build-tags)
+    (prj2-build-filedb all)
+    (prj2-build-tags all)
     (message "Database is updated!")))
 
 ;;;###autoload
@@ -263,6 +264,7 @@ project to be loaded."
                        prj2-search-project-frontends
                        (prj2-ok-delay-begin
                         'prj2-search-project-internal
+                        doctypes
                         match)))
 
 ;;;###autoload
@@ -356,11 +358,21 @@ non nil, the loop will break."
 (defun prj2-edit-project-internal (doctypes filepaths)
   "Internal function to edit project. It is called by functions in the 
 `prj2-edit-project-frontends'."
-  (prj2-plist-put prj2-config :doctypes doctypes)
-  (prj2-plist-put prj2-config :filepaths filepaths)
-  (prj2-export-json (prj2-config-path) prj2-config)
-  ;; Update database.
-  (prj2-build-filedb))
+  (let (update-db)
+    ;; Compare new and old doctypes.
+    ;; Compare new and old filepaths
+    (let ((item1 (prj2-project-doctypes))
+          (item2 (prj2-project-filepaths)))
+      (when (or (/= (length doctypes) (length item1))
+                (not (every 'equal doctypes item1))
+                (/= (length filepaths) (length item2))
+                (not (every 'equal filepaths item2)))
+        (setq update-db t)))
+    (prj2-plist-put prj2-config :doctypes doctypes)
+    (prj2-plist-put prj2-config :filepaths filepaths)
+    (prj2-export-json (prj2-config-path) prj2-config)
+    ;; Update database.
+    (prj2-build-database update-db)))
 
 (defun prj2-delete-project-internal (projects)
   "Internal function to delete project. It is called by functions in the 
@@ -388,7 +400,7 @@ non nil, the loop will break."
      ;; Change major mode.
      (prj2-grep-mode)))
 
-(defun prj2-search-project-internal (match)
+(defun prj2-search-project-internal (doctypes match)
   "Internal function to edit project. It is called by functions in the 
 `prj2-search-project-frontends'."
   ;; Cache search string.
@@ -556,28 +568,33 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
              (split-string output "\n" t))))))
 
 (defun prj2-process-find-change ()
-  )
+  ;; TODO:
+  t)
 
-(defun prj2-build-filedb ()
-  "Create a list that contains all the files which should be included in the current project. Export the list to a file."
+(defun prj2-build-filedb (&optional all)
+  "Create a list that contains all the files which should be included in the 
+current project. Export the list to a file."
   ;; TODO: Find those files which are newer than database, update them.
   (let ((filepaths (prj2-project-filepaths))
         (doctypes (prj2-project-doctypes))
         (excludes prj2-exclude-types)
         db)
-    ;; Iterate doctypes.
-    (while doctypes
-      (let* ((files (prj2-process-find filepaths
-                                       (cadr doctypes)
-                                       excludes)))
-        (prj2-plist-put db (car doctypes) files))
-      ;; Next.
-      (setq doctypes (cddr doctypes)))
-    ;; Export database.
-    (prj2-export-data (prj2-filedb-path) db)
-    ))
+    (if all
+        (progn
+          ;; Iterate doctypes.
+          (while doctypes
+            (let* ((files (prj2-process-find filepaths
+                                             (cadr doctypes)
+                                             excludes)))
+              (prj2-plist-put db (car doctypes) files))
+            ;; Next.
+            (setq doctypes (cddr doctypes)))
+          ;; Export database.
+          (prj2-export-data (prj2-filedb-path) db))
+      ;; TODO: partial update
+      )))
 
-(defun prj2-build-tags ()
+(defun prj2-build-tags (&optional all)
   ;; TODO: implemnt it.
   ;; TODO: Find those files which are newer than database, update them.
   )
