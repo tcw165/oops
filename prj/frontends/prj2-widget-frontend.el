@@ -28,8 +28,11 @@
 (defvar prj2-ok-func nil)
 (make-variable-buffer-local 'prj2-ok-func)
 
-(defvar prj2-widget-project-name nil)
-(make-variable-buffer-local 'prj2-widget-project-name)
+(defvar prj2-widget-textfield nil)
+(make-variable-buffer-local 'prj2-widget-textfield)
+
+(defvar prj2-widget-checkboxes nil)
+(make-variable-buffer-local 'prj2-widget-checkboxes)
 
 (defvar prj2-widget-filepaths nil)
 (make-variable-buffer-local 'prj2-widget-filepaths)
@@ -53,7 +56,7 @@
        ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        (lambda (&rest ignore)
          ;; Validate file paths.
-         (let ((name (widget-value prj2-widget-project-name))
+         (let ((name (widget-value prj2-widget-textfield))
                (doctypes (prj2-widget-doctypes))
                (filepaths (prj2-widget-filepaths)))
            (unless (> (length name) 0)
@@ -61,14 +64,15 @@
            (unless (> (length doctypes) 0)
              (error "No document types is selected!"))
            (unless (> (length filepaths) 0)
-             (error "No file path!"))
+             (error "No valid file path!"))
+           ;; call `prj2-create-project-begin' -> `prj2-create-project-internal'.
            (and prj2-ok-func
                 (funcall prj2-ok-func name doctypes filepaths))
            (kill-buffer)))
 
        ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        ;; Widget for project name.
-       (setq prj2-widget-project-name
+       (setq prj2-widget-textfield
              (widget-create 'editable-field
                             :format "Project Name: %v"))
        (widget-insert "\n")
@@ -81,15 +85,15 @@
                       :notify (prj2-widget-checkbox-deselect-all prj2-widget-doctypes)
                       "Deselect All")
        (widget-insert " :\n")
+       ;; Widget for doctypes.
        (let (wid)
          (dolist (doctype prj2-document-types)
            (setq wid (widget-create 'checkbox
+                                    :data doctype
                                     :format (concat "%[%v%] "
                                                     (prj2-format-doctype doctype)
-                                                    "\n")))
-           (widget-put wid :data doctype)
-           ;; Widget for doctypes.
-           (setq prj2-widget-doctypes (append prj2-widget-doctypes
+                                                    "\n"))
+                 prj2-widget-doctypes (append prj2-widget-doctypes
                                               `(,wid)))))
        (widget-insert "\n")
        (widget-insert "Include Path:\n")
@@ -101,10 +105,10 @@ remove one.\n"
        ;; Widget for filepaths.
        (setq prj2-widget-filepaths
              (widget-create 'editable-list
-                            :entry-format "%i %d %v"
+                            :entry-format "%i %d path: %v"
                             :value '("")
                             ;; Put :company to make company work for it.
-                            '(editable-field :value "" :company prj2-browse-file-backend)))))
+                            '(editable-field :company prj2-browse-file-backend)))))
     (:hide
      (and (get-buffer "*Create Project*")
           (kill-buffer "*Create Project*")))))
@@ -113,7 +117,48 @@ remove one.\n"
 (defun prj2-delete-project-widget-frontend (command &optional ok)
   (case command
     (:show
-     )
+     (prj2-with-widget "*Delete Project*"
+       ;; Ok callback ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       ok
+
+       ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       (lambda (&rest ignore)
+         (let ((projects (prj2-widget-checkboxes)))
+           (unless (> (length projects) 0)
+             (error "No project is selected!"))
+           ;; call `prj2-delete-project-begin' -> `prj2-delete-project-internal'.
+           (and prj2-ok-func
+                (funcall prj2-ok-func projects))
+           (kill-buffer)))
+
+       ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       (widget-insert "Delete project ")
+       (widget-create 'push-button
+                      :notify (prj2-widget-checkbox-select-all prj2-widget-checkboxes)
+                      "Select All")
+       (widget-insert " ")
+       (widget-create 'push-button
+                      :notify (prj2-widget-checkbox-deselect-all prj2-widget-checkboxes)
+                      "Deselect All")
+       (widget-insert " :\n")
+       ;; Widget for project name.
+       (let (projects)
+         ;; Find out all the projects.
+         (dolist (file (directory-files prj2-workspace-path))
+           (let ((config (prj2-config-path file)))
+             (when (file-exists-p config)
+               (setq projects (append projects
+                                      `(,file))))))
+         (unless projects
+           (kill-buffer)
+           (error "No projects can be deleted."))
+         (let (wid)
+           (dolist (project projects)
+             (setq wid (widget-create 'checkbox
+                                      :data project
+                                      :format (concat "%[%v%] " project "\n"))
+                   prj2-widget-checkboxes (append prj2-widget-checkboxes
+                                                  `(,wid))))))))
     (:hide
      (and (get-buffer "*Delete Project*")
           (kill-buffer "*Delete Project*")))))
@@ -122,7 +167,57 @@ remove one.\n"
 (defun prj2-edit-project-widget-frontend (command &optional ok)
   (case command
     (:show
-     )
+     (prj2-with-widget "*Edit Project*"
+       ;; Ok callback ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       ok
+
+       ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       (lambda (&rest ignore)
+         (let ((doctypes (prj2-widget-doctypes))
+               (filepaths (prj2-widget-filepaths)))
+           (unless (> (length doctypes) 0)
+             (error "No document types is selected!"))
+           (unless (> (length filepaths) 0)
+             (error "No valid file path!"))
+           ;; call `prj2-edit-project-begin' -> `prj2-edit-project-internal'.
+           (and prj2-ok-func
+                (funcall prj2-ok-func doctypes filepaths))
+           (kill-buffer)))
+
+       ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       (widget-insert (format "Project Name: %s\n\n"
+                              (propertize (prj2-project-name)
+                                          'face 'widget-field)))
+       (widget-insert "Document Types (Edit) ") ;; TODO: add customizable link
+       (widget-create 'push-button
+                      :notify (prj2-widget-checkbox-select-all prj2-widget-doctypes)
+                      "Select All")
+       (widget-insert " ")
+       (widget-create 'push-button
+                      :notify (prj2-widget-checkbox-deselect-all prj2-widget-doctypes)
+                      "Deselect All")
+       (widget-insert " :\n")
+       ;; Widget for doctypes.
+       (let (wid)
+         (dolist (doctype prj2-document-types)
+           (setq wid (widget-create 'checkbox
+                                    :data doctype
+                                    :format (concat "%[%v%] "
+                                                    (prj2-format-doctype doctype)
+                                                    "\n")
+                                    :value (and (lax-plist-get (prj2-project-doctypes)
+                                                               (car doctype))
+                                                t))
+                 prj2-widget-doctypes (append prj2-widget-doctypes
+                                              `(,wid)))))
+       (widget-insert "\n")
+       (widget-insert "Include Path:\n")
+       ;; Widget for filepaths.
+       (setq prj2-widget-filepaths
+             (widget-create 'editable-list
+                            :entry-format "%i %d path: %v"
+                            :value (copy-list (prj2-project-filepaths))
+                            '(editable-field :company prj2-browse-file-backend)))))
     (:hide
      (and (get-buffer "*Edit Project*")
           (kill-buffer "*Edit Project*")))))
@@ -143,36 +238,6 @@ remove one.\n"
      )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; back-ends for `company' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;;###autoload
-(defun prj2-browse-file-backend (command &optional arg &rest ign)
-  "The backend based on `company' to provide convenience when browsing files."
-  (case command
-    (prefix (prj2-common-prefix 'prj2-browse-file-backend))
-    (candidates (prj2-browse-file-complete arg))
-    (ignore-case t)))
-
-;;;###autoload
-(defun prj2-search-backend (command &optional arg &rest ign)
-  "Following are for `company' when searching project."
-  (case command
-    (prefix (prj2-common-prefix 'prj2-search-backend))
-    (candidates (prj2-search-complete arg))
-    (ignore-case t)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defmacro prj2-widget-checkbox-select-all (checkboxes)
-  `(lambda (&rest ignore)
-     (dolist (box ,checkboxes)
-       (widget-value-set box t))))
-
-(defmacro prj2-widget-checkbox-deselect-all (checkboxes)
-  `(lambda (&rest ignore)
-     (dolist (box ,checkboxes)
-       (widget-value-set box nil))))
 
 (defmacro prj2-with-widget (name ok-callback ok-notify &rest body)
   (declare (indent 1) (debug t))
@@ -227,6 +292,19 @@ remove one.\n"
        (add-to-list 'company-backends 'prj2-browse-file-backend)
        (add-to-list 'company-backends 'prj2-search-backend))))
 
+(defmacro prj2-widget-checkbox-select-all (checkboxes)
+  `(lambda (&rest ignore)
+     (dolist (box ,checkboxes)
+       (widget-value-set box t))))
+
+(defmacro prj2-widget-checkbox-deselect-all (checkboxes)
+  `(lambda (&rest ignore)
+     (dolist (box ,checkboxes)
+       (widget-value-set box nil))))
+
+(defun prj2-format-doctype (doctype)
+  (format "%s (%s)" (car doctype) (cdr doctype)))
+
 (defun prj2-widget-doctypes ()
   "Return a plist of selected document types."
   (let (doctypes)
@@ -247,6 +325,41 @@ remove one.\n"
         (setq filepaths (append filepaths
                                 `(,(expand-file-name file))))))
     filepaths))
+
+(defun prj2-widget-checkboxes ()
+  (let (ret)
+    (dolist (checkbox prj2-widget-checkboxes)
+      (let ((data (and (widget-value checkbox)
+                       (widget-get checkbox :data))))
+        (when data
+          (setq ret (append ret `(,data))))))
+    ret))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; back-ends for `company' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;###autoload
+(defun prj2-browse-file-backend (command &optional arg &rest ign)
+  "The backend based on `company' to provide convenience when browsing files."
+  (case command
+    (prefix (prj2-common-prefix 'prj2-browse-file-backend))
+    (candidates (prj2-browse-file-complete arg))
+    (ignore-case t)))
+
+;;;###autoload
+(defun prj2-search-backend (command &optional arg &rest ign)
+  "Following are for `company' when searching project."
+  (case command
+    (prefix (prj2-common-prefix 'prj2-search-backend))
+    (candidates (prj2-search-complete arg))
+    (ignore-case t)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defvar prj2-browse-file-cache nil
+  "Storing (DIR . (CANDIDATES...)) for completion.")
+(make-variable-buffer-local 'prj2-browse-file-cache)
 
 (defun prj2-concat-filepath (dir file)
   "Return a full path combined with `dir' and `file'. It saves you the worry of whether to append '/' or not."
@@ -287,12 +400,6 @@ remove one.\n"
       (setq regexp (concat regexp el "\\|")))
     (setq regexp (replace-regexp-in-string "\\\\|$" "" regexp)
           regexp (concat "\\(" regexp "\\)"))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defvar prj2-browse-file-cache nil
-  "Storing (DIR . (CANDIDATES...)) for completion.")
-(make-variable-buffer-local 'prj2-browse-file-cache)
 
 (defun prj2-widget-forward-or-company ()
   "It is for `widget-forward-hook' to continue forward to next widget or show company prompt."
@@ -347,18 +454,6 @@ remove one.\n"
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun prj2-format-doctype (doctype)
-  (format "%s (%s)" (car doctype) (cdr doctype)))
-
-(defun prj2-widget-clean ()
-  (dolist (name '("*Create Project*"
-                  "*Edit Project*"
-                  "*Delete Project*"
-                  "*Search Project*"))
-    (let ((search (get-buffer name)))
-      (and search
-           (kill-buffer search)))))
-
 (defun prj2-setup-delete-project-widget ()
   (prj2-with-widget "*Delete Project*"
     ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -384,98 +479,28 @@ remove one.\n"
 				   :notify (prj2-widget-checkbox-notify :filepaths prj2-tmp-list1))
 		    :filepaths c)))))
 
-(defun prj2-setup-edit-project-widget ()
-  (prj2-with-widget "*Edit Project*"
-    ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    (lambda (&rest ignore)
-      ;; Sort the order of doctypes.
-      (prj2-sort-doctypes prj2-tmp-list1 prj2-document-types)
-      ;; Validate file paths.
-      (prj2-validate-filepaths prj2-widget-filepaths)
-      (let (updatefiledb)
-	;; Check if update is necessary.
-	(catch 'loop
-	  (unless (and (= (length prj2-tmp-list1) (length (prj2-project-doctypes)))
-		       (= (length prj2-widget-filepaths) (length (prj2-project-filepaths))))
-	    (setq updatefiledb t)
-	    (throw 'loop t))
-	  (dolist (elm prj2-tmp-list1)
-	    (unless (member elm (prj2-project-doctypes))
-	      (setq updatefiledb t)
-	      (throw 'loop t)))
-	  (dolist (elm prj2-widget-filepaths)
-	    (unless (member elm (prj2-project-filepaths))
-	      (setq updatefiledb t)
-	      (throw 'loop t))))
-	;; Export configuration.
-	(prj2-edit-project-internal prj2-tmp-list1 prj2-widget-filepaths updatefiledb)
-	(kill-buffer)))
-
-    ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    (setq prj2-tmp-list1 (copy-list (prj2-project-doctypes)))
-    (setq prj2-widget-filepaths (copy-list (prj2-project-filepaths)))
-
-    (widget-insert "=== Edit Project ===\n")
-    (widget-insert "Use TAB to jump to forward widget; Shift-Tab to jump to backward widget.\n\n")
-    (widget-insert (format "Project Name: %s\n\n" (prj2-widget-project-name)))
-    (widget-insert "Document Types (Edit) ") ;; TODO: add customizable link
-    (widget-create 'push-button
-		   :notify (lambda (&rest ignore)
-			     (setq prj2-tmp-list1 nil)
-			     (dolist (box prj2-widget-doctypes)
-			       (widget-value-set box t))
-			     (dolist (type prj2-document-types)
-			       (push type prj2-tmp-list1)))
-		   "Select All")
-    (widget-insert " ")
-    (widget-create 'push-button
-		   :notify (lambda (&rest ignore)
-			     (setq prj2-tmp-list1 nil)
-			     (dolist (box prj2-widget-doctypes)
-			       (widget-value-set box nil)))
-		   "Deselect All")
-    (widget-insert " :\n")
-    (dolist (type prj2-document-types)
-      (let (wid)
-	(setq wid (widget-create 'checkbox
-				 :format (concat "%[%v%] " (prj2-format-doctype type) "\n")
-				 :value  (catch 'loop
-					   (dolist (currtype (prj2-project-doctypes))
-					     (and (equal (car currtype) (car type))
-						  (throw 'loop t))))
-				 :notify (prj2-widget-checkbox-notify :doctype prj2-tmp-list1)))
-	(widget-put wid :doctype type)
-	(push wid prj2-widget-doctypes)))
-    (widget-insert "\n")
-    (widget-insert "Include Path:\n")
-    (widget-create 'editable-list
-		   :entry-format "%i %d %v"
-		   :value (prj2-project-filepaths)
-		   :notify (prj2-widget-common-notify prj2-widget-filepaths)
-		   '(editable-field :company prj2-browse-file-backend))))
-
 (defun prj2-setup-search-project-widget (search)
   (prj2-with-widget "*Search Project*"
     ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     (lambda (&rest ignore)
-      (unless prj2-widget-project-name
-	(error (format "[%s] Please enter something for searching!" (prj2-widget-project-name))))
+      (unless prj2-widget-textfield
+	(error (format "[%s] Please enter something for searching!" (prj2-widget-textfield))))
       (unless (> (length prj2-tmp-list1) 0)
-	(error (format "[%s] Please select document types for searching!" (prj2-widget-project-name))))
+	(error (format "[%s] Please select document types for searching!" (prj2-widget-textfield))))
       (kill-buffer)
-      (prj2-search-project-internal prj2-widget-project-name prj2-tmp-list1))
+      (prj2-search-project-internal prj2-widget-textfield prj2-tmp-list1))
 
     ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     (setq prj2-tmp-list1 (copy-list (prj2-project-doctypes)))
     (and search
-         (setq prj2-widget-project-name search))
+         (setq prj2-widget-textfield search))
 
     (widget-insert "=== Search Project ===\n\n")
-    (widget-insert (format "Project Name: %s\n\n" (prj2-widget-project-name)))
+    (widget-insert (format "Project Name: %s\n\n" (prj2-widget-textfield)))
     (widget-create 'editable-field
 		   :format "Search: %v"
                    :value (or search "")
-		   :notify (prj2-widget-common-notify prj2-widget-project-name)
+		   :notify (prj2-widget-common-notify prj2-widget-textfield)
                    :company 'prj2-search-backend)
     (widget-insert "\n")
     (widget-insert "Document Types ")

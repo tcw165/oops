@@ -164,10 +164,10 @@ format:
 (defun prj2-edit-project ()
   "Show configuration for editing project's setting."
   (interactive)
+  (prj2-clean-frontends)
   ;; Load project if wasn't loaded.
   (unless (prj2-project-p)
     (prj2-load-project))
-  (prj2-clean-frontends)
   (prj2-call-frontends :show
                        prj2-edit-project-frontends
                        'prj2-edit-project-begin))
@@ -327,7 +327,8 @@ them returns non nil, the loop will break."
                                    name doctypes filepaths)))
 
 (defun prj2-create-project-internal (name doctypes filepaths)
-  "Internal function to create project. It might be called by widget or other GUI framework."
+  "Internal function to create project. It is called by functions in the 
+`prj2-create-project-frontends'."
   (let* ((path (prj2-config-path name))
          (fullpath (expand-file-name path))
          (dir (file-name-directory fullpath))
@@ -345,31 +346,41 @@ them returns non nil, the loop will break."
     ;; Build database.
     (prj2-build-database)))
 
-(defun prj2-edit-project-begin (name doctypes filepaths)
+(defun prj2-edit-project-begin (doctypes filepaths)
   (when prj2-timer
-    (cancel-timer prj2-timer))
+    (cancel-timer prj2-timer)
+    (setq prj2-timer nil))
   (setq prj2-timer (run-with-timer prj2-idle-delay nil
                                    'prj2-edit-project-internal
                                    doctypes filepaths)))
 
 (defun prj2-edit-project-internal (doctypes filepaths)
-  "Internal function to edit project. It might be called by widget or other GUI framework."
-  (puthash :version (current-time) prj2-config)
-  (puthash :doctypes doctypes prj2-config)
-  (puthash :filepaths filepaths prj2-config)
+  "Internal function to edit project. It is called by functions in the 
+`prj2-edit-project-frontends'."
+  (prj2-plist-put prj2-config :doctypes doctypes)
+  (prj2-plist-put prj2-config :filepaths filepaths)
   (prj2-export-json (prj2-config-path) prj2-config)
   ;; Update database.
   (prj2-build-filedb))
 
+(defun prj2-delete-project-begin (projects)
+  (when prj2-timer
+    (cancel-timer prj2-timer)
+    (setq prj2-timer nil))
+  (setq prj2-timer (run-with-timer prj2-idle-delay nil
+                                   'prj2-delete-project-internal
+                                   projects)))
+
 (defun prj2-delete-project-internal (projects)
-  "Internal function to delete project. It might be called by widget or other GUI framework."
-  (dolist (c projects)
+  "Internal function to delete project. It is called by functions in the 
+`prj2-delete-project-frontends'."
+  (dolist (project projects)
     ;; Unload current project if it is selected.
     (when (and (prj2-project-p)
-	       (equal c (prj2-project-name)))
+	       (string= project (prj2-project-name)))
       (prj2-unload-project))
     ;; Delete directory
-    (delete-directory (format "%s/%s" prj2-workspace-path c) t t))
+    (delete-directory (format "%s/%s" prj2-workspace-path project) t t))
   (message "Delet project ...done"))
 
 (defmacro prj2-with-search-buffer (&rest body)
