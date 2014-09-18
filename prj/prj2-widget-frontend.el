@@ -43,11 +43,13 @@
 ;;   :group 'prj2-group)
 
 ;;;###autoload
-(defun prj2-create-project-widget-frontend (command ok)
-  (setq prj2-ok-func ok)
+(defun prj2-create-project-widget-frontend (command &optional ok)
   (case command
     (:show
-     (prj2-with-widget "Create Project"
+     (prj2-with-widget "*Create Project*"
+       ;; Ok callback ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       ok
+
        ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        (lambda (&rest ignore)
          ;; Validate file paths.
@@ -102,26 +104,46 @@ remove one.\n"
                             :entry-format "%i %d %v"
                             :value '("")
                             ;; Put :company to make company work for it.
-                            '(editable-field :value "" :company prj2-browse-file-backend)))))))
+                            '(editable-field :value "" :company prj2-browse-file-backend)))))
+    (:hide
+     (and (get-buffer "*Create Project*")
+          (kill-buffer "*Create Project*")))))
 
 ;;;###autoload
-(defun prj2-delete-project-widget-frontend (command ok)
+(defun prj2-delete-project-widget-frontend (command &optional ok)
+  (case command
+    (:show
+     )
+    (:hide
+     (and (get-buffer "*Delete Project*")
+          (kill-buffer "*Delete Project*")))))
+
+;;;###autoload
+(defun prj2-edit-project-widget-frontend (command &optional ok)
+  (case command
+    (:show
+     )
+    (:hide
+     (and (get-buffer "*Edit Project*")
+          (kill-buffer "*Edit Project*")))))
+
+;;;###autoload
+(defun prj2-search-project-widget-frontend (command &optional ok)
+  (case command
+    (:show
+     )
+    (:hide
+     (and (get-buffer "*Search Project*")
+          (kill-buffer "*Search Project*")))))
+
+;;;###autoload
+(defun prj2-find-file-frontend (command &optional ok)
   (case command
     (:show
      )))
 
-;;;###autoload
-(defun prj2-edit-project-widget-frontend (command ok)
-  (case command
-    (:show
-     )))
-
-;;;###autoload
-(defun prj2-search-project-widget-frontend (command ok)
-  (case command
-    (:show
-     )))
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; back-ends for `company' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
@@ -152,65 +174,58 @@ remove one.\n"
      (dolist (box ,checkboxes)
        (widget-value-set box nil))))
 
-(defmacro prj2-with-widget (name ok &rest body)
+(defmacro prj2-with-widget (name ok-callback ok-notify &rest body)
   (declare (indent 1) (debug t))
   `(progn
-     (let* ((bname (format "*%s*" ,name))
-            (buffer (get-buffer bname)))
-       (if buffer
-           ;; Kill it if exist.
-           (kill-buffer buffer)
-         ;; Create one if doesn't exist.
-         (switch-to-buffer bname)
-         (kill-all-local-variables)
-         (remove-overlays)
-         ;; TODO: fix compatibility with `company'.
-         ;; Face
-         ;; (setq-local widget-button-face custom-button)
-         ;; (setq-local widget-button-pressed-face custom-button-pressed)
-         ;; (setq-local widget-mouse-face custom-button-mouse)
-         ;; When possible, use relief for buttons, not bracketing.
-         ;; (when custom-raised-buttons
-         ;;   (setq-local widget-push-button-prefix " ")
-         ;;   (setq-local widget-push-button-suffix " ")
-         ;;   (setq-local widget-link-prefix "")
-         ;;   (setq-local widget-link-suffix ""))
-         (setq header-line-format '((:eval (format "  %s"
-                                                   (propertize ,name
-                                                               'face 'bold)))
-                                    " | "
-                                    (:eval (format "%s or %s to jump among widgets."
-                                                   (propertize " TAB "
-                                                               'face 'tooltip)
-                                                   (propertize " Shift-TAB "
-                                                               'face 'tooltip)))))
-         (widget-insert "\n")
-         ;; ==> body
-         ,@body
-         ;; <=======
-         (widget-insert "\n")
-         (widget-create 'push-button
-                        :notify ,ok
-                        "ok")
-         (widget-insert " ")
-         (widget-create 'push-button
-                        :notify (lambda (&rest ignore)
-                                  (kill-buffer))
-                        "cancel")
-         ;; Make some TAB do something before its original task.
-         (add-hook 'widget-forward-hook 'prj2-widget-forward-or-company t t)
-         (use-local-map widget-keymap)
-         (widget-setup)
-         ;; Move point to 1st editable-field.
-         (let ((field (car widget-field-list)))
-           (when field
-             (goto-char (widget-field-end field))))
-         ;; Enable specific feature.
-         (when (featurep 'company)
-           (company-mode)
-           (make-local-variable 'company-backends)
-           (add-to-list 'company-backends 'prj2-browse-file-backend)
-           (add-to-list 'company-backends 'prj2-search-backend))))))
+     (switch-to-buffer (get-buffer-create ,name))
+     ;; TODO: fix compatibility with `company'.
+     ;; Face
+     ;; (setq-local widget-button-face custom-button)
+     ;; (setq-local widget-button-pressed-face custom-button-pressed)
+     ;; (setq-local widget-mouse-face custom-button-mouse)
+     ;; When possible, use relief for buttons, not bracketing.
+     ;; (when custom-raised-buttons
+     ;;   (setq-local widget-push-button-prefix " ")
+     ;;   (setq-local widget-push-button-suffix " ")
+     ;;   (setq-local widget-link-prefix "")
+     ;;   (setq-local widget-link-suffix ""))
+     (setq prj2-ok-func ,ok-callback
+           header-line-format '((:eval (format "  %s"
+                                               (propertize ,name
+                                                           'face 'bold)))
+                                " | "
+                                (:eval (format "%s or %s to jump among widgets."
+                                               (propertize " TAB "
+                                                           'face 'tooltip)
+                                               (propertize " Shift-TAB "
+                                                           'face 'tooltip)))))
+     (widget-insert "\n")
+     ;; ==> body
+     ,@body
+     ;; <=======
+     (widget-insert "\n")
+     (widget-create 'push-button
+                    :notify ,ok-notify
+                    "ok")
+     (widget-insert " ")
+     (widget-create 'push-button
+                    :notify (lambda (&rest ignore)
+                              (kill-buffer))
+                    "cancel")
+     ;; Make some TAB do something before its original task.
+     (add-hook 'widget-forward-hook 'prj2-widget-forward-or-company t t)
+     (use-local-map widget-keymap)
+     (widget-setup)
+     ;; Move point to 1st editable-field.
+     (let ((field (car widget-field-list)))
+       (when field
+         (goto-char (widget-field-end field))))
+     ;; Enable specific feature.
+     (when (featurep 'company)
+       (company-mode)
+       (make-local-variable 'company-backends)
+       (add-to-list 'company-backends 'prj2-browse-file-backend)
+       (add-to-list 'company-backends 'prj2-search-backend))))
 
 (defun prj2-widget-doctypes ()
   "Return a plist of selected document types."
@@ -489,4 +504,4 @@ remove one.\n"
 	(widget-put wid :doctypes type)
 	(push wid prj2-widget-doctypes)))))
 
-(provide 'prj2-widget)
+(provide 'prj2-widget-frontend)

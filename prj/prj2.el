@@ -38,8 +38,8 @@
 (require 'ido)
 (require 'json)
 
-(require 'prj2-widget)
 (require 'prj-grep)
+(require 'prj2-widget-frontend)
 
 (defgroup prj2-group nil
   "A Project management utility. This utility provides you a workspace and many projects concept. It also provide you a way to easily find file without knowing its full path; Add different directories with specific document types in a project; Powerful selective grep string or regular expression in a project, etc."
@@ -130,7 +130,7 @@ format:
 (defconst prj2-search-history-max 16
   "Maximin elements count in the searh history cache.")
 
-(defconst prj2-idle-delay 0.2)
+(defconst prj2-idle-delay 0.5)
 
 (defvar prj2-timer nil)
 
@@ -146,14 +146,18 @@ format:
 (defun prj2-create-project ()
   "Show configuration for creating new project."
   (interactive)
-  (prj2-call-frontends prj2-create-project-frontends
+  (prj2-clean-frontends)
+  (prj2-call-frontends :show
+                       prj2-create-project-frontends
                        'prj2-create-project-begin))
 
 ;;;###autoload
 (defun prj2-delete-project ()
   "Show configuration for deleting projects."
   (interactive)
-  (prj2-call-frontends prj2-delete-project-frontends
+  (prj2-clean-frontends)
+  (prj2-call-frontends :show
+                       prj2-delete-project-frontends
                        'prj2-delete-project-begin))
 
 ;;;###autoload
@@ -163,7 +167,9 @@ format:
   ;; Load project if wasn't loaded.
   (unless (prj2-project-p)
     (prj2-load-project))
-  (prj2-call-frontends prj2-edit-project-frontends
+  (prj2-clean-frontends)
+  (prj2-call-frontends :show
+                       prj2-edit-project-frontends
                        'prj2-edit-project-begin))
 
 ;;;###autoload
@@ -184,8 +190,8 @@ project to be loaded."
         (error "No project can be loaded! Please create a project first."))
       ;; Prompt user to load project.
       (setq name (ido-completing-read "Load project: " choices nil t)))
+    (prj2-clean-all)
     ;; Read configuration.
-    (prj2-clean)
     (setq prj2-config (prj2-import-json (prj2-config-path name)))
     (and (featurep 'sos)
          (unless sos-definition-window-mode
@@ -203,10 +209,9 @@ project to be loaded."
 (defun prj2-unload-project ()
   "Unload current project."
   (interactive)
-  (when (prj2-project-p)
-    (prj2-clean)
-    (message "Unload [%s] ...done" (prj2-project-name))
-    (setq prj2-config (prj2-new-config))))
+  (let ((name (prj2-project-name)))
+    (prj2-clean-all)
+    (message "Unload [%s] ...done" name)))
 
 ;;;###autoload
 (defun prj2-build-database ()
@@ -216,7 +221,7 @@ project to be loaded."
     (prj2-load-project))
   ;; Create file list which is the data base of the project's files.
   (when (prj2-project-p)
-    (message "It might take a minutes, please wait ...")
+    (message "Build database might take a minutes, please wait ...")
     (prj2-build-filedb)
     (prj2-build-tags)
     (message "Database is updated!")))
@@ -225,6 +230,7 @@ project to be loaded."
 (defun prj2-find-file ()
   "Open file by the given file name."
   (interactive)
+  (prj2-clean-frontends)
   ;; Load project if wasn't loaded.
   (unless (prj2-project-p)
     (prj2-load-project))
@@ -245,7 +251,8 @@ project to be loaded."
   ;; Load project if no project was loaded.
   (unless (prj2-project-p)
     (prj2-load-project))
-  (prj2-call-frontends prj2-search-project-frontends
+  (prj2-call-frontends :show
+                       prj2-search-project-frontends
                        'prj2-search-project-begin))
 
 ;;;###autoload
@@ -277,12 +284,38 @@ project to be loaded."
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun prj2-call-frontends (frontends ok)
+(defun prj2-call-frontends (command frontends &optional ok)
   "Call frontends and pass ok and cancel callback functions to them. If one of 
 them returns non nil, the loop will break."
   (dolist (frontend frontends)
-    (and (funcall frontend :show ok)
+    (and (funcall frontend command ok)
          (return t))))
+
+(defun prj2-clean-frontends ()
+  (dolist (frontends `(,prj2-create-project-frontends
+                       ,prj2-delete-project-frontends
+                       ,prj2-edit-project-frontends
+                       ,prj2-search-project-frontends
+                       ,prj2-find-file-frontends))
+    (prj2-call-frontends :hide frontends)))
+
+(defun prj2-clean-all ()
+  "Clean search buffer or widget buffers which belongs to other project when user loads a project or unload a project."
+  ;; Clean widgets.
+  (dolist (frontends `(,prj2-create-project-frontends
+                       ,prj2-delete-project-frontends
+                       ,prj2-edit-project-frontends
+                       ,prj2-search-project-frontends
+                       ,prj2-find-file-frontends))
+    (prj2-call-frontends :hide frontends))
+  ;; Kill search buffer.
+  (let ((search (get-buffer "*Search*")))
+    (and search
+         (with-current-buffer search
+           (save-buffer)
+           (kill-buffer))))
+  ;; Reset configuration.
+  (setq prj2-config nil))
 
 (defun prj2-create-project-begin (name doctypes filepaths)
   (when prj2-timer
@@ -305,20 +338,26 @@ them returns non nil, the loop will break."
     (prj2-plist-put config :doctypes doctypes)
     (prj2-plist-put config :filepaths filepaths)
     (prj2-export-json path config)
-    ;; Build database.
-    (prj2-build-database)
     ;; Load project.
-    (prj2-load-project name)))
+    (prj2-load-project name)
+    ;; Build database.
+    (prj2-build-database)))
 
-(defun prj2-edit-project-internal (doctypes filepaths updatedb)
+(defun prj2-edit-project-begin (name doctypes filepaths)
+  (when prj2-timer
+    (cancel-timer prj2-timer))
+  (setq prj2-timer (run-with-timer prj2-idle-delay nil
+                                   'prj2-edit-project-internal
+                                   doctypes filepaths)))
+
+(defun prj2-edit-project-internal (doctypes filepaths)
   "Internal function to edit project. It might be called by widget or other GUI framework."
   (puthash :version (current-time) prj2-config)
   (puthash :doctypes doctypes prj2-config)
   (puthash :filepaths filepaths prj2-config)
   (prj2-export-json (prj2-config-path) prj2-config)
-  ;; Update file database.
-  (and updatedb
-       (prj2-build-filedb)))
+  ;; Update database.
+  (prj2-build-filedb))
 
 (defun prj2-delete-project-internal (projects)
   "Internal function to delete project. It might be called by widget or other GUI framework."
@@ -411,7 +450,7 @@ them returns non nil, the loop will break."
 (defun prj2-project-p ()
   "Return t if any project was loaded (current project)."
   (and prj2-config
-       (plist-get :name prj2-config)))
+       (plist-get prj2-config :name)))
 
 (defun prj2-new-config ()
   "Return a config template."
@@ -528,16 +567,5 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
 (defun prj2-build-tags ()
   ;; TODO: implemnt it.
   )
-
-(defun prj2-clean ()
-  "Clean search buffer or widget buffers which belongs to other project when user loads a project or unload a project."
-  ;; Clean widgets.
-  (prj2-widget-clean)
-  ;; Kill search buffer.
-  (let ((search (get-buffer "*Search*")))
-    (and search
-         (with-current-buffer search
-           (save-buffer)
-           (kill-buffer)))))
 
 (provide 'prj2)
