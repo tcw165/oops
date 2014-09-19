@@ -153,4 +153,3 @@ The `base' should be a directory string and the `exclude' should be a list that 
 (unless (prj-load-recent-project)
   (prj-load-project))
 
-(require 'prj2)

@@ -35,11 +35,12 @@
 ;; 2014-08-01 (0.0.1)
 ;;    Initial release.
 
+(require 'cl)
 (require 'ido)
 (require 'json)
 
-(require 'prj-widget)
 (require 'prj-grep)
+(require 'prj-widget-frontend)
 
 (defgroup prj-group nil
   "A Project management utility. This utility provides you a workspace and many projects concept. It also provide you a way to easily find file without knowing its full path; Add different directories with specific document types in a project; Powerful selective grep string or regular expression in a project, etc."
@@ -65,282 +66,74 @@
                                 ("Java" . "*.java")
                                 ("C/C++ Header" . "*.h;*.hxx;*.hpp")
                                 ("C/C++ Source" . "*.c;*.cpp")
-                                ("Objective-C/Swift" . "*.m;*.mm;*.swift")
                                 ("Makfile" . "Makefile;makefile;Configure.ac;configure.ac;*.mk"))
-  "Categorize file names refer to specific matches and give them type names. It is a list of (DOC_NAME . MATCHES). Each matches in MATCHES should be delimit with ';'."
+  "Categorize file names refer to specific matches and give them type names. It is a alist of (DOC_NAME MATCHES). Each matches in MATCHES should be delimit with ';'."
   ;; TODO: give GUI a pretty appearance.
   :type '(repeat (cons (string :tag "Type")
                        (string :tag "File")))
   :group 'prj-group)
 
-(defcustom prj-exclude-types ".git;.svn;auto-save-list;*.cache;*.db;.save*;~#*;#*#"
+(defcustom prj-exclude-types ".git;.svn"
   "Those kinds of file should be excluded in the project. Each matches should be delimit with ';'."
   ;; TODO: give GUI a pretty appearance.
   :type '(string :tag "File")
   :group 'prj-group)
 
+(defcustom prj-create-project-frontends '(prj-create-project-widget-frontend)
+  ""
+  :type '(repeat (symbol :tag "Front-end"))
+  :group 'prj-group)
+
+(defcustom prj-delete-project-frontends '(prj-delete-project-widget-frontend)
+  ""
+  :type '(repeat (symbol :tag "Front-end"))
+  :group 'prj-group)
+
+(defcustom prj-edit-project-frontends '(prj-edit-project-widget-frontend)
+  ""
+  :type '(repeat (symbol :tag "Front-end"))
+  :group 'prj-group)
+
+(defcustom prj-search-project-frontends '(prj-search-project-widget-frontend)
+  ""
+  :type '(repeat (symbol :tag "Front-end"))
+  :group 'prj-group)
+
+(defcustom prj-find-file-frontends '(prj-find-file-frontend)
+  ""
+  :type '(repeat (symbol :tag "Front-end"))
+  :group 'prj-group)
+
+(defvar prj-config nil
+  "A plist which represent a project's configuration, it will be exported as format of JSON file.
+format:
+  (:name NAME                                // NAME is a string.
+   :filepaths (PATH1 PATH2 ...)              // PATH is a string.
+   :doctypes (DOC_NAME1 DOC_TYPE1            // e.g. (\"Emacs Lisp\" \".emacs;*.el\"
+              DOC_NAME2 DOC_TYPE2                     \"Text\"       \"*.txt;*.md\"
+              ...)                                    ...).
+   :recent-files (FILE1 FILE2 ...)           // FILE is a string.
+   :search-history (KEYWORD1 KEYWORD2 ...))  // KEYWORD is a string.")
+
 (defconst prj-config-name "config.db"
-  "The file name of project configuration.")
+  "The file name of project configuration. see `prj-config' for detail.")
 
 (defconst prj-filedb-name "files.db"
-  "The file name of project file-list database.")
+  "The file name of project file-list database. The database is a plist which 
+contains files should be concerned.
+format:
+  (DOCTYPE1 (FILE1_1 FILE1_2 ...)
+   DOCTYPE2 (FILE2_1 FILE2_2 ...))")
 
 (defconst prj-searchdb-name "search.db"
   "The simple text file which caches the search result that users have done in the last session.")
 
-(defconst prj-search-cache-max 16
+(defconst prj-search-history-max 16
   "Maximin elements count in the searh history cache.")
 
-(defvar prj-config nil
-  "A hash map which represent project's configuration.")
+(defconst prj-idle-delay 0.25)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defun prj-config-path ()
-  (expand-file-name (format "%s/%s/%s" prj-workspace-path (prj-project-name) prj-config-name)))
-
-(defun prj-filedb-path ()
-  (expand-file-name (format "%s/%s/%s" prj-workspace-path (prj-project-name) prj-filedb-name)))
-
-(defun prj-searchdb-path ()
-  (expand-file-name (format "%s/%s/%s" prj-workspace-path (prj-project-name) prj-searchdb-name)))
-
-(defun prj-project-name ()
-  "The current project's name."
-  (gethash :name prj-config))
-
-(defun prj-project-doctypes ()
-  "The current project's document types value."
-  (gethash :doctypes prj-config))
-
-(defun prj-project-filepaths ()
-  "The current project's file path value."
-  (gethash :filepaths prj-config))
-
-(defun prj-search-cache ()
-  (gethash :search-cache prj-config))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defun prj-project-p ()
-  "Return t if any project was loaded (current project)."
-  (and (hash-table-p prj-config)
-       (gethash :name prj-config)))
-
-(defun prj-new-config ()
-  "Return a new config (hash map)."
-  (let ((config (make-hash-table :test 'equal)))
-    (puthash :version (current-time) config)
-    (puthash :name nil config)
-    (puthash :doctypes nil config)
-    (puthash :filepaths nil config)
-    ;; TODO: implement opened files.
-    (puthash :opened-files nil config)
-    (puthash :search-cache nil config)
-    (garbage-collect)
-    config))
-
-(defun prj-export-data (filename data)
-  "Export `data' to `filename' file. The saved data can be imported with `prj-import-data'."
-  (when (file-writable-p filename)
-    (with-temp-file filename
-      (insert (let (print-length)
-		(prin1-to-string data))))
-    (garbage-collect)))
-
-(defun prj-import-data (filename)
-  "Read data exported by `prj-export-data' from file `filename'."
-  (when (file-exists-p filename)
-    (with-temp-buffer
-      (insert-file-contents filename)
-      (read (buffer-string)))))
-
-(defun prj-wildcardexp-to-regexp (wildcardexp)
-  "Translate wildcard expression to Emacs regular expression."
-  (let (regexp)
-    (dolist (el (split-string wildcardexp ";"))
-      (cond
-       ;; ex: *.el
-       ((string-match "^\\*\\..+" el)
-        (setq el (replace-regexp-in-string "^\\*\\." ".*\\\\." el)
-              el (concat el "$")))
-       ;; ex: cache-*
-       ((string-match ".+\\*$" el)
-        (setq el (concat "^" el)
-              el (replace-regexp-in-string "\\*" ".*" el)))
-       ;; ex: ABC*DEF
-       ((string-match ".+\\*.+" el)
-        (setq el (concat "^" el)
-              el (replace-regexp-in-string "\\*" ".*" el)
-              el (concat el "$")))
-       ;; ex: .git or .svn
-       ((string-match "\\." el)
-        (setq el (replace-regexp-in-string "\\." "\\\\." el))))
-      (setq regexp (concat regexp el "\\|")))
-    (setq regexp (replace-regexp-in-string "\\\\|$" "" regexp)
-          regexp (concat "\\(" regexp "\\)"))))
-
-(defun prj-concat-filepath (dir file)
-  "Return a full path combined with `dir' and `file'. It saves you the worry of whether to append '/' or not."
-  (concat dir
-          (unless (eq (aref dir (1- (length dir))) ?/) "/")
-          file))
-
-(defun prj-directory-files (dir &optional exclude)
-  "Return a list containing file names under `dir' but exlcudes files that match `exclude'."
-  (let (files)
-    (dolist (file (directory-files dir))
-      (and (not (member file '("." "..")))
-           (not (string-match exclude file))
-           (setq files (cons file files))))
-    (setq files (reverse files))))
-
-(defun prj-build-filedb-internal (path matches exclude db)
-  "Return a list that is made by recursively scan `dir' with file name which matches the regexp `matches'."
-  (let* ((dir (file-name-directory path))
-         (file (file-name-nondirectory path)))
-    (if (file-directory-p path)
-        ;; A directory.
-        (dolist (file (prj-directory-files path exclude))
-          (prj-build-filedb-internal (prj-concat-filepath path file) matches exclude db))
-      ;; A file.
-      (message "Building database and may take a moment.\nScan ...%s" path)
-      (dolist (match matches)
-        (let* ((doctype (car match))
-               (match (cdr match))
-               (files (gethash doctype db)))
-          (and (string-match match file)
-               (puthash doctype (push (prj-concat-filepath dir file) files) db)))))))
-
-(defun prj-build-filedb ()
-  "Create a list that contains all the files which should be included in the current project. Export the list to a file."
-  (let ((db (make-hash-table :test 'equal))
-	exclude
-	match
-	matches)
-    ;; Prepare regexp.
-    (setq exclude (prj-wildcardexp-to-regexp prj-exclude-types))
-    ;; Initialize file database:
-    ;; ex: (hashmap ... ((doctypes1) (files set 1...)
-    ;;                   (doctypes2) (files set 2...)))
-    (dolist (doctype (prj-project-doctypes))
-      (setq match (prj-wildcardexp-to-regexp (cdr doctype)))
-      ;; Create hash key with nil value.
-      (puthash doctype nil db)
-      ;; Create match sets (matches).
-      (push (cons doctype match) matches))
-    (setq matches (reverse matches))
-    ;; Search directories and files.
-    (dolist (f (prj-project-filepaths))
-      (prj-build-filedb-internal f matches exclude db))
-    ;; Export database.
-    (puthash :version (current-time) db)
-    (prj-export-data (prj-filedb-path) db)
-    (message (format "[%s] Database is updated!" (prj-project-name)))))
-
-(defun prj-build-tags ()
-  ;; TODO: implemnt it.
-  )
-
-(defun prj-thingatpt ()
-  "Return a list, (REGEXP_STRING BEG END), on which the point is or just string of selection."
-  (if mark-active
-      (buffer-substring-no-properties (region-beginning) (region-end))
-    (let ((bound (bounds-of-thing-at-point 'symbol)))
-      (and bound
-           (buffer-substring-no-properties (car bound) (cdr bound))))))
-
-(defun prj-clean ()
-  "Clean search buffer or widget buffers which belongs to other project when user loads a project or unload a project."
-  ;; Clean widgets.
-  (prj-widget-clean)
-  ;; Kill search buffer.
-  (let ((search (get-buffer "*Search*")))
-    (and search
-         (with-current-buffer search
-           (save-buffer)
-           (kill-buffer)))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defmacro prj-with-search-buffer (&rest body)
-  "Switch to search buffer and setup specific major mode and minor modes. Create a new one if it doesn't exist."
-  (declare (indent 0) (debug t))
-  `(progn
-     (find-file (prj-searchdb-path))
-     (rename-buffer "*Search*")
-     (goto-char (point-max))
-     (save-excursion
-       (progn ,@body))
-     (and (buffer-modified-p)
-          (save-buffer 0))
-     ;; TODO: goto last search result.
-     ;; Change major mode.
-     (prj-grep-mode)))
-
-(defun prj-create-project-internal (name doctypes filepaths)
-  "Internal function to create project. It might be called by widget or other GUI framework."
-  (let* ((path (format "%s/%s/%s" prj-workspace-path name prj-config-name))
-         (fullpath (expand-file-name path))
-         (dir (file-name-directory fullpath))
-         (config (prj-new-config)))
-    ;; Prepare project directory.
-    (unless (file-directory-p dir)
-      (make-directory dir))
-    ;; Export configuration.
-    (puthash :name name config)
-    (puthash :doctypes doctypes config)
-    (puthash :filepaths filepaths config)
-    (prj-export-data path config)
-    ;; Load project.
-    (prj-load-project)
-    ;; Build database if the prject which was just created is present.
-    (and (equal (prj-project-name) prj-tmp-string)
-	 (prj-build-database))))
-
-(defun prj-edit-project-internal (doctypes filepaths updatedb)
-  "Internal function to edit project. It might be called by widget or other GUI framework."
-  (puthash :version (current-time) prj-config)
-  (puthash :doctypes doctypes prj-config)
-  (puthash :filepaths filepaths prj-config)
-  (prj-export-data (prj-config-path) prj-config)
-  ;; Update file database.
-  (and updatedb
-       (prj-build-filedb)))
-
-(defun prj-delete-project-internal (projects)
-  "Internal function to delete project. It might be called by widget or other GUI framework."
-  (dolist (c projects)
-    ;; Unload current project if it is selected.
-    (when (and (prj-project-p)
-	       (equal c (prj-project-name)))
-      (prj-unload-project))
-    ;; Delete directory
-    (delete-directory (format "%s/%s" prj-workspace-path c) t t))
-  (message "[Prj] Delet project ...done"))
-
-(defun prj-search-project-internal (match projects)
-  "Internal function to search project. It might be called by widget or other GUI framework."
-  ;; Cache search string.
-  (let ((cache (prj-search-cache)))
-    (push match cache)
-    (and (> (length cache) prj-search-cache-max)
-         (setcdr (nthcdr (1- prj-search-cache-max) cache) nil))
-    (puthash :search-cache cache prj-config)
-    (prj-export-data (prj-config-path) prj-config))
-  ;; Create search buffer.
-  (prj-with-search-buffer
-    (let ((db (prj-import-data (prj-filedb-path)))
-          (files '()))
-      (insert (format ">>>>> %s\n" match))
-      ;; Prepare file list.
-      (dolist (elm projects)
-        (dolist (f (gethash elm db))
-          (message "[%s] Searching ...%s" (prj-project-name) f)
-          (goto-char (point-max))
-          (call-process "grep" nil (list (current-buffer) nil) t "-nH" match f)))
-      (insert "<<<<<\n\n")
-      (message (format "[%s] Search ...done" (prj-project-name))))))
+(defvar prj-timer nil)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -353,58 +146,71 @@
 ;;;###autoload
 (defun prj-create-project ()
   "Show configuration for creating new project."
-  ;; TODO:
-  ;; (let* ((json-object-type 'plist)
-  ;;      (json-key-type 'string)
-  ;;      (json-array-type 'list)
-  ;;      (config (json-read-from-string "{\"name\":\"Emacs\", \"filepath\":[\"~/.emacs\", \"~/.emacs.d/elpa\", \"~/.emacs.d/etc\"], \"doctypes\":[[\"Text\", \"*.txt;*.md\"], [\"Lisp\", \"*.el\"], [\"Python\", \"*.py\"]]}")))
-  ;; (format "%s" config))
   (interactive)
-  (or (and (featurep 'prj-widget)
-           (prj-setup-create-project-widget))))
+  (prj-clean-frontends)
+  (prj-call-frontends :show
+                       prj-create-project-frontends
+                       (prj-ok-delay-begin
+                        'prj-create-project-internal
+                        name
+                        doctypes
+                        filepaths)))
 
 ;;;###autoload
 (defun prj-delete-project ()
   "Show configuration for deleting projects."
   (interactive)
-  (or (and (featurep 'prj-widget)
-           (prj-setup-delete-project-widget))))
+  (prj-clean-frontends)
+  (prj-call-frontends :show
+                       prj-delete-project-frontends
+                       (prj-ok-delay-begin
+                        'prj-delete-project-internal
+                        projects)))
 
 ;;;###autoload
 (defun prj-edit-project ()
   "Show configuration for editing project's setting."
   (interactive)
+  (prj-clean-frontends)
   ;; Load project if wasn't loaded.
   (unless (prj-project-p)
     (prj-load-project))
-  (or (and (featurep 'prj-widget)
-           (prj-setup-edit-project-widget))))
+  (prj-call-frontends :show
+                       prj-edit-project-frontends
+                       (prj-ok-delay-begin
+                        'prj-edit-project-internal
+                        doctypes
+                        filepaths)))
 
 ;;;###autoload
-(defun prj-load-project ()
+(defun prj-load-project (&optional name)
   "List available prjects in current workspace and let user to choose which 
 project to be loaded."
   (interactive)
   (let (choices)
-    ;; Find available directories which represent a project.
-    (dolist (f (directory-files prj-workspace-path))
-      (let ((config-file (format "%s/%s/%s" prj-workspace-path f prj-config-name)))
-	(when (file-exists-p config-file)
-	  (push f choices))))
-    ;; Prompt user to create project if no projects is in workspace.
-    (and (= 0 (length choices))
-         (prj-create-project))
-    ;; Prompt user to load project.
-    (let ((c (ido-completing-read "[Prj] Load project: " choices)))
-      (unless (member c choices)
-	(error (format "[Prj] Can't load project invalid project, %s" c)))
-      (prj-clean)
+    (unless name
+      ;; Find available directories which represent a project.
+      (dolist (name (directory-files prj-workspace-path))
+        (unless (member name '("." ".."))
+          (let ((config-file (prj-config-path name)))
+            (when (and (file-exists-p config-file)
+                       (not (string= name (prj-project-name))))
+              (setq choices (append choices `(,name)))))))
+      ;; Prompt user to create project if no projects is in workspace.
+      (if choices
+          ;; Prompt user to load project.
+          (setq name (ido-completing-read "Load project: " choices nil t))
+        (message "No project in the workspace. Please create new project!")))
+    (when name
+      (prj-clean-all)
       ;; Read configuration.
-      (setq prj-config (prj-import-data (format "%s/%s/%s" prj-workspace-path c prj-config-name)))
+      (setq prj-config (prj-import-json (prj-config-path name)))
+      ;; Update database
+      (prj-build-database)
       (and (featurep 'sos)
-           (symbolp 'sos-definition-window)
-           (sos-definition-window-mode 1))
-      (message "[%s] Load project ...done" (prj-project-name)))))
+           (unless sos-definition-window-mode
+             (sos-definition-window-mode 1)))
+      (message "Load [%s] ...done" (prj-project-name)))))
 
 ;;;###autoload
 (defun prj-load-recent-project ()
@@ -417,39 +223,36 @@ project to be loaded."
 (defun prj-unload-project ()
   "Unload current project."
   (interactive)
-  (when (prj-project-p)
-    (prj-clean)
-    (message "[%s] Unload project ...done" (prj-project-name))
-    (setq prj-config (prj-new-config))))
+  (let ((name (prj-project-name)))
+    (prj-clean-all)
+    (message "Unload [%s] ...done" name)))
 
 ;;;###autoload
-(defun prj-build-database ()
+(defun prj-build-database (&optional all)
   "Build file list and tags."
-  (interactive)
+  (interactive '(t))
   (unless (prj-project-p)
     (prj-load-project))
   ;; Create file list which is the data base of the project's files.
   (when (prj-project-p)
-    (prj-build-filedb)
-    (prj-build-tags)))
+    (message "Build database might take a minutes, please wait ...")
+    (prj-build-filedb all)
+    (prj-build-tags all)
+    (message "Database is updated!")))
 
 ;;;###autoload
 (defun prj-find-file ()
   "Open file by the given file name."
   (interactive)
+  (prj-clean-frontends)
   ;; Load project if wasn't loaded.
   (unless (prj-project-p)
     (prj-load-project))
-  ;; Build database if is wasn't built.
-  (unless (file-exists-p (prj-filedb-path))
-    (prj-build-database))
-  ;; Find file.
-  (let ((filedb (prj-import-data (prj-filedb-path)))
-	(filelist '()))
-    (dolist (elm (prj-project-doctypes))
-      (setq filelist (append filelist (gethash elm filedb))))
-    (find-file (ido-completing-read (format "[%s] Find file: " (prj-project-name)) filelist)))
-  (garbage-collect))
+  (prj-call-frontends :show
+                       prj-find-file-frontends
+                       (prj-ok-delay-begin
+                        'prj-find-file-internal
+                        file)))
 
 ;;;###autoload
 (defun prj-search-project ()
@@ -458,8 +261,12 @@ project to be loaded."
   ;; Load project if no project was loaded.
   (unless (prj-project-p)
     (prj-load-project))
-  (or (and (featurep 'prj-widget)
-           (prj-setup-search-project-widget (prj-thingatpt)))))
+  (prj-call-frontends :show
+                       prj-search-project-frontends
+                       (prj-ok-delay-begin
+                        'prj-search-project-internal
+                        doctypes
+                        match)))
 
 ;;;###autoload
 (defun prj-toggle-search-buffer ()
@@ -476,11 +283,322 @@ project to be loaded."
       (prj-load-project))
     (prj-with-search-buffer)))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 ;;;###autoload
 (define-minor-mode prj-project-mode
   "Provide convenient menu items and tool-bar items for project feature."
   :lighter " Project"
   :global t
+  (if prj-project-mode
+      (progn
+        )
+    ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmacro prj-ok-delay-begin (ok-impl &rest ok-impl-args)
+  "Create a lambda function that call OK-IMPL function with parameters OK-IMPL-ARGS 
+after `prj-idle-delay' seconds."
+  `(lambda (,@ok-impl-args)
+     (when prj-timer
+       (cancel-timer prj-timer)
+       (setq prj-timer nil))
+     (setq prj-timer (run-with-timer prj-idle-delay nil
+                                      ,ok-impl
+                                      ,@ok-impl-args))))
+
+(defun prj-call-frontends (command frontends &optional ok)
+  "Call frontends and pass ok callback functions to them. If one of them returns 
+non nil, the loop will break."
+  (dolist (frontend frontends)
+    (and (funcall frontend command ok)
+         (return t))))
+
+(defun prj-clean-frontends ()
+  (dolist (frontends `(,prj-create-project-frontends
+                       ,prj-delete-project-frontends
+                       ,prj-edit-project-frontends
+                       ,prj-search-project-frontends
+                       ,prj-find-file-frontends))
+    (prj-call-frontends :hide frontends)))
+
+(defun prj-clean-all ()
+  "Clean search buffer or widget buffers which belongs to other project when user loads a project or unload a project."
+  ;; Clean frontends.
+  (prj-clean-frontends)
+  ;; Kill search buffer.
+  (let ((search (get-buffer "*Search*")))
+    (and search
+         (with-current-buffer search
+           (save-buffer)
+           (kill-buffer))))
+  ;; Reset configuration.
+  (setq prj-config nil))
+
+(defun prj-create-project-internal (name doctypes filepaths)
+  "Internal function to create project. It is called by functions in the 
+`prj-create-project-frontends'."
+  (let* ((path (prj-config-path name))
+         (fullpath (expand-file-name path))
+         (dir (file-name-directory fullpath))
+         (config (prj-new-config)))
+    ;; Prepare project directory.
+    (unless (file-directory-p dir)
+      (make-directory dir))
+    ;; Export configuration.
+    (prj-plist-put config :name name)
+    (prj-plist-put config :doctypes doctypes)
+    (prj-plist-put config :filepaths filepaths)
+    (prj-export-json path config)
+    ;; Load project.
+    (prj-load-project name)
+    ;; Build database.
+    (prj-build-database t)))
+
+(defun prj-edit-project-internal (doctypes filepaths)
+  "Internal function to edit project. It is called by functions in the 
+`prj-edit-project-frontends'."
+  (let (update-db)
+    ;; Compare new and old doctypes.
+    ;; Compare new and old filepaths
+    (let ((item1 (prj-project-doctypes))
+          (item2 (prj-project-filepaths)))
+      (when (or (/= (length doctypes) (length item1))
+                (not (every 'equal doctypes item1))
+                (/= (length filepaths) (length item2))
+                (not (every 'equal filepaths item2)))
+        (setq update-db t)))
+    (prj-plist-put prj-config :doctypes doctypes)
+    (prj-plist-put prj-config :filepaths filepaths)
+    (prj-export-json (prj-config-path) prj-config)
+    ;; Update database.
+    (prj-build-database update-db)))
+
+(defun prj-delete-project-internal (projects)
+  "Internal function to delete project. It is called by functions in the 
+`prj-delete-project-frontends'."
+  (dolist (project projects)
+    ;; Unload current project if it is selected.
+    (when (and (prj-project-p)
+	       (string= project (prj-project-name)))
+      (prj-unload-project))
+    ;; Delete directory
+    (delete-directory (format "%s/%s" prj-workspace-path project) t t))
+  (message "Delet project ...done"))
+
+(defmacro prj-with-search-buffer (&rest body)
+  (declare (indent 0) (debug t))
+  `(progn
+     (find-file (prj-searchdb-path))
+     (rename-buffer "*Search*")
+     (goto-char (point-max))
+     (save-excursion
+       (progn ,@body))
+     (and (buffer-modified-p)
+          (save-buffer 0))
+     ;; TODO: goto last search result.
+     ;; Change major mode.
+     (prj-grep-mode)))
+
+(defun prj-search-project-internal (doctypes match)
+  "Internal function to edit project. It is called by functions in the 
+`prj-search-project-frontends'."
+  ;; Cache search string.
+  (let ((cache (prj-project-search-history)))
+    (push match cache)
+    (and (> (length cache) prj-search-history-max)
+         (setcdr (nthcdr (1- prj-search-history-max) cache) nil))
+    (puthash :search-cache cache prj-config)
+    (prj-export-json (prj-config-path) prj-config))
+  ;; Create search buffer.
+  (prj-with-search-buffer
+    (let ((db (prj-import-data (prj-filedb-path)))
+          (files '()))
+      (insert (format ">>>>> %s\n" match))
+      ;; Prepare file list.
+      (dolist (elm projects)
+        (dolist (f (gethash elm db))
+          (message "Searching ...%s" f)
+          (goto-char (point-max))
+          (call-process "grep" nil (list (current-buffer) nil) t "-nH" match f)))
+      (insert "<<<<<\n\n")
+      (message (format "Search ...done")))))
+
+(defun prj-find-file-internal (file)
+  (and (featurep 'history)
+       (his-add-position-type-history))
+  (find-file file)
+  (and (featurep 'history)
+       (his-add-position-type-history)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmacro prj-plist-put (plist prop val)
+  `(setq ,plist (plist-put ,plist ,prop ,val)))
+
+(defun prj-config-path (&optional name)
+  (expand-file-name (format "%s/%s/%s"
+                            prj-workspace-path
+                            (or name
+                                (prj-project-name))
+                            prj-config-name)))
+
+(defun prj-filedb-path ()
+  (expand-file-name (format "%s/%s/%s"
+                            prj-workspace-path
+                            (prj-project-name)
+                            prj-filedb-name)))
+
+(defun prj-searchdb-path ()
+  (expand-file-name (format "%s/%s/%s"
+                            prj-workspace-path
+                            (prj-project-name)
+                            prj-searchdb-name)))
+
+(defun prj-project-name ()
+  (plist-get prj-config :name))
+
+(defun prj-project-doctypes ()
+  (plist-get prj-config :doctypes))
+
+(defun prj-project-filepaths ()
+  (plist-get prj-config :filepaths))
+
+(defun prj-project-recent-files ()
+  (plist-get prj-config :recent-files))
+
+(defun prj-project-search-history ()
+  (plist-get prj-config :search-history))
+
+(defun prj-project-p ()
+  "Return t if any project was loaded (current project)."
+  (and prj-config
+       (plist-get prj-config :name)))
+
+(defun prj-new-config ()
+  "Return a config template."
+  (let (config)
+    (prj-plist-put config :name "")
+    (prj-plist-put config :filepaths '())
+    (prj-plist-put config :doctypes '())
+    ;; format: (FILE1 FILE2 ...)
+    (prj-plist-put config :recent-files '())
+    ;; format: (POINT (KEYWORD1 KEYWORD2 ...))
+    (prj-plist-put config :search-history '())
+    config))
+
+(defun prj-export-json (filename data)
+  "Export `data' to `filename' file. The saved data can be imported with `prj-import-data'."
+  (when (file-writable-p filename)
+    (with-temp-file filename
+      (insert (json-encode-plist data)))))
+
+(defun prj-import-json (filename)
+  "Read data exported by `prj-export-json' from file `filename'."
+  (when (file-exists-p filename)
+    (let ((json-object-type 'plist)
+          (json-key-type 'keyword)
+          (json-array-type 'list))
+      (json-read-file filename))))
+
+(defun prj-export-data (filename data)
+  "Export `data' to `filename' file. The saved data can be imported with `prj-import-data'."
+  (when (file-writable-p filename)
+    (with-temp-file filename
+      (insert (let (print-length)
+		(prin1-to-string data))))))
+
+(defun prj-import-data (filename)
+  "Read data exported by `prj-export-data' from file `filename'."
+  (when (file-exists-p filename)
+    (with-temp-buffer
+      (insert-file-contents filename)
+      (read (buffer-string)))))
+
+(defun prj-thingatpt ()
+  "Return a list, (REGEXP_STRING BEG END), on which the point is or just string of selection."
+  (if mark-active
+      (buffer-substring-no-properties (region-beginning) (region-end))
+    (let ((bound (bounds-of-thing-at-point 'symbol)))
+      (and bound
+           (buffer-substring-no-properties (car bound) (cdr bound))))))
+
+(defun prj-convert-filepaths (filepaths)
+  "Convert FILEPATHS to string as parameters for find.
+e.g. (~/test01\ ~/test02) => test01 test02"
+  (and (listp filepaths)
+       (let ((path filepaths)
+             paths)
+         (while path
+           (setq paths (concat paths
+                               "\"" (expand-file-name (car path)) "\"")
+                 path (cdr path))
+           (and path
+                (setq paths (concat paths " "))))
+         paths)))
+
+(defun prj-convert-matches (doctype)
+  "Convert DOCTYPE to string as include-path parameter for find.
+e.g. *.md;*.el;*.txt => -name *.md -o -name *.el -o -name *.txt"
+  (and (stringp doctype)
+       (let ((matches (concat "\"-name\" \"" doctype "\"")))
+         (replace-regexp-in-string ";" "\" \"-o\" \"-name\" \"" matches))))
+
+(defun prj-convert-excludes (doctype)
+  "Convert DOCTYPE to string as exclude-path parameter for find.
+e.g. .git;.svn => ! -name .git ! -name .svn"
+  (and (stringp doctype)
+       (let ((matches (concat "\"!\" \"-name\" \"" doctype "\"")))
+         (replace-regexp-in-string ";" "\" \"!\" \"-name\" \"" matches))))
+
+(defun prj-process-find (filepaths matches excludes)
+  (let ((filepaths (prj-convert-filepaths filepaths))
+        (matches (prj-convert-matches matches))
+        (excludes (prj-convert-excludes excludes))
+        stream)
+    (when (and filepaths matches excludes)
+      (setq stream (concat "(with-temp-buffer "
+                           "(call-process \"find\" nil (list (current-buffer) nil) nil "
+                           filepaths " "
+                           matches " "
+                           excludes ")"
+                           "(buffer-string))"))
+      (let ((output (eval (read stream))))
+        (and output
+             (split-string output "\n" t))))))
+
+(defun prj-process-find-change ()
+  ;; TODO:
+  t)
+
+(defun prj-build-filedb (&optional all)
+  "Create a list that contains all the files which should be included in the 
+current project. Export the list to a file."
+  ;; TODO: Find those files which are newer than database, update them.
+  (let ((filepaths (prj-project-filepaths))
+        (doctypes (prj-project-doctypes))
+        (excludes prj-exclude-types)
+        db)
+    (if (or (null (file-exists-p (prj-filedb-path)))
+            all)
+        (progn
+          ;; Iterate doctypes.
+          (while doctypes
+            (let* ((files (prj-process-find filepaths
+                                             (cadr doctypes)
+                                             excludes)))
+              (prj-plist-put db (car doctypes) files))
+            ;; Next.
+            (setq doctypes (cddr doctypes)))
+          ;; Export database.
+          (prj-export-data (prj-filedb-path) db))
+      ;; TODO: partial update
+      )))
+
+(defun prj-build-tags (&optional all)
+  ;; TODO: implemnt it.
+  ;; TODO: Find those files which are newer than database, update them.
   )
 
 (provide 'prj)
