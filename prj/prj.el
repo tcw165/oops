@@ -399,17 +399,22 @@ non nil, the loop will break."
      ;; Change major mode.
      (prj-grep-mode)))
 
-(defun prj-search-project-internal (match doctypes casefold word-only skip-comment)
+(defun prj-search-project-internal (match doctypes casefold word-only
+                                          skip-comment)
   "Internal function to edit project. It is called by functions in the 
 `prj-search-project-frontends'."
-  ;; ;; Cache search string.
-  ;; (let ((cache (prj-project-search-history)))
-  ;;   (push match cache)
-  ;;   (and (> (length cache) prj-search-history-max)
-  ;;        (setcdr (nthcdr (1- prj-search-history-max) cache) nil))
-  ;;   (puthash :search-cache cache prj-config)
-  ;;   (prj-export-json (prj-config-path) prj-config))
-  ;; ;; Create search buffer.
+  ;; Update search history.
+  (let ((last-pos (car (prj-project-search-history)))
+        (history (cdr (prj-project-search-history))))
+    (if (member match history)
+        (setq history (delete match history)
+              history (push match history))
+      (setq history (push match history)))
+    (and (> (length history) prj-search-history-max)
+         (setcdr (nthcdr (1- prj-search-history-max) history) nil))
+    (prj-plist-put prj-config :search-history (append `(,last-pos) history))
+    (prj-export-json (prj-config-path) prj-config))
+  ;; Create search buffer.
   ;; (prj-with-search-buffer
   ;;   (let ((db (prj-import-data (prj-filedb-path)))
   ;;         (files '()))

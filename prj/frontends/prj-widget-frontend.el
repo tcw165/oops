@@ -250,7 +250,7 @@ remove one.\n"
   (case command
     (:show
      (let ((thing (prj-thingatpt))
-           (history (car (last (prj-project-search-history)))))
+           (history (cadr (prj-project-search-history))))
        (prj-with-widget "*Search Project*"
          ;; Ok implementation callback ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
          ok
