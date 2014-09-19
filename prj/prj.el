@@ -107,13 +107,13 @@
 (defvar prj-config nil
   "A plist which represent a project's configuration, it will be exported as format of JSON file.
 format:
-  (:name NAME                                // NAME is a string.
-   :filepaths (PATH1 PATH2 ...)              // PATH is a string.
-   :doctypes (DOC_NAME1 DOC_TYPE1            // e.g. (\"Emacs Lisp\" \".emacs;*.el\"
-              DOC_NAME2 DOC_TYPE2                     \"Text\"       \"*.txt;*.md\"
-              ...)                                    ...).
-   :recent-files (FILE1 FILE2 ...)           // FILE is a string.
-   :search-history (KEYWORD1 KEYWORD2 ...))  // KEYWORD is a string.")
+  (:name NAME                                      // NAME is a string.
+   :filepaths (PATH1 PATH2 ...)                    // PATH is a string.
+   :doctypes (DOC_NAME1 DOC_TYPE1                  // e.g. (\"Emacs Lisp\" \".emacs;*.el\"
+              DOC_NAME2 DOC_TYPE2                           \"Text\"       \"*.txt;*.md\"
+              ...)                                          ...).
+   :recent-files (FILE1 FILE2 ...)                 // FILE is a string.
+   :search-history (POINT KEYWORD1 KEYWORD2 ...))  // KEYWORD is a string.")
 
 (defconst prj-config-name "config.db"
   "The file name of project configuration. see `prj-config' for detail.")
@@ -141,6 +141,7 @@ format:
 (defun prj-preference ()
   "Customize document types."
   (interactive)
+  (prj-clean-frontends)
   (customize-group 'prj-group))
 
 ;;;###autoload
@@ -152,9 +153,7 @@ format:
                        prj-create-project-frontends
                        (prj-ok-delay-begin
                         'prj-create-project-internal
-                        name
-                        doctypes
-                        filepaths)))
+                        name doctypes filepaths)))
 
 ;;;###autoload
 (defun prj-delete-project ()
@@ -179,8 +178,7 @@ format:
                        prj-edit-project-frontends
                        (prj-ok-delay-begin
                         'prj-edit-project-internal
-                        doctypes
-                        filepaths)))
+                        doctypes filepaths)))
 
 ;;;###autoload
 (defun prj-load-project (&optional name)
@@ -258,6 +256,7 @@ project to be loaded."
 (defun prj-search-project ()
   "Search string in the project. Append new search result to the old caches if `new' is nil."
   (interactive)
+  (prj-clean-frontends)
   ;; Load project if no project was loaded.
   (unless (prj-project-p)
     (prj-load-project))
@@ -265,8 +264,7 @@ project to be loaded."
                        prj-search-project-frontends
                        (prj-ok-delay-begin
                         'prj-search-project-internal
-                        doctypes
-                        match)))
+                        match doctypes casefold word-only skip-comment)))
 
 ;;;###autoload
 (defun prj-toggle-search-buffer ()
@@ -401,29 +399,30 @@ non nil, the loop will break."
      ;; Change major mode.
      (prj-grep-mode)))
 
-(defun prj-search-project-internal (doctypes match)
+(defun prj-search-project-internal (match doctypes casefold word-only skip-comment)
   "Internal function to edit project. It is called by functions in the 
 `prj-search-project-frontends'."
-  ;; Cache search string.
-  (let ((cache (prj-project-search-history)))
-    (push match cache)
-    (and (> (length cache) prj-search-history-max)
-         (setcdr (nthcdr (1- prj-search-history-max) cache) nil))
-    (puthash :search-cache cache prj-config)
-    (prj-export-json (prj-config-path) prj-config))
-  ;; Create search buffer.
-  (prj-with-search-buffer
-    (let ((db (prj-import-data (prj-filedb-path)))
-          (files '()))
-      (insert (format ">>>>> %s\n" match))
-      ;; Prepare file list.
-      (dolist (elm projects)
-        (dolist (f (gethash elm db))
-          (message "Searching ...%s" f)
-          (goto-char (point-max))
-          (call-process "grep" nil (list (current-buffer) nil) t "-nH" match f)))
-      (insert "<<<<<\n\n")
-      (message (format "Search ...done")))))
+  ;; ;; Cache search string.
+  ;; (let ((cache (prj-project-search-history)))
+  ;;   (push match cache)
+  ;;   (and (> (length cache) prj-search-history-max)
+  ;;        (setcdr (nthcdr (1- prj-search-history-max) cache) nil))
+  ;;   (puthash :search-cache cache prj-config)
+  ;;   (prj-export-json (prj-config-path) prj-config))
+  ;; ;; Create search buffer.
+  ;; (prj-with-search-buffer
+  ;;   (let ((db (prj-import-data (prj-filedb-path)))
+  ;;         (files '()))
+  ;;     (insert (format ">>>>> %s\n" match))
+  ;;     ;; Prepare file list.
+  ;;     (dolist (elm projects)
+  ;;       (dolist (f (gethash elm db))
+  ;;         (message "Searching ...%s" f)
+  ;;         (goto-char (point-max))
+  ;;         (call-process "grep" nil (list (current-buffer) nil) t "-nH" match f)))
+  ;;     (insert "<<<<<\n\n")
+  ;;     (message (format "Search ...done"))))
+  )
 
 (defun prj-find-file-internal (file)
   (and (featurep 'history)
@@ -477,15 +476,13 @@ non nil, the loop will break."
        (plist-get prj-config :name)))
 
 (defun prj-new-config ()
-  "Return a config template."
+  "Return a config template. Check `prj-config' for detail."
   (let (config)
     (prj-plist-put config :name "")
     (prj-plist-put config :filepaths '())
     (prj-plist-put config :doctypes '())
-    ;; format: (FILE1 FILE2 ...)
     (prj-plist-put config :recent-files '())
-    ;; format: (POINT (KEYWORD1 KEYWORD2 ...))
-    (prj-plist-put config :search-history '())
+    (prj-plist-put config :search-history '(0))
     config))
 
 (defun prj-export-json (filename data)

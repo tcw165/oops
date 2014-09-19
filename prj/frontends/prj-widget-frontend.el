@@ -40,6 +40,15 @@
 (defvar prj-widget-doctypes nil)
 (make-variable-buffer-local 'prj-widget-doctypes)
 
+(defvar prj-widget-case-sensitive nil)
+(make-variable-buffer-local 'prj-widget-case-sensitive)
+
+(defvar prj-widget-word-only nil)
+(make-variable-buffer-local 'prj-widget-word-only)
+
+(defvar prj-widget-skip-comment nil)
+(make-variable-buffer-local 'prj-widget-skip-comment)
+
 ;; (defface prj-title-face
 ;;   '((t (:background "yellow" :foreground "black" :weight bold :height 2.0)))
 ;;   "Default face for highlighting keyword in definition window."
@@ -240,51 +249,72 @@ remove one.\n"
 (defun prj-search-project-widget-frontend (command &optional ok)
   (case command
     (:show
-     (prj-with-widget "*Search Project*"
-       ;; Ok implementation callback ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-       ok
+     (let ((thing (prj-thingatpt))
+           (history (car (last (prj-project-search-history)))))
+       (prj-with-widget "*Search Project*"
+         ;; Ok implementation callback ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+         ok
 
-       ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-       (lambda (&rest ignore)
-         (unless prj-widget-textfield
-           (error (format "[%s] Please enter something for searching!" (prj-widget-textfield))))
-         (unless (> (length prj-tmp-list1) 0)
-           (error (format "[%s] Please select document types for searching!" (prj-widget-textfield))))
-         (kill-buffer)
-         (prj-search-project-internal prj-widget-textfield prj-tmp-list1))
+         ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+         (lambda (&rest ignore)
+           (let ((match (widget-value prj-widget-textfield))
+                 (doctypes (prj-widget-doctypes))
+                 (casefold (widget-value prj-widget-case-sensitive))
+                 (word-only (widget-value prj-widget-word-only))
+                 (skip-comment (widget-value prj-widget-skip-comment)))
+             (unless (> (length match) 0)
+               (error "Empty search!"))
+             (unless (> (length doctypes) 0)
+               (error "No document types is selected!"))
+             (and prj-ok-func
+                  (funcall prj-ok-func match doctypes casefold word-only skip-comment))
+             (kill-buffer)))
 
-       ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-       (widget-create 'editable-field
-                      :format "Search: %v"
-                      :value (or search "")
-                      :notify (prj-widget-common-notify prj-widget-textfield)
-                      :company 'prj-search-backend)
-       (widget-insert "\n")
-       (widget-insert "Document Types ")
-       (widget-create 'push-button
-                      :notify (lambda (&rest ignore)
-                                (setq prj-tmp-list1 nil)
-                                (dolist (box prj-widget-doctypes)
-                                  (widget-value-set box t))
-                                (dolist (type (prj-project-doctypes))
-                                  (push type prj-tmp-list1)))
-                      "Select All")
-       (widget-insert " ")
-       (widget-create 'push-button
-                      :notify (lambda (&rest ignore)
-                                (setq prj-tmp-list1 nil)
-                                (dolist (box prj-widget-doctypes)
-                                  (widget-value-set box nil)))
-                      "Deselect All")
-       (widget-insert " :\n")
-       (dolist (type (prj-project-doctypes))
-         (let (wid)
-           (setq wid (widget-create 'checkbox
-                                    :format (concat "%[%v%] " (prj-format-doctype type) "\n")
-                                    :value t
-                                    :notify (prj-widget-checkbox-notify :doctypes prj-tmp-list1)))
-           (widget-put wid :doctypes type)
-           (push wid prj-widget-doctypes)))))
+         ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+         ;; Widget for search.
+         (setq prj-widget-textfield
+               (widget-create 'editable-field
+                              :format "Search: %v"
+                              :company 'prj-search-backend
+                              ;; Get thing on the point, latest history or empty.
+                              :value (or thing
+                                         (and (stringp history)
+                                              history)
+                                         "")))
+         (setq prj-widget-case-sensitive
+               (widget-create 'checkbox
+                              :format "%[%v%] Case Sensitive  "
+                              :value t))
+         (setq prj-widget-word-only
+               (widget-create 'checkbox
+                              :format "%[%v%] Match Whole Word  "))
+         (setq prj-widget-skip-comment
+               (widget-create 'checkbox
+                              :format "%[%v%] Skip Comments\n"
+                              :value t))
+         (widget-insert "\n")
+         (widget-insert "Document Types ")
+         (widget-create 'push-button
+                        :notify (prj-widget-checkbox-select-all prj-widget-doctypes)
+                        "Select All")
+         (widget-insert " ")
+         (widget-create 'push-button
+                        :notify (prj-widget-checkbox-deselect-all prj-widget-doctypes)
+                        "Deselect All")
+         (widget-insert " :\n")
+         ;; Widget for doctypes.
+         (let ((doctype (prj-project-doctypes))
+               wid)
+           (while doctype
+             (setq wid (widget-create 'checkbox
+                                      :data doctype
+                                      :format (concat "%[%v%] "
+                                                      (prj-format-doctype doctype)
+                                                      "\n")
+                                      :value t)
+                   prj-widget-doctypes (append prj-widget-doctypes
+                                               `(,wid))
+                   doctype (cddr doctype)))))))
     (:hide
      (and (get-buffer "*Search Project*")
           (kill-buffer "*Search Project*")))))
@@ -355,7 +385,13 @@ remove one.\n"
        (widget-value-set box nil))))
 
 (defun prj-format-doctype (doctype)
-  (format "%s (%s)" (car doctype) (cdr doctype)))
+  (cond
+   ;; alist ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+   ((stringp (cdr doctype))
+    (format "%s (%s)" (car doctype) (cdr doctype)))
+   ;; plist ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+   (t
+    (format "%s (%s)" (car doctype) (cadr doctype)))))
 
 (defun prj-widget-doctypes ()
   "Return a plist of selected document types."
