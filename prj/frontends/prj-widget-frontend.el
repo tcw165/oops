@@ -314,7 +314,24 @@ remove one.\n"
                                       :value t)
                    prj-widget-doctypes (append prj-widget-doctypes
                                                `(,wid))
-                   doctype (cddr doctype)))))))
+                   doctype (cddr doctype))))
+         (widget-insert "\n")
+         (widget-insert "Search Path:\n")
+         ;; Widget for filepaths.
+         (dolist (path-root (prj-project-filepaths))
+           (let ((path-root (propertize path-root
+                                        'face 'font-lock-string-face))
+                 wid)
+             (when (file-directory-p path-root)
+               (setq wid (widget-create 'editable-list
+                                        :entry-format (concat "%i %d "
+                                                              path-root
+                                                              "\n%v")
+                                        :value '("")
+                                        '(editable-field
+                                          :company prj-browse-file-backend))
+                     prj-widget-filepaths (append prj-widget-filepaths
+                                                  `(,wid)))))))))
     (:hide
      (and (get-buffer "*Search Project*")
           (kill-buffer "*Search Project*")))))
@@ -410,8 +427,13 @@ remove one.\n"
     (dolist (file (widget-value prj-widget-filepaths))
       (when (and (> (length file) 2)
                  (file-exists-p file))
-        (setq filepaths (append filepaths
-                                `(,(expand-file-name file))))))
+        (setq file (expand-file-name file)
+              ;; Add '/' postfix if it is a directory.
+              file (if (and (file-directory-p file)
+                            (not (string-match "\/$" file)))
+                       (concat file "/")
+                     file)
+              filepaths (append filepaths `(,file)))))
     filepaths))
 
 (defun prj-widget-checkboxes ()

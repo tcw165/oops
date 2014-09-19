@@ -478,7 +478,7 @@ Return (FILE . LINUM) struct."
 (defun sos-header-mode-line ()
   `("  Multiple Definitions | "
     (:eval (when sos-candidates-mode
-             (format "Choose options: %s %s "
+             (format "Choose definition: %s %s "
                      (propertize " Up "
                                  'face 'custom-button
                                  'mouse-face 'custom-button-mouse

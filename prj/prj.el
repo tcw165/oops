@@ -392,7 +392,7 @@ non nil, the loop will break."
      (rename-buffer "*Search*")
      (goto-char (point-max))
      (save-excursion
-       (progn ,@body))
+       ,@body)
      (and (buffer-modified-p)
           (save-buffer 0))
      ;; TODO: goto last search result.
@@ -407,27 +407,29 @@ non nil, the loop will break."
   (let ((last-pos (car (prj-project-search-history)))
         (history (cdr (prj-project-search-history))))
     (if (member match history)
+        ;; Reorder the match.
         (setq history (delete match history)
               history (push match history))
       (setq history (push match history)))
+    ;; Keep maximum history.
     (and (> (length history) prj-search-history-max)
          (setcdr (nthcdr (1- prj-search-history-max) history) nil))
     (prj-plist-put prj-config :search-history (append `(,last-pos) history))
     (prj-export-json (prj-config-path) prj-config))
-  ;; Create search buffer.
-  ;; (prj-with-search-buffer
-  ;;   (let ((db (prj-import-data (prj-filedb-path)))
-  ;;         (files '()))
-  ;;     (insert (format ">>>>> %s\n" match))
-  ;;     ;; Prepare file list.
-  ;;     (dolist (elm projects)
-  ;;       (dolist (f (gethash elm db))
-  ;;         (message "Searching ...%s" f)
-  ;;         (goto-char (point-max))
-  ;;         (call-process "grep" nil (list (current-buffer) nil) t "-nH" match f)))
-  ;;     (insert "<<<<<\n\n")
-  ;;     (message (format "Search ...done"))))
-  )
+  ;; TODO: divide the task into piece.
+  ;; Start to search.
+  (prj-with-search-buffer
+    (let ((db (prj-import-data (prj-filedb-path)))
+          files)
+      (insert (format ">>>>> %s\n" match))
+      (while db
+        (dolist (file (cadr db))
+          (message "Searching ...%s" file)
+          (goto-char (point-max))
+          (call-process "grep" nil (list (current-buffer) nil) t "-nH" match file))
+        (setq db (cddr db)))
+      (insert "<<<<<\n\n")
+      (message (format "Search ...done")))))
 
 (defun prj-find-file-internal (file)
   (and (featurep 'history)
