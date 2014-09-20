@@ -135,6 +135,8 @@ format:
 
 (defvar prj-timer nil)
 
+(defvar prj-process-grep nil)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
@@ -260,11 +262,15 @@ project to be loaded."
   ;; Load project if no project was loaded.
   (unless (prj-project-p)
     (prj-load-project))
-  (prj-call-frontends :show
-                       prj-search-project-frontends
-                       (prj-ok-delay-begin
-                        'prj-search-project-internal
-                        match doctypes casefold word-only skip-comment)))
+  (if (and (processp prj-process-grep)
+           (process-live-p prj-process-grep))
+      (message "Searching is under processing, please wait...")
+    (prj-call-frontends :show
+                        prj-search-project-frontends
+                        (prj-ok-delay-begin
+                         'prj-search-project-internal-1
+                         match doctypes filepaths casefold word-only
+                         skip-comment))))
 
 ;;;###autoload
 (defun prj-toggle-search-buffer ()
@@ -279,7 +285,10 @@ project to be loaded."
     ;; Go to search buffer.
     (unless (prj-project-p)
       (prj-load-project))
-    (prj-with-search-buffer)))
+    (prj-with-search-buffer
+      (switch-to-buffer (current-buffer) nil t)
+      ;; TODO: goto last search result.
+      )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -305,6 +314,15 @@ after `prj-idle-delay' seconds."
      (setq prj-timer (run-with-timer prj-idle-delay nil
                                       ,ok-impl
                                       ,@ok-impl-args))))
+
+(defmacro prj-with-search-buffer (&rest body)
+  (declare (indent 0) (debug t))
+  `(let ((buffer (find-file-noselect (prj-searchdb-path))))
+     (with-current-buffer buffer
+       (rename-buffer "*Search*")
+       (setq buffer-read-only nil)
+       (prj-grep-mode)
+       ,@body)))
 
 (defun prj-call-frontends (command frontends &optional ok)
   "Call frontends and pass ok callback functions to them. If one of them returns 
@@ -385,22 +403,8 @@ non nil, the loop will break."
     (delete-directory (format "%s/%s" prj-workspace-path project) t t))
   (message "Delet project ...done"))
 
-(defmacro prj-with-search-buffer (&rest body)
-  (declare (indent 0) (debug t))
-  `(progn
-     (find-file (prj-searchdb-path))
-     (rename-buffer "*Search*")
-     (goto-char (point-max))
-     (save-excursion
-       ,@body)
-     (and (buffer-modified-p)
-          (save-buffer 0))
-     ;; TODO: goto last search result.
-     ;; Change major mode.
-     (prj-grep-mode)))
-
-(defun prj-search-project-internal (match doctypes casefold word-only
-                                          skip-comment)
+(defun prj-search-project-internal-1 (match doctypes filepaths casefold
+                                          word-only skip-comment)
   "Internal function to edit project. It is called by functions in the 
 `prj-search-project-frontends'."
   ;; Update search history.
@@ -416,20 +420,44 @@ non nil, the loop will break."
          (setcdr (nthcdr (1- prj-search-history-max) history) nil))
     (prj-plist-put prj-config :search-history (append `(,last-pos) history))
     (prj-export-json (prj-config-path) prj-config))
-  ;; TODO: divide the task into piece.
   ;; Start to search.
-  (prj-with-search-buffer
-    (let ((db (prj-import-data (prj-filedb-path)))
-          files)
+  (let ((db (prj-import-data (prj-filedb-path)))
+        files)
+    ;; TODO: support doctypes, filepaths, casefold, word-only, skip-comment.
+    ;; Collect files.
+    (while db
+      (setq files (append files (cadr db))
+            db (cddr db)))
+    ;; Search.
+    (prj-with-search-buffer
+      (switch-to-buffer (current-buffer) nil t)
+      (goto-char (point-max))
       (insert (format ">>>>> %s\n" match))
-      (while db
-        (dolist (file (cadr db))
-          (message "Searching ...%s" file)
-          (goto-char (point-max))
-          (call-process "grep" nil (list (current-buffer) nil) t "-nH" match file))
-        (setq db (cddr db)))
+      (prj-process-grep match files
+                        'prj-search-project-internal-2))))
+
+(defun prj-search-project-internal-2 (process message)
+  "A sentinel for asynchronous process GREP."
+  (when (memq (process-status process) '(stop exit signal))
+    (prj-with-search-buffer
+      (goto-char (point-max))
       (insert "<<<<<\n\n")
-      (message (format "Search ...done")))))
+      (save-buffer 0)
+      (setq buffer-read-only t)
+      (message "Search project...done"))))
+
+(defun prj-process-grep (match filepaths sentinel)
+  "Use `start-process' to call GREP. MATCH is a string to search. FILEPATHS is 
+a file list, (FILE1 FILE2 ...). SENTINEL is the GREP's sentinel."
+  (let ((stream (with-output-to-string
+                  (princ "(start-process \"grep\" (current-buffer) \"grep\" ")
+                  (prin1 "-snH")(princ " ")
+                  (prin1 match)(princ " ")
+                  (dolist (filepath filepaths)
+                    (prin1 filepath)(princ " "))
+                  (princ ")"))))
+    (setq prj-process-grep (eval (read stream)))
+    (set-process-sentinel prj-process-grep sentinel)))
 
 (defun prj-find-file-internal (file)
   (and (featurep 'history)
@@ -528,54 +556,6 @@ non nil, the loop will break."
       (and bound
            (buffer-substring-no-properties (car bound) (cdr bound))))))
 
-(defun prj-convert-filepaths (filepaths)
-  "Convert FILEPATHS to string as parameters for find.
-e.g. (~/test01\ ~/test02) => test01 test02"
-  (and (listp filepaths)
-       (let ((path filepaths)
-             paths)
-         (while path
-           (setq paths (concat paths
-                               "\"" (expand-file-name (car path)) "\"")
-                 path (cdr path))
-           (and path
-                (setq paths (concat paths " "))))
-         paths)))
-
-(defun prj-convert-matches (doctype)
-  "Convert DOCTYPE to string as include-path parameter for find.
-e.g. *.md;*.el;*.txt => -name *.md -o -name *.el -o -name *.txt"
-  (and (stringp doctype)
-       (let ((matches (concat "\"-name\" \"" doctype "\"")))
-         (replace-regexp-in-string ";" "\" \"-o\" \"-name\" \"" matches))))
-
-(defun prj-convert-excludes (doctype)
-  "Convert DOCTYPE to string as exclude-path parameter for find.
-e.g. .git;.svn => ! -name .git ! -name .svn"
-  (and (stringp doctype)
-       (let ((matches (concat "\"!\" \"-name\" \"" doctype "\"")))
-         (replace-regexp-in-string ";" "\" \"!\" \"-name\" \"" matches))))
-
-(defun prj-process-find (filepaths matches excludes)
-  (let ((filepaths (prj-convert-filepaths filepaths))
-        (matches (prj-convert-matches matches))
-        (excludes (prj-convert-excludes excludes))
-        stream)
-    (when (and filepaths matches excludes)
-      (setq stream (concat "(with-temp-buffer "
-                           "(call-process \"find\" nil (list (current-buffer) nil) nil "
-                           filepaths " "
-                           matches " "
-                           excludes ")"
-                           "(buffer-string))"))
-      (let ((output (eval (read stream))))
-        (and output
-             (split-string output "\n" t))))))
-
-(defun prj-process-find-change ()
-  ;; TODO:
-  t)
-
 (defun prj-build-filedb (&optional all)
   "Create a list that contains all the files which should be included in the 
 current project. Export the list to a file."
@@ -604,5 +584,39 @@ current project. Export the list to a file."
   ;; TODO: implemnt it.
   ;; TODO: Find those files which are newer than database, update them.
   )
+
+(defun prj-process-find (filepaths matches excludes)
+  "Use `call-process' to call FIND. FILEPATHS is a file list, (FILE1 FILE2 ...).
+ MATCHES and EXCLUDES is strings in format of \"-name pattern\"."
+  (let* ((matches (prj-convert-matches matches))
+         (excludes (prj-convert-excludes excludes))
+         (stream (with-output-to-string
+                   (princ "(call-process \"find\" nil (list (current-buffer) nil) nil ")
+                   (dolist (filepath filepaths)
+                     (prin1 filepath)(princ " "))
+                   (princ matches)(princ " ")
+                   (princ excludes)(princ ")"))))
+    (let ((output (with-temp-buffer
+                    (eval (read stream))
+                    (buffer-string))))
+      (and output (split-string output "\n" t)))))
+
+(defun prj-process-find-change ()
+  ;; TODO:
+  t)
+
+(defun prj-convert-matches (doctype)
+  "Convert DOCTYPE to string as include-path parameter for FIND.
+e.g. *.md;*.el;*.txt => -name *.md -o -name *.el -o -name *.txt"
+  (and (stringp doctype)
+       (let ((matches (concat "\"-name\" \"" doctype "\"")))
+         (replace-regexp-in-string ";" "\" \"-o\" \"-name\" \"" matches))))
+
+(defun prj-convert-excludes (doctype)
+  "Convert DOCTYPE to string as exclude-path parameter for FIND.
+e.g. .git;.svn => ! -name .git ! -name .svn"
+  (and (stringp doctype)
+       (let ((matches (concat "\"!\" \"-name\" \"" doctype "\"")))
+         (replace-regexp-in-string ";" "\" \"!\" \"-name\" \"" matches))))
 
 (provide 'prj)

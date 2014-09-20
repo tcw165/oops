@@ -286,8 +286,16 @@ or go back to just one window (by deleting all but the selected window)."
   (windmove-down))
 
 ;;;###autoload
-(defun oops-hsplit-window ()
+(defun oops-split-window ()
   (interactive)
-  (split-window (selected-window) nil 'right))
+  (let ((dir (ido-completing-read "Split direction: "
+                                  '("horizontal" "vertical")
+                                  nil
+                                  t)))
+    (cond
+      ((string= dir "vertical")
+       (split-window (selected-window) nil 'below))
+      ((string= dir "horizontal")
+       (split-window (selected-window) nil 'right)))))
 
 (provide 'oops)

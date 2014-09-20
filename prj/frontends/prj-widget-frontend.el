@@ -259,6 +259,7 @@ remove one.\n"
          (lambda (&rest ignore)
            (let ((match (widget-value prj-widget-textfield))
                  (doctypes (prj-widget-doctypes))
+                 (filepaths nil)
                  (casefold (widget-value prj-widget-case-sensitive))
                  (word-only (widget-value prj-widget-word-only))
                  (skip-comment (widget-value prj-widget-skip-comment)))
@@ -267,7 +268,8 @@ remove one.\n"
              (unless (> (length doctypes) 0)
                (error "No document types is selected!"))
              (and prj-ok-func
-                  (funcall prj-ok-func match doctypes casefold word-only skip-comment))
+                  (funcall prj-ok-func match doctypes filepaths
+                           casefold word-only skip-comment))
              (kill-buffer)))
 
          ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -326,7 +328,7 @@ remove one.\n"
                (setq wid (widget-create 'editable-list
                                         :entry-format (concat "%i %d "
                                                               path-root
-                                                              "\n%v")
+                                                              "%v")
                                         :value '("")
                                         '(editable-field
                                           :company prj-browse-file-backend))
@@ -453,16 +455,40 @@ remove one.\n"
 (defun prj-browse-file-backend (command &optional arg &rest ign)
   "The backend based on `company' to provide convenience when browsing files."
   (case command
-    (prefix (prj-common-prefix 'prj-browse-file-backend))
-    (candidates (prj-browse-file-complete arg))
+    (prefix
+     (prj-common-prefix 'prj-browse-file-backend))
+    (candidates
+     (let* ((prefix arg)
+            (dir (or (and (file-directory-p prefix)
+                          prefix)
+                     (file-name-directory prefix)))
+            path candidates directories)
+       (and dir
+            (unless (equal dir (car prj-browse-file-cache))
+              (dolist (file (prj-directory-files dir (prj-to-regexp prj-exclude-types)))
+                (setq path (prj-concat-filepath dir file))
+                (push path candidates)
+                ;; Add one level of children.
+                (when (file-directory-p path)
+                  (push path directories)))
+              (dolist (directory (reverse directories))
+                (ignore-errors
+                  (dolist (child (prj-directory-files directory (prj-to-regexp prj-exclude-types)))
+                    (setq path (prj-concat-filepath directory child))
+                    (push path candidates))))
+              (setq prj-browse-file-cache (cons dir (nreverse candidates)))))
+       (all-completions prefix
+                        (cdr prj-browse-file-cache))))
     (ignore-case t)))
 
 ;;;###autoload
 (defun prj-search-backend (command &optional arg &rest ign)
   "Following are for `company' when searching project."
   (case command
-    (prefix (prj-common-prefix 'prj-search-backend))
-    (candidates (prj-search-complete arg))
+    (prefix
+     (prj-common-prefix 'prj-search-backend))
+    (candidates
+     (all-completions arg (prj-search-cache)))
     (ignore-case t)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -531,35 +557,5 @@ remove one.\n"
                (prefix (buffer-substring-no-properties start end)))
           prefix)
       nil)))
-
-(defun prj-browse-file-complete (prefix)
-  "The function responds 'candiates for `prj-browse-file-backend'."
-  (let* ((dir (or (and (file-directory-p prefix)
-                       prefix)
-                  (file-name-directory prefix)))
-         path
-         candidates
-         directories)
-    (and dir
-         (unless (equal dir (car prj-browse-file-cache))
-           (dolist (file (prj-directory-files dir (prj-to-regexp prj-exclude-types)))
-             (setq path (prj-concat-filepath dir file))
-             (push path candidates)
-             ;; Add one level of children.
-             (when (file-directory-p path)
-               (push path directories)))
-           (dolist (directory (reverse directories))
-             (ignore-errors
-               (dolist (child (prj-directory-files directory (prj-to-regexp prj-exclude-types)))
-                 (setq path (prj-concat-filepath directory child))
-                 (push path candidates))))
-           (setq prj-browse-file-cache (cons dir (nreverse candidates)))))
-    (all-completions prefix
-                     (cdr prj-browse-file-cache))))
-
-(defun prj-search-complete (prefix)
-  "The function responds 'candiates for `prj-search-backend'."
-  ;; TODO: use `prj-search-cache'.
-  (all-completions prefix (prj-search-cache)))
 
 (provide 'prj-widget-frontend)
