@@ -46,8 +46,6 @@
 (require 'thingatpt)
 (eval-when-compile (require 'cl))
 
-;; Common ======================================================================
-
 (defgroup hl-anything nil
   "Highlight anything."
   :group 'faces
@@ -106,6 +104,16 @@
 (defvar hl--paren-last-point 0
   "The last point for which parentheses were highlighted. This is used to prevent analyzing the same context over and over.")
 (make-variable-buffer-local 'hl--paren-last-point)
+
+;;;###autoload
+(define-minor-mode hl-paren-mode
+  "Minor mode to highlight the surrounding parentheses."
+  :lighter " hl-p"
+  (hl--paren-destruct-all)
+  (when hl-paren-mode
+    (hl--paren-create-overlays)
+    (add-hook 'post-command-hook 'hl--paren-update nil t)
+    (add-hook 'change-major-mode-hook 'hl--paren-destruct-all nil t)))
 
 (defun hl--paren-create-overlays ()
   ;; outward overlays.
@@ -197,17 +205,45 @@
   (remove-hook 'post-command-hook 'hl--paren-update t)
   (remove-hook 'post-command-hook 'hl--paren-destruct-all t))
 
-;;;###autoload
-(define-minor-mode hl-paren-mode
-  "Minor mode to highlight the surrounding parentheses."
-  :lighter " hl-p"
-  (hl--paren-destruct-all)
-  (when hl-paren-mode
-    (hl--paren-create-overlays)
-    (add-hook 'post-command-hook 'hl--paren-update nil t)
-    (add-hook 'change-major-mode-hook 'hl--paren-destruct-all nil t)))
-
 ;; Symbol or Selection =========================================================
+
+;;;###autoload
+(defun hl-thing-at-point ()
+  "Toggle highlighting of the thing at point."
+  (interactive)
+  (let* ((thing (hl--thingatpt))
+         (str (car thing)))
+    (when thing
+      (if (hl--thing-p str)
+          (hl--thing-remove str)
+        (hl--thing-add str)))))
+
+;;;###autoload
+(defun hl-thing-remove-all ()
+  "Remove all the highlights in buffer."
+  (interactive)
+  (mapc 'hl--thing-remove hl--things-list))
+
+;;;###autoload
+(defun hl-thing-find-forward ()
+  "Find thing forwardly and jump to it."
+  (interactive)
+  (hl--thing-find 1))
+
+;;;###autoload
+(defun hl-thing-find-backward ()
+  "Find thing backwardly and jump to it."
+  (interactive)
+  (hl--thing-find -1))
+
+;; TODO: Save highlights of last session.
+;; ;;;###autoload
+;; (define-minor-mode hl-thing-mode ()
+;;   "This mode supports following features:
+;; 1. Remember highlights of last session."
+;;   :lighter " hl-t"
+;;   (when hl-thing-mode
+;;     ()))
 
 (defun hl--thing-custom-set (symbol value)
   (set symbol value))
@@ -340,43 +376,5 @@ Maybe you'll need it for history and navigation feature.")
       ;; Hook after searching.
       (run-hook-with-args hl-thing-after-find-hook
                           `(,str ,(marker-position (mark-marker)) ,(point))))))
-
-;;;###autoload
-(defun hl-thing-at-point ()
-  "Toggle highlighting of the thing at point."
-  (interactive)
-  (let* ((thing (hl--thingatpt))
-         (str (car thing)))
-    (when thing
-      (if (hl--thing-p str)
-          (hl--thing-remove str)
-        (hl--thing-add str)))))
-
-;;;###autoload
-(defun hl-thing-remove-all ()
-  "Remove all the highlights in buffer."
-  (interactive)
-  (mapc 'hl--thing-remove hl--things-list))
-
-;;;###autoload
-(defun hl-thing-find-forward ()
-  "Find thing forwardly and jump to it."
-  (interactive)
-  (hl--thing-find 1))
-
-;;;###autoload
-(defun hl-thing-find-backward ()
-  "Find thing backwardly and jump to it."
-  (interactive)
-  (hl--thing-find -1))
-
-;; TODO: Save highlights of last session.
-;; ;;;###autoload
-;; (define-minor-mode hl-thing-mode ()
-;;   "This mode supports following features:
-;; 1. Remember highlights of last session."
-;;   :lighter " hl-t"
-;;   (when hl-thing-mode
-;;     ()))
 
 (provide 'hl-anything)

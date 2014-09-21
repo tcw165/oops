@@ -447,6 +447,14 @@ remove one.\n"
           (setq ret (append ret `(,data))))))
     ret))
 
+(defun prj-thingatpt ()
+  "Return a list, (REGEXP_STRING BEG END), on which the point is or just string of selection."
+  (if mark-active
+      (buffer-substring-no-properties (region-beginning) (region-end))
+    (let ((bound (bounds-of-thing-at-point 'symbol)))
+      (and bound
+           (buffer-substring-no-properties (car bound) (cdr bound))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; back-ends for `company' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

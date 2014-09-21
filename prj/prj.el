@@ -150,6 +150,8 @@ format:
 (defun prj-create-project ()
   "Show configuration for creating new project."
   (interactive)
+  (unless prj-project-mode
+    (prj-project-mode 1))
   (prj-clean-frontends)
   (prj-call-frontends :show
                        prj-create-project-frontends
@@ -161,6 +163,8 @@ format:
 (defun prj-delete-project ()
   "Show configuration for deleting projects."
   (interactive)
+  (unless prj-project-mode
+    (prj-project-mode 1))
   (prj-clean-frontends)
   (prj-call-frontends :show
                        prj-delete-project-frontends
@@ -172,6 +176,8 @@ format:
 (defun prj-edit-project ()
   "Show configuration for editing project's setting."
   (interactive)
+  (unless prj-project-mode
+    (prj-project-mode 1))
   (prj-clean-frontends)
   ;; Load project if wasn't loaded.
   (unless (prj-project-p)
@@ -187,6 +193,9 @@ format:
   "List available prjects in current workspace and let user to choose which 
 project to be loaded."
   (interactive)
+  (unless prj-project-mode
+    (prj-project-mode 1))
+  (prj-clean-frontends)
   (let (choices)
     (unless name
       ;; Find available directories which represent a project.
@@ -205,17 +214,24 @@ project to be loaded."
       (prj-clean-all)
       ;; Read configuration.
       (setq prj-config (prj-import-json (prj-config-path name)))
+      ;; Open files.
+      (let ((files (prj-project-recent-files)))
+        (dolist (file (cdr files))
+          (find-file-existing file))
+        (find-file-existing (car files)))
       ;; Update database
       (prj-build-database)
       (and (featurep 'sos)
-           (unless sos-definition-window-mode
-             (sos-definition-window-mode 1)))
+           (sos-definition-window-mode 1))
       (message "Load [%s] ...done" (prj-project-name)))))
 
 ;;;###autoload
 (defun prj-load-recent-project ()
   "Load the project which user exits emacs last time."
   (interactive)
+  (unless prj-project-mode
+    (prj-project-mode 1))
+  (prj-clean-frontends)
   ;; TODO:
   nil)
 
@@ -223,6 +239,9 @@ project to be loaded."
 (defun prj-unload-project ()
   "Unload current project."
   (interactive)
+  (unless prj-project-mode
+    (prj-project-mode 1))
+  (prj-clean-frontends)
   (let ((name (prj-project-name)))
     (prj-clean-all)
     (message "Unload [%s] ...done" name)))
@@ -231,6 +250,7 @@ project to be loaded."
 (defun prj-build-database (&optional all)
   "Build file list and tags."
   (interactive '(t))
+  (prj-clean-frontends)
   (unless (prj-project-p)
     (prj-load-project))
   ;; Create file list which is the data base of the project's files.
@@ -287,22 +307,12 @@ project to be loaded."
       (prj-load-project))
     (prj-with-search-buffer
       (switch-to-buffer (current-buffer) nil t)
+      (setq buffer-read-only t)
       ;; TODO: goto last search result.
       )))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;;###autoload
-(define-minor-mode prj-project-mode
-  "Provide convenient menu items and tool-bar items for project feature."
-  :lighter " Project"
-  :global t
-  (if prj-project-mode
-      (progn
-        )
-    ))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defmacro prj-plist-put (plist prop val)
+  `(setq ,plist (plist-put ,plist ,prop ,val)))
 
 (defmacro prj-ok-delay-begin (ok-impl &rest ok-impl-args)
   "Create a lambda function that call OK-IMPL function with parameters OK-IMPL-ARGS 
@@ -466,96 +476,6 @@ a file list, (FILE1 FILE2 ...). SENTINEL is the GREP's sentinel."
   (and (featurep 'history)
        (his-add-position-type-history)))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defmacro prj-plist-put (plist prop val)
-  `(setq ,plist (plist-put ,plist ,prop ,val)))
-
-(defun prj-config-path (&optional name)
-  (expand-file-name (format "%s/%s/%s"
-                            prj-workspace-path
-                            (or name
-                                (prj-project-name))
-                            prj-config-name)))
-
-(defun prj-filedb-path ()
-  (expand-file-name (format "%s/%s/%s"
-                            prj-workspace-path
-                            (prj-project-name)
-                            prj-filedb-name)))
-
-(defun prj-searchdb-path ()
-  (expand-file-name (format "%s/%s/%s"
-                            prj-workspace-path
-                            (prj-project-name)
-                            prj-searchdb-name)))
-
-(defun prj-project-name ()
-  (plist-get prj-config :name))
-
-(defun prj-project-doctypes ()
-  (plist-get prj-config :doctypes))
-
-(defun prj-project-filepaths ()
-  (plist-get prj-config :filepaths))
-
-(defun prj-project-recent-files ()
-  (plist-get prj-config :recent-files))
-
-(defun prj-project-search-history ()
-  (plist-get prj-config :search-history))
-
-(defun prj-project-p ()
-  "Return t if any project was loaded (current project)."
-  (and prj-config
-       (plist-get prj-config :name)))
-
-(defun prj-new-config ()
-  "Return a config template. Check `prj-config' for detail."
-  (let (config)
-    (prj-plist-put config :name "")
-    (prj-plist-put config :filepaths '())
-    (prj-plist-put config :doctypes '())
-    (prj-plist-put config :recent-files '())
-    (prj-plist-put config :search-history '(0))
-    config))
-
-(defun prj-export-json (filename data)
-  "Export `data' to `filename' file. The saved data can be imported with `prj-import-data'."
-  (when (file-writable-p filename)
-    (with-temp-file filename
-      (insert (json-encode-plist data)))))
-
-(defun prj-import-json (filename)
-  "Read data exported by `prj-export-json' from file `filename'."
-  (when (file-exists-p filename)
-    (let ((json-object-type 'plist)
-          (json-key-type 'keyword)
-          (json-array-type 'list))
-      (json-read-file filename))))
-
-(defun prj-export-data (filename data)
-  "Export `data' to `filename' file. The saved data can be imported with `prj-import-data'."
-  (when (file-writable-p filename)
-    (with-temp-file filename
-      (insert (let (print-length)
-		(prin1-to-string data))))))
-
-(defun prj-import-data (filename)
-  "Read data exported by `prj-export-data' from file `filename'."
-  (when (file-exists-p filename)
-    (with-temp-buffer
-      (insert-file-contents filename)
-      (read (buffer-string)))))
-
-(defun prj-thingatpt ()
-  "Return a list, (REGEXP_STRING BEG END), on which the point is or just string of selection."
-  (if mark-active
-      (buffer-substring-no-properties (region-beginning) (region-end))
-    (let ((bound (bounds-of-thing-at-point 'symbol)))
-      (and bound
-           (buffer-substring-no-properties (car bound) (cdr bound))))))
-
 (defun prj-build-filedb (&optional all)
   "Create a list that contains all the files which should be included in the 
 current project. Export the list to a file."
@@ -618,5 +538,105 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
   (and (stringp doctype)
        (let ((matches (concat "\"!\" \"-name\" \"" doctype "\"")))
          (replace-regexp-in-string ";" "\" \"!\" \"-name\" \"" matches))))
+
+(defun prj-project-p ()
+  "Return t if any project was loaded (current project)."
+  (and prj-config
+       (plist-get prj-config :name)))
+
+(defun prj-config-path (&optional name)
+  (expand-file-name (format "%s/%s/%s"
+                            prj-workspace-path
+                            (or name
+                                (prj-project-name))
+                            prj-config-name)))
+
+(defun prj-filedb-path ()
+  (expand-file-name (format "%s/%s/%s"
+                            prj-workspace-path
+                            (prj-project-name)
+                            prj-filedb-name)))
+
+(defun prj-searchdb-path ()
+  (expand-file-name (format "%s/%s/%s"
+                            prj-workspace-path
+                            (prj-project-name)
+                            prj-searchdb-name)))
+
+(defun prj-project-name ()
+  (plist-get prj-config :name))
+
+(defun prj-project-doctypes ()
+  (plist-get prj-config :doctypes))
+
+(defun prj-project-filepaths ()
+  (plist-get prj-config :filepaths))
+
+(defun prj-project-recent-files ()
+  (plist-get prj-config :recent-files))
+
+(defun prj-project-search-history ()
+  (plist-get prj-config :search-history))
+
+(defun prj-export-json (filename data)
+  "Export `data' to `filename' file. The saved data can be imported with `prj-import-data'."
+  (when (file-writable-p filename)
+    (with-temp-file filename
+      (insert (json-encode-plist data)))))
+
+(defun prj-import-json (filename)
+  "Read data exported by `prj-export-json' from file `filename'."
+  (when (file-exists-p filename)
+    (let ((json-object-type 'plist)
+          (json-key-type 'keyword)
+          (json-array-type 'list))
+      (json-read-file filename))))
+
+(defun prj-export-data (filename data)
+  "Export `data' to `filename' file. The saved data can be imported with `prj-import-data'."
+  (when (file-writable-p filename)
+    (with-temp-file filename
+      (insert (let (print-length)
+		(prin1-to-string data))))))
+
+(defun prj-import-data (filename)
+  "Read data exported by `prj-export-data' from file `filename'."
+  (when (file-exists-p filename)
+    (with-temp-buffer
+      (insert-file-contents filename)
+      (read (buffer-string)))))
+
+(defun prj-new-config ()
+  "Return a config template. Check `prj-config' for detail."
+  (let (config)
+    (prj-plist-put config :name "")
+    (prj-plist-put config :filepaths '())
+    (prj-plist-put config :doctypes '())
+    (prj-plist-put config :recent-files '())
+    (prj-plist-put config :search-history '(0))
+    config))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;###autoload
+(define-minor-mode prj-project-mode
+  "Provide convenient menu items and tool-bar items for project feature."
+  :lighter " Project"
+  :global t
+  (if prj-project-mode
+      (progn
+        (add-hook 'kill-emacs-hook 'prj-kill-emacs-hook t nil))
+    (remove-hook 'kill-emacs-hook 'prj-kill-emacs-hook nil)))
+
+(defun prj-kill-emacs-hook ()
+  (when (prj-project-p)
+    ;; Save file names opened in current session.
+    (let (file files)
+      (dolist (buffer (buffer-list))
+        (setq file (buffer-file-name buffer))
+        (when file
+          (setq files (append files `(,file)))))
+      (prj-plist-put prj-config :recent-files files)
+      (prj-export-json (prj-config-path) prj-config))))
 
 (provide 'prj)
