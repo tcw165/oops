@@ -60,7 +60,7 @@
   :group 'prj-group)
 
 (defface prj-button-pressed-face
-  '((t (:background "grey90" :foreground "red" :weight bold)))
+  '((t (:background "cyan3" :foreground "black" :weight bold)))
   "Face for pressed button."
   :group 'prj-group)
 
@@ -356,6 +356,7 @@ remove one.\n"
      (switch-to-buffer (get-buffer-create ,name))
      ;; TODO: fix compatibility with `company'.
      ;; Face
+     (setq-local widget-image-enable nil)
      (setq-local widget-button-face 'prj-button-face)
      (setq-local widget-button-pressed-face 'prj-button-pressed-face)
      (setq-local widget-mouse-face 'prj-button-mouse-face)
