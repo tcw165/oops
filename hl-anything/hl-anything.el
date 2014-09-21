@@ -205,24 +205,33 @@
   (remove-hook 'post-command-hook 'hl--paren-update t)
   (remove-hook 'post-command-hook 'hl--paren-destruct-all t))
 
-;; Symbol or Selection =========================================================
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Highlight things ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
-(defun hl-thing-at-point ()
+(defun hl-highlight-thingatpt ()
   "Toggle highlighting of the thing at point."
   (interactive)
-  (let* ((thing (hl--thingatpt))
+  (let* ((thing (hl-thingatpt))
          (str (car thing)))
     (when thing
-      (if (hl--thing-p str)
-          (hl--thing-remove str)
-        (hl--thing-add str)))))
+      (if (member thing hl-things)
+          (hl-unhighlight-thing str)
+        (hl-highlight-thing str)))))
+
+;;;###autoload
+(defun hl-highlight-thingatpt-local ()
+  "Toggle highlighting of the thing at point."
+  (interactive)
+  ;; TODO:
+  )
 
 ;;;###autoload
 (defun hl-thing-remove-all ()
   "Remove all the highlights in buffer."
   (interactive)
-  (mapc 'hl--thing-remove hl--things-list))
+  (mapc 'hl-unhighlight-thing hl-things))
 
 ;;;###autoload
 (defun hl-thing-find-forward ()
@@ -253,7 +262,7 @@
   :group 'hl-anything)
 
 (defcustom hl-thing-fg-colors nil
-  "The foreground colors for `hl-thing-at-point'."
+  "The foreground colors for `hl-highlight-thingatpt'."
   :type '(repeat color)
   :group 'hl-anything)
 
@@ -262,7 +271,7 @@
                                 "SpringGreen1"
                                 "moccasin"
                                 "violet")
-  "The background colors for `hl-thing-at-point'."
+  "The background colors for `hl-highlight-thingatpt'."
   :type '(repeat color)
   :group 'hl-anything)
 
@@ -280,8 +289,12 @@ Maybe you'll need it for history and navigation feature.")
 This hook has one argument, (REGEXP_STRING BEG END).
 Maybe you'll need it for history and navigation feature.")
 
-(defvar hl--things-list nil
+(defvar hl-things nil
   "A list storing things \(text string\) to be highlighted.")
+
+(defvar hl-things-local nil
+  "A list storing things \(text string\) to be highlighted.")
+(make-variable-buffer-local 'hl-things-local)
 
 (defvar hl--things-overlays nil
   "This buffers currently active overlays.")
@@ -290,30 +303,20 @@ Maybe you'll need it for history and navigation feature.")
 (defun hl--thing-create-overlays ()
   )
 
-(defun hl--thing-p (thing)
-  "Test if the thing is currently highlighted."
-  (member thing hl--things-list))
-
-(defun hl--thingatpt ()
+(defun hl-thingatpt ()
   "Return a list, (REGEXP_STRING BEG END), on which the point is or just string of selection."
-  (if mark-active
-      ;; return the selection.
-      (let ((str (buffer-substring-no-properties (region-beginning) (region-end))))
-        (list (regexp-quote str)
-              (region-beginning)
-              (region-end)))
-    ;; else.
-    ;; TODO: Use the highlight if point is on it.
-    (let ((bound (bounds-of-thing-at-point 'symbol))
-          thing)
-      (when bound
-        (setq thing (buffer-substring-no-properties (car bound) (cdr bound)))
-        ;; (format "\\<%s\\>" (regexp-quote thing))
-        (list (regexp-quote thing)
-              (car bound)
-              (cdr bound))))))
+  ;; TODO: Use the highlight if point is on it.
+  (let ((bound (if mark-active
+                   (cons (region-beginning) (region-end))
+                 (bounds-of-thing-at-point 'symbol))))
+    (when bound
+      ;; TODO: Improve regexp translation in order to support multiple lines.
+      (list (regexp-quote
+             (buffer-substring-no-properties (car bound) (cdr bound)))
+            (car bound)
+            (cdr bound)))))
 
-(defun hl--thing-add (thing)
+(defun hl-highlight-thing (thing)
   ;; TODO: get understand what it is exactly doing.
   (let ((fg-color (nth hl--things-color-index hl-thing-fg-colors))
         (bg-color (nth hl--things-color-index hl-thing-bg-colors))
@@ -335,10 +338,10 @@ Maybe you'll need it for history and navigation feature.")
     ;; highlight
     (font-lock-add-keywords nil `((,thing 0 ',color prepend)) 'append)
     (font-lock-fontify-buffer)
-    (push thing hl--things-list)))
+    (push thing hl-things)))
 
-(defun hl--thing-remove (thing)
-  (setq hl--things-list (delete thing hl--things-list))
+(defun hl-unhighlight-thing (thing)
+  (setq hl-things (delete thing hl-things))
   (let ((keyword (assoc thing (if (eq t (car font-lock-keywords))
                                     (cadr font-lock-keywords)
                                   font-lock-keywords
@@ -348,7 +351,7 @@ Maybe you'll need it for history and navigation feature.")
 
 (defun hl--thing-find (step)
   (let* ((case-fold-search t)
-         (thing (hl--thingatpt))
+         (thing (hl-thingatpt))
          (str (nth 0 thing)))
     (when (and thing
                (not (= step 0)))
