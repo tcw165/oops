@@ -49,10 +49,20 @@
 (defvar prj-widget-skip-comment nil)
 (make-variable-buffer-local 'prj-widget-skip-comment)
 
-;; (defface prj-title-face
-;;   '((t (:background "yellow" :foreground "black" :weight bold :height 2.0)))
-;;   "Default face for highlighting keyword in definition window."
-;;   :group 'prj-group)
+(defface prj-button-face
+  '((t (:background "lightgrey" :foreground "black" :weight bold)))
+  "Face for button."
+  :group 'prj-group)
+
+(defface prj-button-mouse-face
+  '((t (:background "grey90" :foreground "black" :weight bold)))
+  "Face for mouse button (when mouse is over the button)."
+  :group 'prj-group)
+
+(defface prj-button-pressed-face
+  '((t (:background "grey90" :foreground "red" :weight bold)))
+  "Face for pressed button."
+  :group 'prj-group)
 
 ;;;###autoload
 (defun prj-create-project-widget-frontend (command &optional ok)
@@ -346,15 +356,11 @@ remove one.\n"
      (switch-to-buffer (get-buffer-create ,name))
      ;; TODO: fix compatibility with `company'.
      ;; Face
-     ;; (setq-local widget-button-face custom-button)
-     ;; (setq-local widget-button-pressed-face custom-button-pressed)
-     ;; (setq-local widget-mouse-face custom-button-mouse)
-     ;; When possible, use relief for buttons, not bracketing.
-     ;; (when custom-raised-buttons
-     ;;   (setq-local widget-push-button-prefix " ")
-     ;;   (setq-local widget-push-button-suffix " ")
-     ;;   (setq-local widget-link-prefix "")
-     ;;   (setq-local widget-link-suffix ""))
+     (setq-local widget-button-face 'prj-button-face)
+     (setq-local widget-button-pressed-face 'prj-button-pressed-face)
+     (setq-local widget-mouse-face 'prj-button-mouse-face)
+     (setq-local widget-push-button-prefix " ")
+     (setq-local widget-push-button-suffix " ")
      (setq prj-ok-func ,ok-callback
            header-line-format '((:eval (format "  %s"
                                                (propertize ,name
