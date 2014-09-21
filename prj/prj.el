@@ -211,6 +211,8 @@ project to be loaded."
           (setq name (ido-completing-read "Load project: " choices nil t))
         (message "No project in the workspace. Please create new project!")))
     (when name
+      ;; Save last sessions.
+      (prj-save-file-names t)
       (prj-clean-all)
       ;; Read configuration.
       (setq prj-config (prj-import-json (prj-config-path name)))
@@ -629,13 +631,21 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
     (remove-hook 'kill-emacs-hook 'prj-kill-emacs-hook nil)))
 
 (defun prj-kill-emacs-hook ()
+  (prj-save-file-names))
+
+(defun prj-save-file-names (&optional close)
   (when (prj-project-p)
     ;; Save file names opened in current session.
-    (let (file files)
+    (let (file files buffers-to-kill)
       (dolist (buffer (buffer-list))
-        (setq file (buffer-file-name buffer))
-        (when file
-          (setq files (append files `(,file)))))
+        (when (setq file (buffer-file-name buffer))
+          (setq files (append files `(,file))))
+        (when (and close file)
+          (setq buffers-to-kill (append buffers-to-kill `(,buffer)))))
+      ;; Close buffers.
+      (dolist (buffer buffers-to-kill)
+        (kill-buffer buffer))
+      ;; Export configuration.
       (prj-plist-put prj-config :recent-files files)
       (prj-export-json (prj-config-path) prj-config))))
 
