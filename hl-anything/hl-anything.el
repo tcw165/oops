@@ -46,8 +46,9 @@
 (require 'thingatpt)
 (eval-when-compile (require 'cl))
 
-(defgroup hl-anything nil
+(defgroup hl-anything-group nil
   "Highlight anything."
+  :tag "hl-anything"
   :group 'faces
   :group 'matching)
 
@@ -66,32 +67,32 @@
   :type '(repeat color)
   :initialize 'custom-initialize-default
   :set 'hl--paren-custom-set
-  :group 'hl-anything)
+  :group 'hl-anything-group)
 
 (defcustom hl-outward-paren-bg-colors '("cyan" "yellow")
   "List of colors for the background highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
   :type '(repeat color)
   :initialize 'custom-initialize-default
   :set 'hl--paren-custom-set
-  :group 'hl-anything)
+  :group 'hl-anything-group)
 
 (defcustom hl-inward-paren-fg-colors nil
   "List of colors for the highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
   :type '(repeat color)
   :initialize 'custom-initialize-default
   :set 'hl--paren-custom-set
-  :group 'hl-anything)
+  :group 'hl-anything-group)
 
 (defcustom hl-inward-paren-bg-colors '("hot pink")
   "List of colors for the background highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
   :type '(repeat color)
   :initialize 'custom-initialize-default
   :set 'hl--paren-custom-set
-  :group 'hl-anything)
+  :group 'hl-anything-group)
 
 (defface hl-paren-face nil
   "Face used for highlighting parentheses."
-  :group 'hl-anything)
+  :group 'hl-anything-group)
 
 (defvar hl--outward-paren-overlays nil
   "This buffers currently active overlays.")
@@ -254,26 +255,24 @@
 ;;   (when hl-thing-mode
 ;;     ()))
 
-(defun hl--thing-custom-set (symbol value)
-  (set symbol value))
-
 (defface hl-thing-face nil
   "Face used for highlighting thing (a symbol or a text selection)."
-  :group 'hl-anything)
+  :group 'hl-anything-group)
 
 (defcustom hl-thing-fg-colors nil
   "The foreground colors for `hl-highlight-thingatpt'."
   :type '(repeat color)
-  :group 'hl-anything)
+  :group 'hl-anything-group)
 
-(defcustom hl-thing-bg-colors '("yellow"
+(defcustom hl-thing-bg-colors '("gold"
                                 "cyan"
                                 "SpringGreen1"
                                 "moccasin"
-                                "violet")
+                                "orchid1"
+                                "khaki1")
   "The background colors for `hl-highlight-thingatpt'."
   :type '(repeat color)
-  :group 'hl-anything)
+  :group 'hl-anything-group)
 
 (defvar hl--things-color-index 0)
 

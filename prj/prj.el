@@ -25,7 +25,8 @@
 ;;           `prj-create-project', `prj-delete-project',
 ;;           `prj-load-project', `prj-unload-project',
 ;;           `prj-build-database', `prj-find-file'.
-;; - Divide complex computation into piece, let user can interrupt it and save the result before the cancellation.
+;; - Divide complex computation into piece, let user can interrupt it and save
+;;   the result before the cancellation.
 ;; - Support project's local variable.
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -43,7 +44,10 @@
 (require 'prj-widget-frontend)
 
 (defgroup prj-group nil
-  "A Project management utility. This utility provides you a workspace and many projects concept. It also provide you a way to easily find file without knowing its full path; Add different directories with specific document types in a project; Powerful selective grep string or regular expression in a project, etc."
+  "A Project management utility. This utility provides you a workspace and many 
+projects concept. It also provide you a way to easily find file without knowing 
+its full path; Add different directories with specific document types in a 
+project; Powerful selective grep string or regular expression in a project, etc."
   :tag "Prj")
 
 (defun prj-cus-set-workspace (symbol value)
@@ -67,24 +71,35 @@
                                 ("C/C++ Header" . "*.h;*.hxx;*.hpp")
                                 ("C/C++ Source" . "*.c;*.cpp")
                                 ("Makfile" . "Makefile;makefile;Configure.ac;configure.ac;*.mk"))
-  "Categorize file names refer to specific matches and give them type names. It is a alist of (DOC_NAME MATCHES). Each matches in MATCHES should be delimit with ';'."
+  "Categorize file names refer to specific matches and give them type names. 
+It is a alist of (DOC_NAME MATCHES). Each matches in MATCHES should be delimit 
+with ';'."
   ;; TODO: give GUI a pretty appearance.
   :type '(repeat (cons (string :tag "Type")
                        (string :tag "File")))
   :group 'prj-group)
 
 (defcustom prj-exclude-types ".git;.svn"
-  "Those kinds of file should be excluded in the project. Each matches should be delimit with ';'."
+  "Those kinds of file should be excluded in the project. Each matches should 
+be delimit with ';'."
   ;; TODO: give GUI a pretty appearance.
   :type '(string :tag "File")
   :group 'prj-group)
 
 (defcustom prj-create-project-frontends '(prj-create-project-widget-frontend)
-  ""
+  "The front-ends should return a struct:
+  (:name NAME
+   :doctypes DOCTYPES
+   :filepaths FILEPATHS)"
   :type '(repeat (symbol :tag "Front-end"))
   :group 'prj-group)
 
 (defcustom prj-delete-project-frontends '(prj-delete-project-widget-frontend)
+  "The front-ends should return "
+  :type '(repeat (symbol :tag "Front-end"))
+  :group 'prj-group)
+
+(defcustom prj-load-project-frontends '(prj-load-project-widget-frontend)
   ""
   :type '(repeat (symbol :tag "Front-end"))
   :group 'prj-group)
@@ -105,7 +120,8 @@
   :group 'prj-group)
 
 (defvar prj-config nil
-  "A plist which represent a project's configuration, it will be exported as format of JSON file.
+  "A plist which represent a project's configuration, it will be exported as 
+format of JSON file.
 format:
   (:name NAME                                      // NAME is a string.
    :filepaths (PATH1 PATH2 ...)                    // PATH is a string.
@@ -126,12 +142,13 @@ format:
    DOCTYPE2 (FILE2_1 FILE2_2 ...))")
 
 (defconst prj-searchdb-name "search.db"
-  "The simple text file which caches the search result that users have done in the last session.")
+  "The simple text file which caches the search result that users have done 
+in the last session.")
 
 (defconst prj-search-history-max 16
   "Maximin elements count in the searh history cache.")
 
-(defconst prj-idle-delay 0.25)
+(defconst prj-idle-delay 0.15)
 
 (defvar prj-timer nil)
 
@@ -156,8 +173,7 @@ format:
   (prj-call-frontends :show
                        prj-create-project-frontends
                        (prj-ok-delay-begin
-                        'prj-create-project-internal
-                        name doctypes filepaths)))
+                        'prj-create-project-internal)))
 
 ;;;###autoload
 (defun prj-delete-project ()
@@ -169,8 +185,7 @@ format:
   (prj-call-frontends :show
                        prj-delete-project-frontends
                        (prj-ok-delay-begin
-                        'prj-delete-project-internal
-                        projects)))
+                        'prj-delete-project-internal)))
 
 ;;;###autoload
 (defun prj-edit-project ()
@@ -185,8 +200,7 @@ format:
   (prj-call-frontends :show
                        prj-edit-project-frontends
                        (prj-ok-delay-begin
-                        'prj-edit-project-internal
-                        doctypes filepaths)))
+                        'prj-edit-project-internal)))
 
 ;;;###autoload
 (defun prj-load-project (&optional name)
@@ -196,36 +210,12 @@ project to be loaded."
   (unless prj-project-mode
     (prj-project-mode 1))
   (prj-clean-frontends)
-  (let (choices)
-    (unless name
-      ;; Find available directories which represent a project.
-      (dolist (name (directory-files prj-workspace-path))
-        (unless (member name '("." ".."))
-          (let ((config-file (prj-config-path name)))
-            (when (and (file-exists-p config-file)
-                       (not (string= name (prj-project-name))))
-              (setq choices (append choices `(,name)))))))
-      ;; Prompt user to create project if no projects is in workspace.
-      (if choices
-          ;; Prompt user to load project.
-          (setq name (ido-completing-read "Load project: " choices nil t))
-        (message "No project in the workspace. Please create new project!")))
-    (when name
-      ;; Save last sessions.
-      (prj-save-file-names t)
-      (prj-clean-all)
-      ;; Read configuration.
-      (setq prj-config (prj-import-json (prj-config-path name)))
-      ;; Open files.
-      (let ((files (prj-project-recent-files)))
-        (dolist (file (cdr files))
-          (find-file-existing file))
-        (find-file-existing (car files)))
-      ;; Update database
-      (prj-build-database)
-      (and (featurep 'sos)
-           (sos-definition-window-mode 1))
-      (message "Load [%s] ...done" (prj-project-name)))))
+  (if name
+      (prj-load-project-internal name)
+    (prj-call-frontends :show
+                        prj-load-project-frontends
+                        (prj-ok-delay-begin
+                         'prj-load-project-internal))))
 
 ;;;###autoload
 (defun prj-load-recent-project ()
@@ -243,6 +233,8 @@ project to be loaded."
   (interactive)
   (unless prj-project-mode
     (prj-project-mode 1))
+  ;; Save files in the last session.
+  (prj-save-file-names t)
   (prj-clean-frontends)
   (let ((name (prj-project-name)))
     (prj-clean-all)
@@ -273,12 +265,11 @@ project to be loaded."
   (prj-call-frontends :show
                        prj-find-file-frontends
                        (prj-ok-delay-begin
-                        'prj-find-file-internal
-                        file)))
+                        'prj-find-file-internal)))
 
 ;;;###autoload
 (defun prj-search-project ()
-  "Search string in the project. Append new search result to the old caches if `new' is nil."
+  "Search string in the project. Append new search result to the old caches."
   (interactive)
   (prj-clean-frontends)
   ;; Load project if no project was loaded.
@@ -290,9 +281,7 @@ project to be loaded."
     (prj-call-frontends :show
                         prj-search-project-frontends
                         (prj-ok-delay-begin
-                         'prj-search-project-internal-1
-                         match doctypes filepaths casefold word-only
-                         skip-comment))))
+                         'prj-search-project-internal-1))))
 
 ;;;###autoload
 (defun prj-toggle-search-buffer ()
@@ -316,16 +305,16 @@ project to be loaded."
 (defmacro prj-plist-put (plist prop val)
   `(setq ,plist (plist-put ,plist ,prop ,val)))
 
-(defmacro prj-ok-delay-begin (ok-impl &rest ok-impl-args)
-  "Create a lambda function that call OK-IMPL function with parameters OK-IMPL-ARGS 
+(defmacro prj-ok-delay-begin (ok-impl)
+  "Create a lambda function that call OK-IMPL function with  one parameters 
 after `prj-idle-delay' seconds."
-  `(lambda (,@ok-impl-args)
+  `(lambda (data)
      (when prj-timer
        (cancel-timer prj-timer)
        (setq prj-timer nil))
      (setq prj-timer (run-with-timer prj-idle-delay nil
-                                      ,ok-impl
-                                      ,@ok-impl-args))))
+                                     ,ok-impl
+                                     data))))
 
 (defmacro prj-with-search-buffer (&rest body)
   (declare (indent 0) (debug t))
@@ -337,8 +326,8 @@ after `prj-idle-delay' seconds."
        ,@body)))
 
 (defun prj-call-frontends (command frontends &optional ok)
-  "Call frontends and pass ok callback functions to them. If one of them returns 
-non nil, the loop will break."
+  "Call frontends and pass ok callback functions to them. If one of them 
+returns non nil, the loop will break."
   (dolist (frontend frontends)
     (and (funcall frontend command ok)
          (return t))))
@@ -352,7 +341,8 @@ non nil, the loop will break."
     (prj-call-frontends :hide frontends)))
 
 (defun prj-clean-all ()
-  "Clean search buffer or widget buffers which belongs to other project when user loads a project or unload a project."
+  "Clean search buffer or widget buffers which belongs to other project when 
+user loads a project or unload a project."
   ;; Clean frontends.
   (prj-clean-frontends)
   ;; Kill search buffer.
@@ -364,10 +354,13 @@ non nil, the loop will break."
   ;; Reset configuration.
   (setq prj-config nil))
 
-(defun prj-create-project-internal (name doctypes filepaths)
+(defun prj-create-project-internal (data)
   "Internal function to create project. It is called by functions in the 
 `prj-create-project-frontends'."
-  (let* ((path (prj-config-path name))
+  (let* ((name (plist-get data :name))
+         (doctypes (plist-get data :doctypes))
+         (filepaths (plist-get data :filepaths))
+         (path (prj-config-path name))
          (fullpath (expand-file-name path))
          (dir (file-name-directory fullpath))
          (config (prj-new-config)))
@@ -384,10 +377,46 @@ non nil, the loop will break."
     ;; Build database.
     (prj-build-database t)))
 
-(defun prj-edit-project-internal (doctypes filepaths)
+(defun prj-delete-project-internal (data)
+  "Internal function to delete project. It is called by functions in the 
+`prj-delete-project-frontends'."
+  (let ((projects data))
+    (dolist (project projects)
+      ;; Unload current project if it is selected.
+      (when (and (prj-project-p)
+                 (string= project (prj-project-name)))
+        (prj-unload-project))
+      ;; Delete directory
+      (delete-directory (format "%s/%s" prj-workspace-path project) t t))
+    (message "Delet project ...done")))
+
+(defun prj-load-project-internal (data)
+  "Internal function to edit project. It is called by functions in the 
+`prj-load-project-frontends'."
+  (let ((name data))
+    ;; Save files in the last session.
+    (prj-save-file-names t)
+    (prj-clean-all)
+    ;; Read configuration.
+    (setq prj-config (prj-import-json (prj-config-path name)))
+    ;; Open files.
+    (let ((files (prj-project-recent-files)))
+      (when files
+        (dolist (file (cdr files))
+          (find-file-existing file))
+        (find-file-existing (car files))))
+    ;; Update database
+    (prj-build-database)
+    (and (featurep 'sos)
+         (sos-definition-window-mode 1))
+    (message "Load [%s] ...done" (prj-project-name))))
+
+(defun prj-edit-project-internal (data)
   "Internal function to edit project. It is called by functions in the 
 `prj-edit-project-frontends'."
-  (let (update-db)
+  (let ((doctypes (plist-get data :doctypes))
+        (filepaths (plist-get data :filepaths))
+        update-db)
     ;; Compare new and old doctypes.
     ;; Compare new and old filepaths
     (let ((item1 (prj-project-doctypes))
@@ -403,50 +432,43 @@ non nil, the loop will break."
     ;; Update database.
     (prj-build-database update-db)))
 
-(defun prj-delete-project-internal (projects)
-  "Internal function to delete project. It is called by functions in the 
-`prj-delete-project-frontends'."
-  (dolist (project projects)
-    ;; Unload current project if it is selected.
-    (when (and (prj-project-p)
-	       (string= project (prj-project-name)))
-      (prj-unload-project))
-    ;; Delete directory
-    (delete-directory (format "%s/%s" prj-workspace-path project) t t))
-  (message "Delet project ...done"))
-
-(defun prj-search-project-internal-1 (match doctypes filepaths casefold
-                                          word-only skip-comment)
+(defun prj-search-project-internal-1 (data)
   "Internal function to edit project. It is called by functions in the 
 `prj-search-project-frontends'."
-  ;; Update search history.
-  (let ((last-pos (car (prj-project-search-history)))
-        (history (cdr (prj-project-search-history))))
-    (if (member match history)
-        ;; Reorder the match.
-        (setq history (delete match history)
-              history (push match history))
-      (setq history (push match history)))
-    ;; Keep maximum history.
-    (and (> (length history) prj-search-history-max)
-         (setcdr (nthcdr (1- prj-search-history-max) history) nil))
-    (prj-plist-put prj-config :search-history (append `(,last-pos) history))
-    (prj-export-json (prj-config-path) prj-config))
-  ;; Start to search.
-  (let ((db (prj-import-data (prj-filedb-path)))
-        files)
-    ;; TODO: support doctypes, filepaths, casefold, word-only, skip-comment.
-    ;; Collect files.
-    (while db
-      (setq files (append files (cadr db))
-            db (cddr db)))
-    ;; Search.
-    (prj-with-search-buffer
-      (switch-to-buffer (current-buffer) nil t)
-      (goto-char (point-max))
-      (insert (format ">>>>> %s\n" match))
-      (prj-process-grep match files
-                        'prj-search-project-internal-2))))
+  (let ((match (plist-get data :match))
+        (doctypes (plist-get data :doctypes))
+        (filepaths (plist-get data :filepaths))
+        (casefold (plist-get data :casefold))
+        (word-only (plist-get data :word-only))
+        (skip-comment (plist-get data :skip-comment)))
+    ;; Update search history.
+    (let ((last-pos (car (prj-project-search-history)))
+          (history (cdr (prj-project-search-history))))
+      (if (member match history)
+          ;; Reorder the match.
+          (setq history (delete match history)
+                history (push match history))
+        (setq history (push match history)))
+      ;; Keep maximum history.
+      (and (> (length history) prj-search-history-max)
+           (setcdr (nthcdr (1- prj-search-history-max) history) nil))
+      (prj-plist-put prj-config :search-history (append `(,last-pos) history))
+      (prj-export-json (prj-config-path) prj-config))
+    ;; Start to search.
+    (let ((db (prj-import-data (prj-filedb-path)))
+          files)
+      ;; TODO: support doctypes, filepaths, casefold, word-only, skip-comment.
+      ;; Collect files.
+      (while db
+        (setq files (append files (cadr db))
+              db (cddr db)))
+      ;; Search.
+      (prj-with-search-buffer
+        (switch-to-buffer (current-buffer) nil t)
+        (goto-char (point-max))
+        (insert (format ">>>>> %s\n" match))
+        (prj-process-grep match files
+                          'prj-search-project-internal-2)))))
 
 (defun prj-search-project-internal-2 (process message)
   "A sentinel for asynchronous process GREP."

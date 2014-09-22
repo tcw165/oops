@@ -64,6 +64,8 @@
   "Face for pressed button."
   :group 'prj-group)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 ;;;###autoload
 (defun prj-create-project-widget-frontend (command &optional ok)
   (case command
@@ -83,9 +85,11 @@
              (error "No document types is selected!"))
            (unless (> (length filepaths) 0)
              (error "No valid file path!"))
-           ;; call `prj-create-project-begin' -> `prj-create-project-internal'.
+           ;; call `prj-create-project-internal'.
            (and prj-ok-func
-                (funcall prj-ok-func name doctypes filepaths))
+                (funcall prj-ok-func
+                         `(:name ,name :doctypes ,doctypes
+                                 :filepaths ,filepaths)))
            (kill-buffer)))
 
        ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -144,7 +148,7 @@ remove one.\n"
          (let ((projects (prj-widget-checkboxes)))
            (unless (> (length projects) 0)
              (error "No project is selected!"))
-           ;; call `prj-delete-project-begin' -> `prj-delete-project-internal'.
+           ;; call `prj-delete-project-internal'.
            (and prj-ok-func
                 (funcall prj-ok-func projects))
            (kill-buffer)))
@@ -182,6 +186,26 @@ remove one.\n"
           (kill-buffer "*Delete Project*")))))
 
 ;;;###autoload
+(defun prj-load-project-widget-frontend (command &optional ok)
+  (case command
+    (:show
+     (let (choices)
+       ;; Find available directories which represent a project.
+       (dolist (name (directory-files prj-workspace-path))
+         (unless (member name '("." ".."))
+           (let ((config-file (prj-config-path name)))
+             (when (and (file-exists-p config-file)
+                        (not (string= name (prj-project-name))))
+               (setq choices (append choices `(,name)))))))
+       ;; Prompt user to create project if no projects is in workspace.
+       (if choices
+           ;; Prompt user to load project and call
+           ;; `prj-load-project-internal'.
+           (funcall ok
+                    (ido-completing-read "Load project: " choices nil t))
+         (message "No project in the workspace. Please create new project!"))))))
+
+;;;###autoload
 (defun prj-edit-project-widget-frontend (command &optional ok)
   (case command
     (:show
@@ -197,9 +221,10 @@ remove one.\n"
              (error "No document types is selected!"))
            (unless (> (length filepaths) 0)
              (error "No valid file path!"))
-           ;; call `prj-edit-project-begin' -> `prj-edit-project-internal'.
+           ;; call `prj-edit-project-internal'.
            (and prj-ok-func
-                (funcall prj-ok-func doctypes filepaths))
+                (funcall prj-ok-func
+                         `(:doctypes ,doctypes :filepaths ,filepaths)))
            (kill-buffer)))
 
        ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -227,7 +252,7 @@ remove one.\n"
                                                                (car doctype))
                                                 t))
                  prj-widget-doctypes (append prj-widget-doctypes
-                                              `(,wid)))))
+                                             `(,wid)))))
        (widget-insert "\n")
        (widget-insert "Include Path:\n")
        ;; Widget for filepaths.
@@ -250,7 +275,7 @@ remove one.\n"
          (setq filelist (append filelist (cadr filedb))
                filedb (cddr filedb)))
        ;; TOOD: use `sos-source-buffer' and new implementation.
-       ;; call `find-file-begin' -> `find-file'.
+       ;; call `prj-find-file-internal'.
        (funcall ok (ido-completing-read (format "[%s] Find file: "
                                                 (prj-project-name))
                                         filelist))))))
@@ -277,9 +302,14 @@ remove one.\n"
                (error "Empty search!"))
              (unless (> (length doctypes) 0)
                (error "No document types is selected!"))
+             ;; call `prj-search-project-internal-1'.
              (and prj-ok-func
-                  (funcall prj-ok-func match doctypes filepaths
-                           casefold word-only skip-comment))
+                  (funcall prj-ok-func
+                           `(:match ,match :doctypes ,doctypes
+                                    :filepaths ,filepaths
+                                    :casefold ,casefold
+                                    :word-only ,word-only
+                                    :skip-comment ,skip-comment)))
              (kill-buffer)))
 
          ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
