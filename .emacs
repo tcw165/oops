@@ -138,6 +138,10 @@ The `base' should be a directory string and the `exclude' should be a list that 
 ;;                                   3rd-party                                ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(require 'saveplace)
+(setq save-place-file "~/.emacs.d/.emacs-places")
+(setq-default save-place t)
+
 (require 'semantic)
 (semantic-mode 1)
 
