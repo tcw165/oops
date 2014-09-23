@@ -61,15 +61,15 @@
 
 (defun sos-elisp-thingatpt ()
   "Find symbol string around the point or text selection."
-  (if mark-active
-      (buffer-substring-no-properties (region-beginning) (region-end))
-    ;; Skip string and comment.
-    (unless (memq (get-text-property (point) 'face) '(font-lock-doc-face
-                                                      font-lock-string-face
-                                                      font-lock-comment-face))
-      (let* ((bound (bounds-of-thing-at-point 'symbol)))
-        (and bound
-             (buffer-substring-no-properties (car bound) (cdr bound)))))))
+  (let ((bound (if mark-active
+                   (cons (region-beginning) (region-end))
+                 (unless (memq (get-text-property (point) 'face)
+                               '(font-lock-doc-face
+                                 font-lock-string-face
+                                 font-lock-comment-face))
+                   (bounds-of-thing-at-point 'symbol)))))
+    (when bound
+      (buffer-substring-no-properties (car bound) (cdr bound)))))
 
 (defun sos-elisp-normalize-path (file)
   ;; Convert extension from .elc to .el.
