@@ -113,7 +113,7 @@ The `base' should be a directory string and the `exclude' should be a list that 
 (global-set-key (kbd "S-<f1>") 'prj-search-project)
 (global-set-key (kbd "M-<f1>") 'prj-toggle-search-buffer)
 ;; F2
-(global-set-key (kbd "<f2>") 'hl-highlight-thingatpt)
+(global-set-key (kbd "<f2>") 'hl-highlight-thingatpt-local)
 ;; F3
 (global-set-key (kbd "<f3>") 'hl-thing-find-forward)
 ;; F4
@@ -121,7 +121,7 @@ The `base' should be a directory string and the `exclude' should be a list that 
 
 ;; Shift + F1
 ;; Shift + F2
-(global-set-key (kbd "S-<f2>") 'hl-thing-remove-all)
+(global-set-key (kbd "S-<f2>") 'hl-unhighlight-all-local)
 ;; Shift + F3
 (global-set-key (kbd "S-<f3>") 'hl-thing-find-backward)
 ;; Shift + F4

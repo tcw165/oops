@@ -214,25 +214,27 @@
 (defun hl-highlight-thingatpt ()
   "Toggle highlighting of the thing at point."
   (interactive)
-  (let* ((thing (hl-thingatpt))
-         (str (car thing)))
-    (when thing
-      (if (member thing hl-things)
-          (hl-unhighlight-thing str)
-        (hl-highlight-thing str)))))
+  ;; TODO:
+  )
 
 ;;;###autoload
 (defun hl-highlight-thingatpt-local ()
   "Toggle highlighting of the thing at point."
   (interactive)
-  ;; TODO:
-  )
+  (let* ((thing (hl-thingatpt))
+         (str (car thing)))
+    (when thing
+      (if (member str hl-things-local)
+          (hl-unhighlight str t)
+        (hl-highlight str t)))))
 
 ;;;###autoload
-(defun hl-thing-remove-all ()
+(defun hl-unhighlight-all-local ()
   "Remove all the highlights in buffer."
   (interactive)
-  (mapc 'hl-unhighlight-thing hl-things))
+  (dolist (thing hl-things-local)
+    (hl-unhighlight thing t))
+  (setq hl-index-local 0))
 
 ;;;###autoload
 (defun hl-thing-find-forward ()
@@ -255,52 +257,52 @@
 ;;   (when hl-thing-mode
 ;;     ()))
 
-(defface hl-thing-face nil
-  "Face used for highlighting thing (a symbol or a text selection)."
-  :group 'hl-anything-group)
+;; (defface hl-thing-face nil
+;;   "Face used for highlighting thing (a symbol or a text selection)."
+;;   :group 'hl-anything-group)
 
-(defcustom hl-thing-fg-colors nil
+(defcustom hl-fg-colors nil
   "The foreground colors for `hl-highlight-thingatpt'."
   :type '(repeat color)
+  :tag "Highlight Foreground Colors"
   :group 'hl-anything-group)
 
-(defcustom hl-thing-bg-colors '("gold"
-                                "cyan"
-                                "SpringGreen1"
-                                "moccasin"
-                                "orchid1"
-                                "khaki1")
+(defcustom hl-bg-colors '("gold"
+                          "cyan"
+                          "moccasin"
+                          "SpringGreen1"
+                          "orchid1"
+                          "khaki1")
   "The background colors for `hl-highlight-thingatpt'."
   :type '(repeat color)
+  :tag "Highlight Background Colors"
   :group 'hl-anything-group)
 
-(defvar hl--things-color-index 0)
-
-;; TODO: defcustom
-(defvar hl-thing-before-find-hook nil
+(defcustom hl-thing-before-find-hook nil
   "Hook for doing something before `hl--thing-find' do the searching.
 This hook has one argument, (REGEXP_STRING BEG END).
-Maybe you'll need it for history and navigation feature.")
+Maybe you'll need it for history and navigation feature."
+  :type '(repeat function)
+  :group 'hl-anything-group)
 
-;; TODO: defcustom
-(defvar hl-thing-after-find-hook nil
+(defcustom hl-thing-after-find-hook nil
   "Hook for doing something after `hl--thing-find' do the searching.
 This hook has one argument, (REGEXP_STRING BEG END).
-Maybe you'll need it for history and navigation feature.")
+Maybe you'll need it for history and navigation feature."
+  :type '(repeat function)
+  :group 'hl-anything-group)
+
+(defvar hl-index 0)
 
 (defvar hl-things nil
   "A list storing things \(text string\) to be highlighted.")
 
+(defvar hl-index-local 0)
+(make-variable-buffer-local 'hl-index-local)
+
 (defvar hl-things-local nil
   "A list storing things \(text string\) to be highlighted.")
 (make-variable-buffer-local 'hl-things-local)
-
-(defvar hl--things-overlays nil
-  "This buffers currently active overlays.")
-(make-variable-buffer-local 'hl--things-overlays)
-
-(defun hl--thing-create-overlays ()
-  )
 
 (defun hl-thingatpt ()
   "Return a list, (REGEXP_STRING BEG END), on which the point is or just string of selection."
@@ -315,38 +317,60 @@ Maybe you'll need it for history and navigation feature.")
             (car bound)
             (cdr bound)))))
 
-(defun hl-highlight-thing (thing)
-  ;; TODO: get understand what it is exactly doing.
-  (let ((fg-color (nth hl--things-color-index hl-thing-fg-colors))
-        (bg-color (nth hl--things-color-index hl-thing-bg-colors))
-        color)
-    (if (and (null fg-color)
-             (null bg-color))
-        (setq hl--things-color-index 1)
-      (setq hl--things-color-index (1+ hl--things-color-index))
-      )
-    (and (null fg-color)
-         ;; (setq fg-color (car hl-thing-fg-colors))
-         ;; TODO: if no fg-color, use default.
-         (setq fg-color "red"))
-    (and (null bg-color)
-         (setq bg-color (car hl-thing-bg-colors)))
-    ;; TODO: if no fg-color, use default.
-    (setq color `((foreground-color . ,fg-color)
-                  (background-color . ,bg-color)))
+(defun hl-highlight (thing &optional local)
+  (let* ((index (if local
+                    hl-index-local
+                  hl-index))
+         (mode (if local
+                   nil
+                 major-mode))
+         (fg (nth index hl-fg-colors))
+         (bg (nth index hl-bg-colors))
+         (max (max (length hl-fg-colors)
+                   (length hl-bg-colors)))
+         (next-index (1+ index))
+         facespec)
+    ;; (font-lock-add-keywords 'emacs-lisp-mode `(("setq" 0 'link)))
+    ;; (font-lock-add-keywords 'emacs-lisp-mode `(("setq" 0 font-lock-variable-name-face)))
+    ;; (font-lock-add-keywords 'emacs-lisp-mode `(("setq" 0 '(face 'link mouse-face 'highlight))))
+    ;; (font-lock-add-keywords 'emacs-lisp-mode `(("setq" 0 '((background-color . "yellow") (foreground-color . nil)))))
+    ;; (font-lock-refresh-defaults)
+    ;; (font-lock-fontify-buffer)
+    (when fg
+      (setq facespec (append facespec `((foreground-color . ,fg)))))
+    (when bg
+      (setq facespec (append facespec `((background-color . ,bg)))))
     ;; highlight
-    (font-lock-add-keywords nil `((,thing 0 ',color prepend)) 'append)
-    (font-lock-fontify-buffer)
-    (push thing hl-things)))
+    (font-lock-add-keywords mode `((,thing 0 ',facespec prepend)) 'append)
+    (if local
+        (progn
+          (font-lock-fontify-buffer)
+          (push thing hl-things-local)
+          (setq hl-index-local (if (>= next-index max)
+                                   0
+                                 next-index)))
+      (font-lock-refresh-defaults)
+      (push thing hl-things)
+      (setq hl-index (if (>= next-index max)
+                         0
+                       next-index)))))
 
-(defun hl-unhighlight-thing (thing)
-  (setq hl-things (delete thing hl-things))
-  (let ((keyword (assoc thing (if (eq t (car font-lock-keywords))
-                                    (cadr font-lock-keywords)
-                                  font-lock-keywords
-                                  ))))
-    (font-lock-remove-keywords nil (list keyword))
-    (font-lock-fontify-buffer)))
+(defun hl-unhighlight (thing &optional local)
+  (let ((mode (if local
+                  nil
+                major-mode))
+        (keyword (assoc thing (if (eq t (car font-lock-keywords))
+                                  (cadr font-lock-keywords)
+                                font-lock-keywords))))
+    (font-lock-remove-keywords mode `(,keyword))
+    (if local
+        (progn
+          (font-lock-fontify-buffer)
+          (setq hl-things-local (delete thing hl-things-local)))
+      (font-lock-refresh-defaults)
+      (setq hl-things (delete thing hl-things)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun hl--thing-find (step)
   (let* ((case-fold-search t)
