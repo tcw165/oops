@@ -244,13 +244,13 @@
 (define-minor-mode hl-highlight-mode
   "Provide convenient menu items and tool-bar items for project feature."
   :lighter " Highlight"
-  :global t
+  ;; :global t
   (if hl-highlight-mode
       (progn
-        (add-hook 'pre-command-hook 'hl-highlight-pre-command t nil)
-        (add-hook 'post-command-hook 'hl-highlight-post-command t nil))
-    (remove-hook 'pre-command-hook 'hl-highlight-pre-command nil)
-    (remove-hook 'post-command-hook 'hl-highlight-post-command nil)))
+        (add-hook 'pre-command-hook 'hl-highlight-pre-command t t)
+        (add-hook 'post-command-hook 'hl-highlight-post-command t t))
+    (remove-hook 'pre-command-hook 'hl-highlight-pre-command t)
+    (remove-hook 'post-command-hook 'hl-highlight-post-command t)))
 
 (defcustom hl-fg-colors '("snow"
                           "snow"
@@ -309,11 +309,9 @@ buffer. The things's format:
 (defvar hl-overlays-local nil)
 (make-variable-buffer-local 'hl-overlays-local)
 
-(defvar hl-overlay-bound 0)
-
 (defvar hl-timer nil)
 
-(defconst hl-idle-delay 0.1)
+(defconst hl-idle-delay 0.05)
 
 (defun hl-thingatpt ()
   "Return a list, (REGEXP_STRING BEG END), on which the point is or just string
@@ -331,35 +329,36 @@ buffer. The things's format:
         (list text (car bound) (cdr bound))))))
 
 (defun hl-bounds-of-thingatpt ()
-  (let ((face (get-text-property (point) 'face)))
-    (if (or (facep face)
-            (null face))
-        (bounds-of-thing-at-point 'symbol)
-      (hl-bounds-of-highlight))))
+  (or (hl-bounds-of-highlight)
+      (bounds-of-thing-at-point 'symbol)))
 
 (defun hl-bounds-of-highlight ()
   (let* ((face (get-text-property (point) 'face))
-         (fg (assoc 'foreground-color face))
-         (bg (assoc 'background-color face))
+         org-fg org-bg
          beg end)
-    ;; Find beginning.
-    (save-excursion
-      (while (and (listp face)
-                  (equal fg (assoc 'foreground-color face))
-                  (equal bg (assoc 'background-color face)))
-        (setq beg (point))
-        (backward-char)
-        (setq face (get-text-property (point) 'face))))
-    (setq face (get-text-property (point) 'face))
-    ;; Find end.
-    (save-excursion
-      (while (and (listp face)
-                  (equal fg (assoc 'foreground-color face))
-                  (equal bg (assoc 'background-color face)))
-        (forward-char)
-        (setq end (point))
-        (setq face (get-text-property (point) 'face))))
-    (when (and beg end)
+    (when (and (not (null face))
+               (listp face))
+      (setq org-fg (assoc 'foreground-color face)
+            org-bg (assoc 'background-color face))
+      ;; Find beginning.
+      (save-excursion
+        (while (and (not (null face))
+                    (listp face)
+                    (equal org-fg (assoc 'foreground-color face))
+                    (equal org-bg (assoc 'background-color face)))
+          (setq beg (point))
+          (backward-char)
+          (setq face (get-text-property (point) 'face))))
+      (setq face (get-text-property (point) 'face))
+      ;; Find end.
+      (save-excursion
+        (while (and (not (null face))
+                    (listp face)
+                    (equal org-fg (assoc 'foreground-color face))
+                    (equal org-bg (assoc 'background-color face)))
+          (forward-char)
+          (setq end (point))
+          (setq face (get-text-property (point) 'face))))
       (cons beg end))))
 
 (defun hl-highlight (thing &optional local)
@@ -408,40 +407,44 @@ buffer. The things's format:
                               hl-things)))))
 
 (defun hl-highlight-pre-command ()
-  ;; (when hl-timer
-  ;;   (cancel-timer hl-timer)
-  ;;   (setq hl-timer nil))
-  ;; (hl-remove-highlight-overlays)
-  )
+  (when hl-timer
+    (cancel-timer hl-timer)
+    (setq hl-timer nil))
+  (when (hl-is-begin)
+    (hl-remove-highlight-overlays)))
 
 (defun hl-highlight-post-command ()
-  ;; (when (hl-is-idle-begin)
-  ;;   (setq hl-timer (run-with-timer hl-idle-delay nil
-  ;;                                  'hl-add-highlight-overlays)))
+  (when (hl-is-begin)
+    (hl-add-highlight-overlays)
+    ;; (setq hl-timer (run-with-timer hl-idle-delay nil
+    ;;                                'hl-add-highlight-overlays))
+    )
   )
 
-(defun hl-is-idle-begin ()
+(defun hl-is-begin ()
   (not (or (active-minibuffer-window))))
 
-;; (setq test (make-overlay 100 120))
-;; (overlay-put test 'face `((background-color . "gold")))
 (defun hl-add-highlight-overlays ()
-  (let ((things (append hl-things hl-things-local)))
-    (dolist (thing things)
-      (let ((beg (line-beginning-position))
-            (end (line-end-position)))
-        (save-excursion
-          (goto-char beg)
-          (while (re-search-forward thing end t)
-            ))))))
+  (when (or hl-things hl-things-local)
+    (let ((beg (line-beginning-position))
+          (end (line-end-position))
+          bound)
+      (save-excursion
+        (goto-char beg)
+        (while (<= (point) end)
+          (if (setq bound (hl-bounds-of-highlight))
+              (let* ((overlay (make-overlay (point) (cdr bound)))
+                     (face (get-text-property (point) 'face))
+                     (fg (assoc 'foreground-color face))
+                     (bg (assoc 'background-color face)))
+                (overlay-put overlay 'face `(,fg ,bg))
+                (push overlay hl-overlays-local)
+                (goto-char (+1 (cdr bound))))
+            (forward-char)))))))
 
 (defun hl-remove-highlight-overlays ()
-  (when (or hl-things hl-things-local)
-    (let ((min (car hl-overlays-local))
-          (max (cdr hl-overlays-local)))
-      (when (and (>= (point) min)
-                 (<= (point) max))
-        ))))
+  (mapc 'delete-overlay hl-overlays-local)
+  (setq hl-overlays-local nil))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
