@@ -263,18 +263,25 @@
 ;;   "Face used for highlighting thing (a symbol or a text selection)."
 ;;   :group 'hl-anything-group)
 
-(defcustom hl-fg-colors nil
+(defcustom hl-fg-colors '("snow"
+                          "snow"
+                          "black"
+                          "black"
+                          "snow"
+                          "snow"
+                          "snow")
   "The foreground colors for `hl-highlight-thingatpt'."
   :type '(repeat color)
   :tag "Highlight Foreground Colors"
   :group 'hl-anything-group)
 
-(defcustom hl-bg-colors '("gold"
-                          "cyan"
-                          "moccasin"
-                          "SpringGreen1"
-                          "orchid1"
-                          "khaki1")
+(defcustom hl-bg-colors '("orange red"
+                          "Orange"
+                          "gold"
+                          "green1"
+                          "DeepSkyBlue1"
+                          "dark blue"
+                          "blue violet")
   "The background colors for `hl-highlight-thingatpt'."
   :type '(repeat color)
   :tag "Highlight Background Colors"
@@ -320,7 +327,7 @@ buffer. The things's format:
   ;; TODO: Use the highlight if point is on it.
   (let ((bound (if mark-active
                    (cons (region-beginning) (region-end))
-                 (bounds-of-thing-at-point 'symbol))))
+                 (hl-bounds-of-thingatpt))))
     (when bound
       ;; TODO: Improve regexp translation in order to support multiple lines.
       (let ((text (regexp-quote
@@ -328,6 +335,33 @@ buffer. The things's format:
         ;; Replace space as "\\s-+"
         (setq text (replace-regexp-in-string "\\s-+" "\\\\s-+" text))
         (list text (car bound) (cdr bound))))))
+
+(defun hl-bounds-of-thingatpt ()
+  (let ((face (get-text-property (point) 'face)))
+    (if (or (facep face)
+            (null face))
+        (bounds-of-thing-at-point 'symbol)
+      ;; Find boundary of current highlighted word.
+      (let ((fg (assoc 'foreground-color face))
+            (bg (assoc 'background-color face))
+            beg end)
+        ;; Find beginning.
+        (save-excursion
+          (while (and (equal fg (assoc 'foreground-color face))
+                      (equal bg (assoc 'background-color face)))
+            (setq beg (point))
+            (backward-char)
+            (setq face (get-text-property (point) 'face))))
+        (setq face (get-text-property (point) 'face))
+        ;; Find end.
+        (save-excursion
+          (while (and (equal fg (assoc 'foreground-color face))
+                      (equal bg (assoc 'background-color face)))
+            (forward-char)
+            (setq end (point))
+            (setq face (get-text-property (point) 'face))))
+        (when (and beg end)
+          (cons beg end))))))
 
 (defun hl-highlight (thing &optional local)
   (let* ((index (if local
