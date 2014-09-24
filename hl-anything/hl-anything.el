@@ -309,10 +309,6 @@ buffer. The things's format:
 (defvar hl-overlays-local nil)
 (make-variable-buffer-local 'hl-overlays-local)
 
-(defvar hl-timer nil)
-
-(defconst hl-idle-delay 0.05)
-
 (defun hl-thingatpt ()
   "Return a list, (REGEXP_STRING BEG END), on which the point is or just string
  of selection."
@@ -336,7 +332,9 @@ buffer. The things's format:
   (let* ((face (get-text-property (point) 'face))
          org-fg org-bg
          beg end)
+    ;; (message "hl-bounds-of-highlight 0000 %s" face)
     (when (and (not (null face))
+               (not (facep face))
                (listp face))
       (setq org-fg (assoc 'foreground-color face)
             org-bg (assoc 'background-color face))
@@ -362,68 +360,46 @@ buffer. The things's format:
       (cons beg end))))
 
 (defun hl-highlight (thing &optional local)
-  (let* ((index (if local
-                    hl-index-local
-                  hl-index))
-         (mode (if local
-                   nil
-                 major-mode))
-         (fg (nth index hl-fg-colors))
-         (bg (nth index hl-bg-colors))
+  (let* ((fg (nth hl-index-local hl-fg-colors))
+         (bg (nth hl-index-local hl-bg-colors))
          (max (max (length hl-fg-colors)
                    (length hl-bg-colors)))
-         (next-index (1+ index))
+         (next-index (1+ hl-index-local))
          facespec)
+    (push (cons thing facespec) hl-things-local)
+    (setq hl-index-local (if (>= next-index max) 0 next-index))
+    ;; Highlight.
     (when fg
       (setq facespec (append facespec `((foreground-color . ,fg)))))
     (when bg
       (setq facespec (append facespec `((background-color . ,bg)))))
-    (font-lock-add-keywords mode `((,thing 0 ',facespec prepend)) 'append)
-    (if local
-        (progn
-          (font-lock-fontify-buffer)
-          (push (cons thing facespec) hl-things-local)
-          (setq hl-index-local (if (>= next-index max) 0 next-index)))
-      (font-lock-refresh-defaults)
-      (push (cons thing facespec) hl-things)
-      (setq hl-index (if (>= next-index max) 0 next-index)))))
+    (font-lock-add-keywords nil `((,thing 0 ',facespec prepend)) 'append)
+    (font-lock-fontify-buffer)
+    (message "hl-highlight")))
 
 (defun hl-unhighlight (thing &optional local)
-  (let* ((mode (if local
-                   nil
-                 major-mode))
-         ;; (real-thing (car thing))
-         (keyword (assoc thing (if (eq t (car font-lock-keywords))
+  (let* ((keyword (assoc thing (if (eq t (car font-lock-keywords))
                                    (cadr font-lock-keywords)
                                  font-lock-keywords))))
-    (font-lock-remove-keywords mode `(,keyword))
-    (if local
-        (progn
-          (font-lock-fontify-buffer)
-          (setq hl-things-local (delete (assoc thing hl-things-local)
-                                        hl-things-local)))
-      (font-lock-refresh-defaults)
-      (setq hl-things (delete (assoc thing hl-things)
-                              hl-things)))))
+    (setq hl-things-local (delete (assoc thing hl-things-local)
+                                  hl-things-local))
+    (hl-remove-highlight-overlays)
+    ;; Highlight.
+    (font-lock-remove-keywords nil `(,keyword))
+    (font-lock-fontify-buffer)))
 
 (defun hl-highlight-pre-command ()
-  (when hl-timer
-    (cancel-timer hl-timer)
-    (setq hl-timer nil))
   (when (hl-is-begin)
     (hl-remove-highlight-overlays)))
 
 (defun hl-highlight-post-command ()
   (when (hl-is-begin)
-    (hl-add-highlight-overlays)
-    ;; (setq hl-timer (run-with-timer hl-idle-delay nil
-    ;;                                'hl-add-highlight-overlays))
-    )
-  )
+    (hl-add-highlight-overlays)))
 
 (defun hl-is-begin ()
   (not (or (active-minibuffer-window))))
 
+;; `hl-bounds-of-highlight'
 (defun hl-add-highlight-overlays ()
   (when (or hl-things hl-things-local)
     (let ((beg (line-beginning-position))
@@ -431,15 +407,17 @@ buffer. The things's format:
           bound)
       (save-excursion
         (goto-char beg)
+        (message "hl-add-highlight-overlays 1111")
         (while (<= (point) end)
           (if (setq bound (hl-bounds-of-highlight))
               (let* ((overlay (make-overlay (point) (cdr bound)))
                      (face (get-text-property (point) 'face))
                      (fg (assoc 'foreground-color face))
                      (bg (assoc 'background-color face)))
+                (message "hl-add-highlight-overlays 3333")
                 (overlay-put overlay 'face `(,fg ,bg))
                 (push overlay hl-overlays-local)
-                (goto-char (+1 (cdr bound))))
+                (goto-char (cdr bound)))
             (forward-char)))))))
 
 (defun hl-remove-highlight-overlays ()
