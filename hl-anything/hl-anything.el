@@ -432,8 +432,9 @@ buffer. The things's format:
 
 (defun hl-find-thing (step)
   (let* ((thing (hl-thingatpt))
-         (str (nth 0 thing))
-         (point (point))
+         (match (nth 0 thing))
+         (beg (nth 1 thing))
+         (end (nth 2 thing))
          (case-fold-search t))
     (when thing
       ;; Hook before searching.
@@ -444,11 +445,12 @@ buffer. The things's format:
                           2
                         ;; Move to beginning.
                         1) thing))
-      (if (re-search-forward str nil t step)
+      (if (re-search-forward match nil t step)
           (progn
             (set-marker (mark-marker) (match-beginning 0))
             (goto-char (match-end 0)))
-        (goto-char point))
+        (set-marker (mark-marker) beg)
+        (goto-char end))
       (setq mark-active t)
       ;; Hook after searching.
       (run-hook-with-args hl-after-find-thing-hook thing))))
