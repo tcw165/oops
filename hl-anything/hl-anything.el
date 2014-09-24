@@ -214,6 +214,8 @@
 (defun hl-highlight-thingatpt ()
   "Toggle highlighting of the thing at point."
   (interactive)
+  (unless hl-highlight-mode
+    (hl-highlight-mode 1))
   ;; TODO:
   )
 
@@ -221,10 +223,12 @@
 (defun hl-highlight-thingatpt-local ()
   "Toggle highlighting of the thing at point."
   (interactive)
+  (unless hl-highlight-mode
+    (hl-highlight-mode 1))
   (let* ((thing (hl-thingatpt))
          (str (car thing)))
     (when thing
-      (if (member str hl-things-local)
+      (if (assoc str hl-things-local)
           (hl-unhighlight str t)
         (hl-highlight str t)))))
 
@@ -233,20 +237,18 @@
   "Remove all the highlights in buffer."
   (interactive)
   (dolist (thing hl-things-local)
-    (hl-unhighlight thing t))
+    (hl-unhighlight (car thing) t))
   (setq hl-index-local 0))
 
 ;;;###autoload
-(defun hl-thing-find-forward ()
-  "Find thing forwardly and jump to it."
-  (interactive)
-  (hl--thing-find 1))
-
-;;;###autoload
-(defun hl-thing-find-backward ()
-  "Find thing backwardly and jump to it."
-  (interactive)
-  (hl--thing-find -1))
+(define-minor-mode hl-highlight-mode
+  "Provide convenient menu items and tool-bar items for project feature."
+  :lighter " Highlight"
+  :global t
+  (if hl-highlight-mode
+      (progn
+        (add-hook 'post-command-hook 'hl-highlight-post-command t nil))
+    (remove-hook 'post-command-hook 'hl-highlight-post-command nil)))
 
 ;; TODO: Save highlights of last session.
 ;; ;;;###autoload
@@ -278,14 +280,14 @@
   :tag "Highlight Background Colors"
   :group 'hl-anything-group)
 
-(defcustom hl-thing-before-find-hook nil
+(defcustom hl-before-find-thing-hook nil
   "Hook for doing something before `hl--thing-find' do the searching.
 This hook has one argument, (REGEXP_STRING BEG END).
 Maybe you'll need it for history and navigation feature."
   :type '(repeat function)
   :group 'hl-anything-group)
 
-(defcustom hl-thing-after-find-hook nil
+(defcustom hl-after-find-thing-hook nil
   "Hook for doing something after `hl--thing-find' do the searching.
 This hook has one argument, (REGEXP_STRING BEG END).
 Maybe you'll need it for history and navigation feature."
@@ -295,27 +297,37 @@ Maybe you'll need it for history and navigation feature."
 (defvar hl-index 0)
 
 (defvar hl-things nil
-  "A list storing things \(text string\) to be highlighted.")
+  "A things list. The list stores things to be highlighted globally in the 
+buffer. The things's format:
+  ((REGEXP . FACESPEC) ...)")
 
 (defvar hl-index-local 0)
 (make-variable-buffer-local 'hl-index-local)
 
 (defvar hl-things-local nil
-  "A list storing things \(text string\) to be highlighted.")
+  "A things list. The list only stores things to be highlighted locally in the 
+buffer. The things's format:
+  ((REGEXP . FACESPEC) ...)")
 (make-variable-buffer-local 'hl-things-local)
 
+(defvar hl-timer nil)
+
+(defconst hl-idle-delay 0.15)
+
 (defun hl-thingatpt ()
-  "Return a list, (REGEXP_STRING BEG END), on which the point is or just string of selection."
+  "Return a list, (REGEXP_STRING BEG END), on which the point is or just string
+ of selection."
   ;; TODO: Use the highlight if point is on it.
   (let ((bound (if mark-active
                    (cons (region-beginning) (region-end))
                  (bounds-of-thing-at-point 'symbol))))
     (when bound
       ;; TODO: Improve regexp translation in order to support multiple lines.
-      (list (regexp-quote
-             (buffer-substring-no-properties (car bound) (cdr bound)))
-            (car bound)
-            (cdr bound)))))
+      (let ((text (regexp-quote
+                   (buffer-substring-no-properties (car bound) (cdr bound)))))
+        ;; Replace space as "\\s-+"
+        (setq text (replace-regexp-in-string "\\s-+" "\\\\s-+" text))
+        (list text (car bound) (cdr bound))))))
 
 (defun hl-highlight (thing &optional local)
   (let* ((index (if local
@@ -345,62 +357,100 @@ Maybe you'll need it for history and navigation feature."
     (if local
         (progn
           (font-lock-fontify-buffer)
-          (push thing hl-things-local)
+          (push (cons thing facespec) hl-things-local)
           (setq hl-index-local (if (>= next-index max)
                                    0
                                  next-index)))
       (font-lock-refresh-defaults)
-      (push thing hl-things)
+      (push (cons thing facespec) hl-things)
       (setq hl-index (if (>= next-index max)
                          0
                        next-index)))))
 
 (defun hl-unhighlight (thing &optional local)
-  (let ((mode (if local
-                  nil
-                major-mode))
-        (keyword (assoc thing (if (eq t (car font-lock-keywords))
-                                  (cadr font-lock-keywords)
-                                font-lock-keywords))))
+  (let* ((mode (if local
+                   nil
+                 major-mode))
+         ;; (real-thing (car thing))
+         (keyword (assoc thing (if (eq t (car font-lock-keywords))
+                                   (cadr font-lock-keywords)
+                                 font-lock-keywords))))
     (font-lock-remove-keywords mode `(,keyword))
     (if local
         (progn
           (font-lock-fontify-buffer)
-          (setq hl-things-local (delete thing hl-things-local)))
+          (setq hl-things-local (delete (assoc thing hl-things-local)
+                                        hl-things-local)))
       (font-lock-refresh-defaults)
-      (setq hl-things (delete thing hl-things)))))
+      (setq hl-things (delete (assoc thing hl-things)
+                              hl-things)))))
+
+(assoc "hello" '(("aaa" 1 2 3)
+                 ("bbb" 1 2 3)
+                 ("hello" 1 2 3)
+                 ("ccc" 1 2 3)
+                 ("ddd" 1 2 3)
+                 ("eee" 1 2 3)))
+
+(defun hl-highlight-post-command ()
+  (when hl-timer
+    (cancel-timer hl-timer)
+    (setq hl-timer nil))
+  (when (hl-is-idle-begin)
+    (setq hl-timer (run-with-timer hl-idle-delay nil
+                                   'hl-idle-begin))))
+
+(defun hl-is-idle-begin ()
+  (not (or (active-minibuffer-window))))
+
+(defun hl-idle-begin ()
+  (hl-update-highlight-overlays))
+
+(defun hl-update-highlight-overlays ()
+  (let ((things (append hl-things hl-things-local)))
+    (dolist (thing things)
+      (let ((beg (line-beginning-position))
+            (end (line-end-position)))
+        (save-excursion
+          (goto-char beg)
+          (while (re-search-forward thing end t)
+            ))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun hl--thing-find (step)
-  (let* ((case-fold-search t)
-         (thing (hl-thingatpt))
-         (str (nth 0 thing)))
-    (when (and thing
-               (not (= step 0)))
+;;;###autoload
+(defun hl-find-thing-forwardly ()
+  "Find thing forwardly and jump to it."
+  (interactive)
+  (hl-find-thing 1))
+
+;;;###autoload
+(defun hl-find-thing-backwardly ()
+  "Find thing backwardly and jump to it."
+  (interactive)
+  (hl-find-thing -1))
+
+(defun hl-find-thing (step)
+  (let* ((thing (hl-thingatpt))
+         (str (nth 0 thing))
+         (point (point))
+         (case-fold-search t))
+    (when thing
       ;; Hook before searching.
-      (run-hook-with-args hl-thing-before-find-hook thing)
-      ;; Disable selection.
+      (run-hook-with-args hl-before-find-thing-hook thing)
       (setq mark-active nil)
-      ;; Regexp search.
-      (goto-char (if (> step 0)
-                     ;; Move to end.
-                     (nth 2 thing)
-                   ;; Move to beginning.
-                   (nth 1 thing)))
-      ;; Make a selection.
-      (re-search-forward str nil t step)
-      (let* ((pos1 (point))
-             (pos2 (if (> step 0)
-                       (- (point) (length str))
-                     (+ (point) (length str))))
-             (beg (if (< pos1 pos2) pos1 pos2))
-             (end (if (> pos1 pos2) pos1 pos2)))
-        (set-marker (mark-marker) beg)
-        (goto-char end))
+      (goto-char (nth (if (> step 0)
+                          ;; Move to end.
+                          2
+                        ;; Move to beginning.
+                        1) thing))
+      (if (re-search-forward str nil t step)
+          (progn
+            (set-marker (mark-marker) (match-beginning 0))
+            (goto-char (match-end 0)))
+        (goto-char point))
       (setq mark-active t)
       ;; Hook after searching.
-      (run-hook-with-args hl-thing-after-find-hook
-                          `(,str ,(marker-position (mark-marker)) ,(point))))))
+      (run-hook-with-args hl-after-find-thing-hook thing))))
 
 (provide 'hl-anything)
