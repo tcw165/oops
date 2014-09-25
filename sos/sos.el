@@ -212,22 +212,6 @@ result to the `sos-def-buf' displayed in the `sos-def-win'."
 (defvar sos-source-window nil
   "The current window where the source code buffer is at.")
 
-;; (defmacro sos-get-local (symb)
-;;   "Get buffer-localed variable of source code buffer. e.g. `sos-backend', 
-;; `sos-symbol'."
-;;   `(progn
-;;      (and sos-source-buffer
-;;           (with-current-buffer sos-source-buffer
-;;             ,symb))))
-
-;; (defmacro sos-set-local (symb value)
-;;   "Set buffer-localed variable of source code buffer. e.g. `sos-backend', 
-;; `sos-symbol'."
-;;   `(progn
-;;      (and sos-source-buffer
-;;           (with-current-buffer sos-source-buffer
-;;             (setq ,symb ,value)))))
-
 (defun sos-pre-command ()
   (when sos-timer
     (cancel-timer sos-timer)
@@ -328,6 +312,12 @@ If you want to skip additional commands, try example:
 
 ;;;###autoload
 (defun sos-goto-local-symbol ()
+  (interactive)
+  ;; TODO:
+  )
+
+;;;###autoload
+(defun sos-goto-global-symbol ()
   (interactive)
   ;; TODO:
   )
