@@ -114,19 +114,25 @@
                           "black"
                           "snow"
                           "snow"
+                          "snow"
+                          "black"
+                          "snow"
                           "snow")
   "The foreground colors for `hl-highlight-thingatpt'."
   :type '(repeat color)
   :tag "Highlight Foreground Colors"
   :group 'hl-anything-group)
 
-(defcustom hl-bg-colors '("orange red"
+(defcustom hl-bg-colors '("firebrick"
                           "Orange"
                           "gold"
                           "green1"
                           "DeepSkyBlue1"
                           "dark blue"
-                          "blue violet")
+                          "blue violet"
+                          "gray90"
+                          "gray60"
+                          "gray30")
   "The background colors for `hl-highlight-thingatpt'."
   :type '(repeat color)
   :tag "Highlight Background Colors"
