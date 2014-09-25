@@ -27,7 +27,7 @@
 ;;
 ;;; Change Log:
 ;;
-;; 2014-10-01 (0.0.1)
+;; 2014-11-01 (0.0.1)
 ;;    Initial release.
 
 ;; Front-ends.
@@ -40,26 +40,13 @@
 
 (require 'history)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Common ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defgroup sos-group nil
   "A utility to show you documentation at button window by finding some 
 meaningful information around the point."
   :tag "Sos")
-
-(defcustom sos-frontends '(sos-definition-buffer-frontend
-                           sos-tips-frontend)
-  "The list of front-ends for the purpose of visualization.
-
-`:init': When the visualization should be initialized.
-
-`:show': When the visualization should be showed.
-
-`:hide': When the visualization should be hidden.
-
-`:destroy': When the visualization should be destroied.
-
-`:update': When the data has been updated."
-  :type '(repeat (symbol :tag "Front-end"))
-  :group 'sos-group)
 
 (defcustom sos-backends '(sos-grep-backend
                           sos-elisp-backend)
@@ -129,26 +116,6 @@ Return value will be cached to `sos-candidates'.
   :type '(repeat (symbol :tag "Back-end"))
   :group 'sos-group)
 
-(defcustom sos-idle-delay 0.15
-  "The idle delay in seconds until sos starts automatically."
-  :type '(number :tag "Seconds"))
-
-(defvar sos-timer nil
-  "The idle timer to call `sos-idle-begin'.")
-
-(defvar sos-source-buffer nil
-  "The current source code buffer.")
-
-(defvar sos-source-buffer-tick 0
-  "The current source buffer's tick counter.")
-
-(defvar sos-source-window nil
-  "The current window where the source code buffer is at.")
-
-(defvar sos-candidates-stack nil
-  "A list containing `sos-candidates'. Engine will push the current candidates 
-into the stack when user navigate to deeper definition in the definition window.")
-
 (defvar sos-backend nil
   "The back-end which takes control of current session in the back-ends list.")
 (make-variable-buffer-local 'sos-backend)
@@ -169,8 +136,6 @@ into the stack when user navigate to deeper definition in the definition window.
   "Cache the return value from back-end with `:tips' command.")
 (make-variable-buffer-local 'sos-tips)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 (defmacro sos-get-local (symb)
   "Get buffer-localed variable of source code buffer. e.g. `sos-backend', 
 `sos-symbol', `sos-candidates', `sos-index' and `sos-tips'."
@@ -187,27 +152,63 @@ into the stack when user navigate to deeper definition in the definition window.
           (with-current-buffer sos-source-buffer
             (setq ,symb ,value)))))
 
-(defun sos-is-skip-command (&rest commands)
-  "Return t if `this-command' should be skipped.
-If you want to skip additional commands, try example:
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Definition Window ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-  (sos-is-skip-command 'self-insert-command 'previous-line 'next-line
-                       'left-char right-char)"
-  (memq this-command `(mwheel-scroll
-                       save-buffer
-                       eval-buffer
-                       eval-last-sexp
-                       ;; Additional commands.
-                       ,@commands)))
+;;;###autoload
+(define-minor-mode sos-definition-window-mode
+  "This local minor mode gethers symbol returned from backends around the point 
+and show the reference visually through frontends. Usually frontends output the 
+result to the `sos-def-buf' displayed in the `sos-def-win'."
+  :lighter " SOS:def"
+  :global t
+  :group 'sos-group
+  ;; TODO: menu-bar and tool-bar keymap.
+  (if sos-definition-window-mode
+      (progn
+        (mapc 'sos-init-backend sos-backends)
+        (sos-call-def-win-frontends :init)
+        (add-hook 'pre-command-hook 'sos-pre-command)
+        (add-hook 'post-command-hook 'sos-post-command))
+    (sos-call-def-win-frontends :destroy)
+    (remove-hook 'pre-command-hook 'sos-pre-command)
+    (remove-hook 'post-command-hook 'sos-post-command)))
 
-(defun sos-is-multiple-candidates ()
-  (> (length (sos-get-local sos-candidates)) 1))
+(defcustom sos-definition-window-frontends '(sos-definition-buffer-frontend
+                                             sos-tips-frontend)
+  "The list of front-ends for the purpose of visualization.
 
-(defun sos-push-candidates-stack ()
-  (push (sos-get-local sos-candidates) sos-candidates-stack))
+`:init': When the visualization should be initialized.
 
-(defun sos-pop-candidates-stack ()
-  (pop sos-candidates-stack))
+`:show': When the visualization should be showed.
+
+`:hide': When the visualization should be hidden.
+
+`:destroy': When the visualization should be destroied.
+
+`:update': When the data has been updated."
+  :type '(repeat (symbol :tag "Front-end"))
+  :group 'sos-group)
+
+(defcustom sos-idle-delay 0.15
+  "The idle delay in seconds until sos starts automatically."
+  :type '(number :tag "Seconds"))
+
+(defvar sos-timer nil
+  "The idle timer to call `sos-idle-begin'.")
+
+(defvar sos-source-buffer nil
+  "The current source code buffer.")
+
+(defvar sos-source-buffer-tick 0
+  "The current source buffer's tick counter.")
+
+(defvar sos-source-window nil
+  "The current window where the source code buffer is at.")
+
+(defvar sos-candidates-stack nil
+  "A list containing `sos-candidates'. Engine will push the current candidates 
+into the stack when user navigate to deeper definition in the definition window.")
 
 (defun sos-pre-command ()
   (when sos-timer
@@ -226,6 +227,19 @@ If you want to skip additional commands, try example:
            (sos-is-defintion-buffer&window)
            (sos-is-skip-command))))
 
+(defun sos-is-skip-command (&rest commands)
+  "Return t if `this-command' should be skipped.
+If you want to skip additional commands, try example:
+
+  (sos-is-skip-command 'self-insert-command 'previous-line 'next-line
+                       'left-char right-char)"
+  (memq this-command `(mwheel-scroll
+                       save-buffer
+                       eval-buffer
+                       eval-last-sexp
+                       ;; Additional commands.
+                       ,@commands)))
+
 (defun sos-idle-begin ()
   (condition-case err
       (progn
@@ -240,21 +254,21 @@ If you want to skip additional commands, try example:
     (sos-normal-process backend)
     (if sos-backend
         (return t)
-      (sos-call-frontends :hide))))
+      (sos-call-def-win-frontends :hide))))
 
 (defun sos-normal-process (backend)
   (let ((symb (sos-call-backend backend :symbol)))
     (cond
-     ;; Return `:stop' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+     ;; Return `:stop' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
      ((eq symb :stop)
       ;; (message "(%s) sos-normal-process: stop" (current-time))
       (setq sos-backend backend)
-      (sos-call-frontends :hide))
+      (sos-call-def-win-frontends :hide))
 
-     ;; Return nil ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+     ;; Return nil ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
      ((null symb)
       ;; (message "(%s) sos-normal-process: hide" (current-time))
-      (sos-call-frontends :hide))
+      (sos-call-def-win-frontends :hide))
 
      ;; Something ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
      (t
@@ -265,7 +279,7 @@ If you want to skip additional commands, try example:
             ;; to do `:update' task.
             ;; (message "(%s) sos-normal-process: update" (current-time))
             (setq sos-tips (sos-call-backend backend :tips symb))
-            (sos-call-frontends :update))
+            (sos-call-def-win-frontends :update))
         (setq sos-backend backend
               sos-symbol symb
               sos-candidates (sos-call-backend backend :candidates symb)
@@ -273,14 +287,14 @@ If you want to skip additional commands, try example:
         (if (and sos-candidates (listp sos-candidates))
             (progn
               ;; (message "(%s) sos-normal-process: show" (current-time))
-              (sos-call-frontends :show))
+              (sos-call-def-win-frontends :show))
           ;; (message "(%s) sos-normal-process: hide" (current-time))
-          (sos-call-frontends :hide)))))))
+          (sos-call-def-win-frontends :hide)))))))
 
-(defun sos-call-frontends (command &rest args)
+(defun sos-call-def-win-frontends (command &rest args)
   "Iterate all the `sos-backends' and pass `command' by order."
   (let ((commands (cons command args)))
-    (dolist (frontend sos-frontends)
+    (dolist (frontend sos-definition-window-frontends)
       (dolist (cmd commands)
         (funcall frontend cmd)))))
 
@@ -291,38 +305,21 @@ If you want to skip additional commands, try example:
 (defun sos-init-backend (backend)
   (funcall backend :init))
 
-;;;###autoload
-(defun sos-goto-definition ()
-  (interactive)
-  ;; TODO:
-  (and (featurep 'history)
-       (his-add-position-type-history)))
+(defun sos-is-multiple-candidates ()
+  (> (length (sos-get-local sos-candidates)) 1))
 
-;;;###autoload
-(define-minor-mode sos-definition-window-mode
-  "This local minor mode gethers symbol returned from backends around the point 
-and show the reference visually through frontends. Usually frontends output the 
-result to the `sos-def-buf' displayed in the `sos-def-win'."
-  :lighter " SOS:def"
-  :global t
-  :group 'sos-group
-  ;; TODO: menu-bar and tool-bar keymap.
-  (if sos-definition-window-mode
-      (progn
-        (mapc 'sos-init-backend sos-backends)
-        (sos-call-frontends :init)
-        (add-hook 'pre-command-hook 'sos-pre-command)
-        (add-hook 'post-command-hook 'sos-post-command))
-    (sos-call-frontends :destroy)
-    (remove-hook 'pre-command-hook 'sos-pre-command)
-    (remove-hook 'post-command-hook 'sos-post-command)))
+(defun sos-push-candidates-stack ()
+  (push (sos-get-local sos-candidates) sos-candidates-stack))
+
+(defun sos-pop-candidates-stack ()
+  (pop sos-candidates-stack))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Outline Window ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
 (define-minor-mode sos-outline-window-mode
-  "This local minor mode gethers symbol returned from backends around the point 
-and show the reference visually through frontends. Usually frontends output the 
-result to the `sos-definition-buffer' displayed in the `sos-definition-window'. 
-Show or hide these buffer and window are controlled by `sos-watchdog-mode'."
+  ""
   :lighter " SOS:outline"
   :global t
   :group 'sos-group
@@ -331,5 +328,15 @@ Show or hide these buffer and window are controlled by `sos-watchdog-mode'."
       (progn
         nil)
     nil) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Go to Definition ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;###autoload
+(defun sos-goto-definition ()
+  (interactive)
+  ;; TODO:
+  (and (featurep 'history)
+       (his-add-position-type-history)))
 
 (provide 'sos)
