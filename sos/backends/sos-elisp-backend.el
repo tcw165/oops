@@ -30,8 +30,6 @@
 
 (require 'thingatpt)
 
-(defconst sos-elisp-find-feature-regexp "^\\s-*(provide '%s)")
-
 ;;;###autoload
 (defun sos-elisp-backend (command &optional arg)
   (case command
@@ -58,6 +56,8 @@
     (:tips
      (when arg
        (list (format "%s" arg))))))
+
+(defconst sos-elisp-find-feature-regexp "^\\s-*(provide '%s)")
 
 (defun sos-elisp-thingatpt ()
   "Find symbol string around the point or text selection."

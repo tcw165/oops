@@ -37,33 +37,93 @@
 (require 'linum)
 (require 'thingatpt)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Front-ends ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 ;;;###autoload
-(defun sos-definition-buffer-frontend (command)
+(defun sos-definition-buffer-frontend (command &optional arg)
   (case command
     (:init (sos-toggle-definition-buffer&window 1))
     (:destroy (sos-toggle-definition-buffer&window -1))
     (:show
      ;; TODO: remember user choice at last session in the prj.
-     (setq sos-index 0
+     (setq sos-candidates arg
+           sos-index 0
            ;; Clean the stack.
            sos-candidates-stack nil)
      (sos-toggle-definition-buffer&window 1)
-     (if (> (length sos-candidates) 1)
+     (if (sos-is-multiple-candidates)
          (sos-show-candidates)
        (sos-show-candidate))))
   ;; Save the height of definition window.
   (and (window-live-p sos-def-win)
        (setq sos-def-win-height (window-height sos-def-win))))
 
-;;;###autoload
-(defun sos-tips-frontend (command)
-  (and sos-tips (memq command '(:show :update))
-       (let* ((tips (nth sos-index sos-tips)))
-         (and tips
-              ;; (message tips)
-              ))))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Common ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;###autoload
+(defun sos-open-definition-file ()
+  "Open file refer to `mode-line-format'."
+  (interactive)
+  (let* ((info (sos-ml-info))
+         (file (car info))
+         (linum (cdr info)))
+    (when (and (file-exists-p file)
+               (integerp linum)
+               (window-live-p sos-source-window))
+      (with-selected-window sos-source-window
+        (unless (string= file (buffer-file-name (window-buffer)))
+          (and (featurep 'history)
+               (his-add-position-type-history))
+          (find-file file)
+          (goto-line linum)
+          (and (featurep 'history)
+               (his-add-position-type-history))
+          (recenter 3)))
+      (select-window sos-source-window))))
+
+;;;###autoload
+(defun sos-copy-definition-file-path ()
+  "Copy file path refer to `mode-line-format'."
+  (interactive)
+  (let* ((info (sos-ml-info))
+         (file (car info)))
+    (and file
+         (with-temp-buffer
+           (insert file)
+           (clipboard-kill-ring-save 1 (point-max)))
+         (message "File path is copied to clipboard!"))))
+
+;;;###autoload
+(defun sos-goto-definition-line ()
+  "Go to line refer to `mode-line-format'."
+  (interactive)
+  (let* ((info (sos-ml-info))
+         (linum (cdr info)))
+    (and (integerp linum)
+         (sos-with-definition-buffer
+           (goto-line linum)
+           (recenter 3)))))
+
+;;;###autoload
+(defun sos-jump-in-candidate ()
+  (interactive)
+  (sos-push-candidates-stack)
+  (let ((index (1- (sos-with-definition-buffer
+                     (line-number-at-pos)))))
+    (setq sos-candidates `(,(nth index sos-candidates)))
+    (sos-show-candidate)))
+
+;;;###autoload
+(defun sos-jump-out-candidate ()
+  (interactive)
+  (let ((candidates (sos-pop-candidates-stack)))
+    (when candidates
+      (setq sos-candidates candidates)
+      (if (sos-is-multiple-candidates)
+          (sos-show-candidates)
+        (sos-show-candidate)))))
 
 (defface sos-hl-face
   '((t (:background "yellow" :foreground "black" :weight bold :height 2.0)))
@@ -75,6 +135,14 @@
   "Default face for highlighting line in definition window."
   :group 'sos-group)
 
+(defvar sos-hl-overlay nil
+  "The highlight for keyword in `sos-definition-buffer'.")
+(make-variable-buffer-local 'sos-hl-overlay)
+
+(defvar sos-hl-line-overlay nil
+  "The highlight for line in `sos-definition-buffer'.")
+(make-variable-buffer-local 'sos-hl-line-overlay)
+
 (defvar sos-def-buf nil
   "Definition buffer.")
 
@@ -84,27 +152,25 @@
 (defvar sos-def-win-height 0
   "The height of definition window.")
 
-(defvar sos-hl-overlay nil
-  "The highlight for keyword in `sos-definition-buffer'.")
-(make-variable-buffer-local 'sos-hl-overlay)
+(defvar sos-index 0
+  "The index of current candidate in the list.")
 
-(defvar sos-hl-line-overlay nil
-  "The highlight for line in `sos-definition-buffer'.")
-(make-variable-buffer-local 'sos-hl-line-overlay)
+(defvar sos-candidates nil
+  "Cache the return value from back-end with `:candidates' command.")
 
-(defvar sos-candidate-mode-map
+(defvar sos-candidates-stack nil
+  "A list containing `sos-candidates'. Engine will push the current candidates 
+into the stack when user navigate to deeper definition in the definition window.")
+
+(defvar sos-file-path-map
   (let ((map (make-sparse-keymap)))
-    ;; (define-key map [left] (lambda ()
-    ;;                          (interactive)
-    ;;                          (forward-symbol -1)))
-    ;; (define-key map [right] (lambda ()
-    ;;                           (interactive)
-    ;;                           (forward-symbol 1)))
-    ;; TODO: let q become return function.
-    (define-key map (kbd "q") 'sos-jump-out-candidate)
-    (define-key map [return] (lambda ()
-                               (interactive)
-                               (message "\"Jump to definition\" is yet supported!")))
+    (define-key map [mode-line mouse-1] 'sos-open-definition-file)
+    (define-key map [mode-line mouse-3] 'sos-copy-definition-file-path)
+    map))
+
+(defvar sos-linum-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [mode-line mouse-1] 'sos-goto-definition-line)
     map))
 
 (defmacro sos-with-definition-buffer (&rest body)
@@ -155,9 +221,8 @@
       (setq sos-def-buf nil
             sos-def-win nil))))
 
-(defun sos-is-defintion-buffer&window ()
-  (or (eq (current-buffer) sos-def-buf)
-      (eq (selected-window) sos-def-win)))
+(defun sos-is-multiple-candidates ()
+  (> (length sos-candidates) 1))
 
 (defun sos-hl-word (hl-word)
   (unless sos-hl-overlay
@@ -176,9 +241,72 @@
                               'face 'font-lock-string-face))))
   (end-of-line))
 
+(defun sos-header-mode-line ()
+  `("  Multiple Definitions | "
+    (:eval (when sos-candidates-mode
+             (format "Choose definition: %s %s "
+                     (propertize " Up "
+                                 'face 'custom-button
+                                 'mouse-face 'custom-button-mouse
+                                 'local-map sos-prev-candidate-button-map)
+                     (propertize " Down "
+                                 'face 'custom-button
+                                 'mouse-face 'custom-button-mouse
+                                 'local-map sos-next-candidate-button-map))))
+    (:eval (if sos-candidates-stack
+               (format "Back to options: %s "
+                       (propertize " Back "
+                                   'face 'custom-button
+                                   'mouse-face 'custom-button-mouse
+                                   'local-map sos-jump-out-button-map))
+             (format "Open definition: %s "
+                     (propertize " Go "
+                                 'face 'custom-button
+                                 'mouse-face 'custom-button-mouse
+                                 'local-map sos-jump-in-button-map))))))
+
+(defun sos-bottom-mode-line (&optional desc file line)
+  `(,(propertize "  Definition "
+                 'face 'mode-line-buffer-id)
+    (:eval (and (stringp ,file) (file-exists-p ,file) (integerp ,line)
+                (format "| file:%s, line:%s, function:(yet supported) "
+                        (propertize (abbreviate-file-name ,file)
+                                    'face 'link
+                                    'mouse-face 'highlight
+                                    'help-echo "mouse-1: Open the file.\n\
+mouse-3: Copy the path."
+                                    'local-map sos-file-path-map)
+                        (propertize (number-to-string ,line)
+                                    'face 'link
+                                    'mouse-face 'highlight
+                                    'help-echo "mouse-1: Back to the line."
+                                    'local-map sos-linum-map))))
+    (:eval (and ,desc (> (length ,desc) 0)
+                (format "| %s " ,desc)))))
+
+(defun sos-ml-info ()
+  "Get file and line number from definition buffer's `mode-line-format'.
+Return (FILE . LINUM) struct."
+  (sos-with-definition-buffer
+    (let* ((text (pp-to-string mode-line-format))
+           (beg (string-match "(file-exists-p \".+\")" text))
+           (end (match-end 0))
+           (file (and beg end
+                      (substring text
+                                 (+ beg 16)
+                                 (- end 2))))
+           (beg (string-match "(integerp [0-9]+)" text))
+           (end (match-end 0))
+           (linum (and beg end
+                       (string-to-int
+                        (substring text
+                                   (+ beg 10)
+                                   (- end 1))))))
+      (cons file linum))))
+
 (defun sos-show-candidate ()
   "Show single candidate prompt."
-  (let* ((candidate (nth sos-index (sos-get-local sos-candidates)))
+  (let* ((candidate (nth sos-index sos-candidates))
          (file (plist-get candidate :file))
          (doc (plist-get candidate :doc))
          (linum (plist-get candidate :linum))
@@ -248,7 +376,7 @@
     (kill-all-local-variables)
     (remove-overlays)
     (erase-buffer)
-    (dolist (candidate (sos-get-local sos-candidates))
+    (dolist (candidate sos-candidates)
       (let* ((file (plist-get candidate :file))
              (doc (plist-get candidate :doc))
              (linum (plist-get candidate :linum))
@@ -298,71 +426,8 @@
                                                 'face 'tooltip)))
           cursor-type nil)))
 
-(defun sos-ml-info ()
-  "Get file and line number from definition buffer's `mode-line-format'.
-Return (FILE . LINUM) struct."
-  (sos-with-definition-buffer
-    (let* ((text (pp-to-string mode-line-format))
-           (beg (string-match "(file-exists-p \".+\")" text))
-           (end (match-end 0))
-           (file (and beg end
-                      (substring text
-                                 (+ beg 16)
-                                 (- end 2))))
-           (beg (string-match "(integerp [0-9]+)" text))
-           (end (match-end 0))
-           (linum (and beg end
-                       (string-to-int
-                        (substring text
-                                   (+ beg 10)
-                                   (- end 1))))))
-      ;; (message "%s" text)
-      ;; (message "%s-%s %s:%s" beg end file linum)
-      (cons file linum))))
-
-;;;###autoload
-(defun sos-open-definition-file ()
-  "Open file refer to `mode-line-format'."
-  (interactive)
-  (let* ((info (sos-ml-info))
-         (file (car info))
-         (linum (cdr info)))
-    (when (and (file-exists-p file)
-               (integerp linum)
-               (window-live-p sos-source-window))
-      (with-selected-window sos-source-window
-        (unless (string= file (buffer-file-name (window-buffer)))
-          (and (featurep 'history)
-               (his-add-position-type-history))
-          (find-file file)
-          (goto-line linum)
-          (and (featurep 'history)
-               (his-add-position-type-history))
-          (recenter 3)))
-      (select-window sos-source-window))))
-
-;;;###autoload
-(defun sos-copy-definition-file-path ()
-  "Copy file path refer to `mode-line-format'."
-  (interactive)
-  (let* ((info (sos-ml-info))
-         (file (car info)))
-    (and file
-         (with-temp-buffer
-           (insert file)
-           (clipboard-kill-ring-save 1 (point-max)))
-         (message "File path is copied to clipboard!"))))
-
-;;;###autoload
-(defun sos-goto-definition-line ()
-  "Go to line refer to `mode-line-format'."
-  (interactive)
-  (let* ((info (sos-ml-info))
-         (linum (cdr info)))
-    (and (integerp linum)
-         (sos-with-definition-buffer
-           (goto-line linum)
-           (recenter 3)))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Signle Candidate ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
 (define-minor-mode sos-candidate-mode
@@ -374,57 +439,27 @@ Return (FILE . LINUM) struct."
         (use-local-map sos-candidate-mode-map))
     ))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defvar sos-candidates-mode-map
+(defvar sos-candidate-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map [return] 'sos-jump-in-candidate)
-    (define-key map [mouse-1] 'sos-jump-in-candidate)
+    (define-key map (kbd "q") 'sos-jump-out-candidate)
+    (define-key map [return] (lambda ()
+                               (interactive)
+                               (message "\"Jump to definition\" is yet supported!")))
     map))
 
-(defun sos-hl-line ()
-  (unless sos-hl-line-overlay
-    (setq sos-hl-line-overlay (make-overlay 1 1))
-    (overlay-put sos-hl-line-overlay 'face 'sos-hl-line-face))
-  (move-overlay sos-hl-line-overlay (line-beginning-position)
-                (line-beginning-position 2)))
-
-(defun sos-candidates-post-command ()
-  (when (eobp)
-    (backward-char))
-  (end-of-line)
-  (sos-hl-line))
-
-(defun sos-add-text-button ()
-  (save-excursion
-    (goto-char (point-min))
-    (dolist (candidate (sos-get-local sos-candidates))
-      (let ((beg (line-beginning-position))
-            (end (line-end-position)))
-        (add-text-properties beg end
-                             '(mouse-face highlight))
-        (add-text-properties beg end
-                             `(keymap ,sos-candidates-mode-map)))
-      (forward-line))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Multiple Candidates ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
-(defun sos-jump-in-candidate ()
-  (interactive)
-  (sos-push-candidates-stack)
-  (let ((index (1- (sos-with-definition-buffer
-                     (line-number-at-pos)))))
-    (sos-set-local sos-candidates `(,(nth index sos-candidates)))
-    (sos-show-candidate)))
-
-;;;###autoload
-(defun sos-jump-out-candidate ()
-  (interactive)
-  (let ((candidates (sos-pop-candidates-stack)))
-    (when candidates
-      (sos-set-local sos-candidates candidates)
-      (if (sos-is-multiple-candidates)
-          (sos-show-candidates)
-        (sos-show-candidate)))))
+(define-minor-mode sos-candidates-mode
+  "Minor mode for *Definition* buffers."
+  :lighter " SOS:mcand"
+  :group 'sos-group
+  (if sos-candidates-mode
+      (progn
+        (sos-add-text-button)
+        (add-hook 'post-command-hook 'sos-candidates-post-command t t))
+    (remove-hook 'post-command-hook 'sos-candidates-post-command t)))
 
 ;;;###autoload
 (defun sos-next-candidate ()
@@ -442,18 +477,11 @@ Return (FILE . LINUM) struct."
       (previous-line)
       (sos-candidates-post-command))))
 
-;;;###autoload
-(define-minor-mode sos-candidates-mode
-  "Minor mode for *Definition* buffers."
-  :lighter " SOS:mcand"
-  :group 'sos-group
-  (if sos-candidates-mode
-      (progn
-        (sos-add-text-button)
-        (add-hook 'post-command-hook 'sos-candidates-post-command t t))
-    (remove-hook 'post-command-hook 'sos-candidates-post-command t)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defvar sos-candidates-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [return] 'sos-jump-in-candidate)
+    (define-key map [mouse-1] 'sos-jump-in-candidate)
+    map))
 
 (defvar sos-next-candidate-button-map
   (let ((map (make-sparse-keymap)))
@@ -475,58 +503,35 @@ Return (FILE . LINUM) struct."
     (define-key map [header-line mouse-1] 'sos-jump-out-candidate)
     map))
 
-(defun sos-header-mode-line ()
-  `("  Multiple Definitions | "
-    (:eval (when sos-candidates-mode
-             (format "Choose definition: %s %s "
-                     (propertize " Up "
-                                 'face 'custom-button
-                                 'mouse-face 'custom-button-mouse
-                                 'local-map sos-prev-candidate-button-map)
-                     (propertize " Down "
-                                 'face 'custom-button
-                                 'mouse-face 'custom-button-mouse
-                                 'local-map sos-next-candidate-button-map))))
-    (:eval (if sos-candidates-stack
-               (format "Back to options: %s "
-                       (propertize " Back "
-                                   'face 'custom-button
-                                   'mouse-face 'custom-button-mouse
-                                   'local-map sos-jump-out-button-map))
-             (format "Open definition: %s "
-                     (propertize " Go "
-                                 'face 'custom-button
-                                 'mouse-face 'custom-button-mouse
-                                 'local-map sos-jump-in-button-map))))))
+(defun sos-candidates-post-command ()
+  (when (eobp)
+    (backward-char))
+  (end-of-line)
+  (sos-hl-line))
 
-(defvar sos-file-path-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map [mode-line mouse-1] 'sos-open-definition-file)
-    (define-key map [mode-line mouse-3] 'sos-copy-definition-file-path)
-    map))
+(defun sos-push-candidates-stack ()
+  (push sos-candidates sos-candidates-stack))
 
-(defvar sos-linum-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map [mode-line mouse-1] 'sos-goto-definition-line)
-    map))
+(defun sos-pop-candidates-stack ()
+  (pop sos-candidates-stack))
 
-(defun sos-bottom-mode-line (&optional desc file line)
-  `(,(propertize "  Definition "
-                 'face 'mode-line-buffer-id)
-    (:eval (and (stringp ,file) (file-exists-p ,file) (integerp ,line)
-                (format "| file:%s, line:%s, function:(yet supported) "
-                        (propertize (abbreviate-file-name ,file)
-                                    'face 'link
-                                    'mouse-face 'highlight
-                                    'help-echo "mouse-1: Open the file.\n\
-mouse-3: Copy the path."
-                                    'local-map sos-file-path-map)
-                        (propertize (number-to-string ,line)
-                                    'face 'link
-                                    'mouse-face 'highlight
-                                    'help-echo "mouse-1: Back to the line."
-                                    'local-map sos-linum-map))))
-    (:eval (and ,desc (> (length ,desc) 0)
-                (format "| %s " ,desc)))))
+(defun sos-add-text-button ()
+  (save-excursion
+    (goto-char (point-min))
+    (dolist (candidate sos-candidates)
+      (let ((beg (line-beginning-position))
+            (end (line-end-position)))
+        (add-text-properties beg end
+                             '(mouse-face highlight))
+        (add-text-properties beg end
+                             `(keymap ,sos-candidates-mode-map)))
+      (forward-line))))
+
+(defun sos-hl-line ()
+  (unless sos-hl-line-overlay
+    (setq sos-hl-line-overlay (make-overlay 1 1))
+    (overlay-put sos-hl-line-overlay 'face 'sos-hl-line-face))
+  (move-overlay sos-hl-line-overlay (line-beginning-position)
+                (line-beginning-position 2)))
 
 (provide 'sos-basic-frontend)

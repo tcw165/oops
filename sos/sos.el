@@ -62,13 +62,12 @@ to dispatch remaining back-ends.
 
 ### The sample of a back-end:
 
-  (defun some-backend (command &rest args)
+  (defun some-backend (command &optional arg)
     (case command
       (:init t)
       (:symbol (and (member major-mode MAJOR_MODE_CANDIDATES)
                     (thing-at-point 'symbol))))
-      (:candidates (list STRING01 STRING02 STRING03 ...))
-      (:tips STRING))
+      (:candidates (list STRING01 STRING02 STRING03 ...)))
 
 Each back-end is a function that takes a variable number of arguments. The
 first argument is the command requested from the sos enine.  It is one of
@@ -94,7 +93,6 @@ even if there's only one candidate. It also tells sos engine don't iterate the
 following back-ends.
 Return nil tells sos engine it cannot find any definition and stop iterating
 the following back-ends.
-Return value will be cached to `sos-candidates'.
 
  $CANDIDATES format (alist):
  ### If candidate is a file...
@@ -115,6 +113,21 @@ Return value will be cached to `sos-candidates'.
 `:tips': ."
   :type '(repeat (symbol :tag "Back-end"))
   :group 'sos-group)
+
+(defvar sos-backend nil
+  "The back-end which takes control of current session in the back-ends list.")
+(make-variable-buffer-local 'sos-backend)
+
+(defvar sos-symbol nil
+  "Cache the return value from back-end with `:symbol' command.")
+(make-variable-buffer-local 'sos-symbol)
+
+(defun sos-call-backend (backend command &optional arg)
+  "Call certain backend `backend' and pass `command' to it."
+  (funcall backend command arg))
+
+(defun sos-init-backend (backend)
+  (funcall backend :init))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Definition Window ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -138,9 +151,19 @@ result to the `sos-def-buf' displayed in the `sos-def-win'."
     (remove-hook 'pre-command-hook 'sos-pre-command)
     (remove-hook 'post-command-hook 'sos-post-command)))
 
-(defcustom sos-definition-window-frontends '(sos-definition-buffer-frontend
-                                             sos-tips-frontend)
+(defcustom sos-definition-window-frontends '(sos-definition-buffer-frontend)
   "The list of front-ends for the purpose of visualization.
+
+### The sample of a back-end:
+
+  (defun some-front (command &optional arg)
+    (case command
+      (:init t)
+      (:show (message PROMPTY)))
+      (:hide ...)
+      (:destroy ...))
+
+### Commands to be called by sos engine:
 
 `:init': When the visualization should be initialized.
 
@@ -170,45 +193,21 @@ result to the `sos-def-buf' displayed in the `sos-def-win'."
 (defvar sos-source-window nil
   "The current window where the source code buffer is at.")
 
-(defvar sos-candidates-stack nil
-  "A list containing `sos-candidates'. Engine will push the current candidates 
-into the stack when user navigate to deeper definition in the definition window.")
+;; (defmacro sos-get-local (symb)
+;;   "Get buffer-localed variable of source code buffer. e.g. `sos-backend', 
+;; `sos-symbol'."
+;;   `(progn
+;;      (and sos-source-buffer
+;;           (with-current-buffer sos-source-buffer
+;;             ,symb))))
 
-(defvar sos-backend nil
-  "The back-end which takes control of current session in the back-ends list.")
-(make-variable-buffer-local 'sos-backend)
-
-(defvar sos-symbol nil
-  "Cache the return value from back-end with `:symbol' command.")
-(make-variable-buffer-local 'sos-symbol)
-
-(defvar sos-candidates nil
-  "Cache the return value from back-end with `:candidates' command.")
-(make-variable-buffer-local 'sos-candidates)
-
-(defvar sos-index 0
-  "The index of current candidate in the list.")
-(make-variable-buffer-local 'sos-index)
-
-(defvar sos-tips nil
-  "Cache the return value from back-end with `:tips' command.")
-(make-variable-buffer-local 'sos-tips)
-
-(defmacro sos-get-local (symb)
-  "Get buffer-localed variable of source code buffer. e.g. `sos-backend', 
-`sos-symbol', `sos-candidates', `sos-index' and `sos-tips'."
-  `(progn
-     (and sos-source-buffer
-          (with-current-buffer sos-source-buffer
-            ,symb))))
-
-(defmacro sos-set-local (symb value)
-  "Set buffer-localed variable of source code buffer. e.g. `sos-backend', 
-`sos-symbol', `sos-candidates', `sos-index' and `sos-tips'."
-  `(progn
-     (and sos-source-buffer
-          (with-current-buffer sos-source-buffer
-            (setq ,symb ,value)))))
+;; (defmacro sos-set-local (symb value)
+;;   "Set buffer-localed variable of source code buffer. e.g. `sos-backend', 
+;; `sos-symbol'."
+;;   `(progn
+;;      (and sos-source-buffer
+;;           (with-current-buffer sos-source-buffer
+;;             (setq ,symb ,value)))))
 
 (defun sos-pre-command ()
   (when sos-timer
@@ -224,8 +223,11 @@ into the stack when user navigate to deeper definition in the definition window.
 
 (defun sos-is-idle-begin ()
   (not (or (active-minibuffer-window)
-           (sos-is-defintion-buffer&window)
+           (sos-is-valid-buffer)
            (sos-is-skip-command))))
+
+(defun sos-is-valid-buffer ()
+  (string-match "\\*[Dd]efinition\\*" (buffer-name (current-buffer))))
 
 (defun sos-is-skip-command (&rest commands)
   "Return t if `this-command' should be skipped.
@@ -244,30 +246,30 @@ If you want to skip additional commands, try example:
   (condition-case err
       (progn
         (if (null sos-backend)
-            (sos-1st-process)
-          (sos-normal-process sos-backend))
+            (sos-def-win-1st-process)
+          (sos-def-win-normal-process sos-backend))
         (setq sos-source-buffer-tick (buffer-modified-tick)))
     (error err)))
 
-(defun sos-1st-process ()
+(defun sos-def-win-1st-process ()
   (dolist (backend sos-backends)
-    (sos-normal-process backend)
+    (sos-def-win-normal-process backend)
     (if sos-backend
         (return t)
       (sos-call-def-win-frontends :hide))))
 
-(defun sos-normal-process (backend)
+(defun sos-def-win-normal-process (backend)
   (let ((symb (sos-call-backend backend :symbol)))
     (cond
      ;; Return `:stop' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
      ((eq symb :stop)
-      ;; (message "(%s) sos-normal-process: stop" (current-time))
-      (setq sos-backend backend)
+      (setq sos-backend backend
+            sos-symbol nil)
       (sos-call-def-win-frontends :hide))
 
      ;; Return nil ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
      ((null symb)
-      ;; (message "(%s) sos-normal-process: hide" (current-time))
+      (setq sos-symbol nil)
       (sos-call-def-win-frontends :hide))
 
      ;; Something ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -275,44 +277,20 @@ If you want to skip additional commands, try example:
       (if (and (eq symb sos-symbol)
                (eq (buffer-modified-tick) sos-source-buffer-tick))
           (progn
-            ;; If return symbol string is equal to `sos-symbol', ask front-ends
-            ;; to do `:update' task.
-            ;; (message "(%s) sos-normal-process: update" (current-time))
-            (setq sos-tips (sos-call-backend backend :tips symb))
+            ;; If return symbol is equal to `sos-symbol', ask front-ends to do
+            ;; `:update' task.
+            ;; TODO: ask backends for more information and pass them to frontends.
             (sos-call-def-win-frontends :update))
         (setq sos-backend backend
-              sos-symbol symb
-              sos-candidates (sos-call-backend backend :candidates symb)
-              sos-tips (sos-call-backend backend :tips symb))
-        (if (and sos-candidates (listp sos-candidates))
-            (progn
-              ;; (message "(%s) sos-normal-process: show" (current-time))
-              (sos-call-def-win-frontends :show))
-          ;; (message "(%s) sos-normal-process: hide" (current-time))
-          (sos-call-def-win-frontends :hide)))))))
+              sos-symbol symb)
+        (let ((candidates (sos-call-backend backend :candidates symb)))
+          (if (and candidates (listp candidates))
+              (sos-call-def-win-frontends :show candidates)
+            (sos-call-def-win-frontends :hide))))))))
 
-(defun sos-call-def-win-frontends (command &rest args)
-  "Iterate all the `sos-backends' and pass `command' by order."
-  (let ((commands (cons command args)))
-    (dolist (frontend sos-definition-window-frontends)
-      (dolist (cmd commands)
-        (funcall frontend cmd)))))
-
-(defun sos-call-backend (backend command &optional arg)
-  "Call certain backend `backend' and pass `command' to it."
-  (funcall backend command arg))
-
-(defun sos-init-backend (backend)
-  (funcall backend :init))
-
-(defun sos-is-multiple-candidates ()
-  (> (length (sos-get-local sos-candidates)) 1))
-
-(defun sos-push-candidates-stack ()
-  (push (sos-get-local sos-candidates) sos-candidates-stack))
-
-(defun sos-pop-candidates-stack ()
-  (pop sos-candidates-stack))
+(defun sos-call-def-win-frontends (command &optional arg)
+  (dolist (frontend sos-definition-window-frontends)
+    (funcall frontend command arg)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Outline Window ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -335,8 +313,43 @@ If you want to skip additional commands, try example:
 ;;;###autoload
 (defun sos-goto-definition ()
   (interactive)
-  ;; TODO:
-  (and (featurep 'history)
-       (his-add-position-type-history)))
+  (if (null sos-backend)
+      (sos-goto-def-1st-process)
+    (sos-goto-def-normal-process sos-backend)))
+
+(defcustom sos-goto-definition-frontends nil
+  "The list of front-ends for the purpose of visualization.
+
+`:show': When the visualization should be showed."
+  :type '(repeat (symbol :tag "Front-end"))
+  :group 'sos-group)
+
+(defun sos-goto-def-1st-process ()
+  (dolist (backend sos-backends)
+    (sos-goto-def-normal-process backend)
+    (if sos-backend
+        (return t))))
+
+(defun sos-goto-def-normal-process (backend)
+  (let ((symb (sos-call-backend backend :symbol)))
+    (cond
+     ;; Return `:stop' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+     ((eq symb :stop)
+      (setq sos-backend backend))
+
+     ;; Return nil ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+     ((null symb))
+
+     ;; Something ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+     (t
+      (setq sos-backend backend)
+      (let ((candidates (sos-call-backend backend :candidates symb)))
+        (when (and candidates (listp candidates))
+          (sos-call-goto-def-frontends :show candidates)))))))
+
+(defun sos-call-goto-def-frontends (command &optional arg)
+  "Iterate all the `sos-backends' and pass `command' by order."
+  (dolist (frontend sos-goto-definition-frontends)
+    (funcall frontend command arg)))
 
 (provide 'sos)
