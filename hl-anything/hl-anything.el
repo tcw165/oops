@@ -24,12 +24,24 @@
 ;; Add the following to your .emacs file:
 ;; (require 'hl-anything)
 ;;
-;; Enable parenethese highlighting.
-;; (hl-paren-mode 1)
+;; Toggle highlighting things at point:
+;;   M-x hl-highlight-thingatpt-local
+;;
+;; Remove all highlights:
+;;   M-x hl-unhighlight-all-local
+;;
+;; Enable parenethese highlighting:
+;;   M-x hl-paren-mode
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;;; Change Log:
+;;
+;; 2014-09-25 (0.0.5)
+;;    1. Highlights won't be blocked behind the current line when `hl-line-mode'
+;;       is enabled.
+;;    2. Smartly select highlighted region.
+;;    3. Highlight words across multiple lines.
 ;;
 ;; 2014-05-25 (0.0.4)
 ;;    Support searching thing. The thing might be a symbol text or a selection text.
@@ -52,176 +64,20 @@
   :group 'faces
   :group 'matching)
 
-;; Parentheses =================================================================
-
-(defun hl--paren-custom-set (symbol value)
-  (dolist (buffer (buffer-list))
-    (with-current-buffer buffer
-      (set symbol value)
-      (when hl-paren-mode
-        (hl-paren-mode -1)
-        (hl-paren-mode 1)))))
-
-(defcustom hl-outward-paren-fg-colors nil
-  "List of colors for the highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
-  :type '(repeat color)
-  :initialize 'custom-initialize-default
-  :set 'hl--paren-custom-set
-  :group 'hl-anything-group)
-
-(defcustom hl-outward-paren-bg-colors '("cyan" "yellow")
-  "List of colors for the background highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
-  :type '(repeat color)
-  :initialize 'custom-initialize-default
-  :set 'hl--paren-custom-set
-  :group 'hl-anything-group)
-
-(defcustom hl-inward-paren-fg-colors nil
-  "List of colors for the highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
-  :type '(repeat color)
-  :initialize 'custom-initialize-default
-  :set 'hl--paren-custom-set
-  :group 'hl-anything-group)
-
-(defcustom hl-inward-paren-bg-colors '("hot pink")
-  "List of colors for the background highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
-  :type '(repeat color)
-  :initialize 'custom-initialize-default
-  :set 'hl--paren-custom-set
-  :group 'hl-anything-group)
-
-(defface hl-paren-face nil
-  "Face used for highlighting parentheses."
-  :group 'hl-anything-group)
-
-(defvar hl--outward-paren-overlays nil
-  "This buffers currently active overlays.")
-(make-variable-buffer-local 'hl--outward-paren-overlays)
-
-(defvar hl--inward-paren-overlays nil
-  "This buffers currently active overlays.")
-(make-variable-buffer-local 'hl--inward-paren-overlays)
-
-(defvar hl--paren-last-point 0
-  "The last point for which parentheses were highlighted. This is used to prevent analyzing the same context over and over.")
-(make-variable-buffer-local 'hl--paren-last-point)
-
-;;;###autoload
-(define-minor-mode hl-paren-mode
-  "Minor mode to highlight the surrounding parentheses."
-  :lighter " hl-p"
-  (hl--paren-destruct-all)
-  (when hl-paren-mode
-    (hl--paren-create-overlays)
-    (add-hook 'post-command-hook 'hl--paren-update nil t)
-    (add-hook 'change-major-mode-hook 'hl--paren-destruct-all nil t)))
-
-(defun hl--paren-create-overlays ()
-  ;; outward overlays.
-  (let ((fg hl-outward-paren-fg-colors)
-        (bg hl-outward-paren-bg-colors)
-        attributes)
-    (while (or fg bg)
-      (setq attributes (face-attr-construct 'hl-paren-face))
-      (when (car fg)
-        (setq attributes (plist-put attributes :foreground (car fg))))
-      (pop fg)
-      (when (car bg)
-        (setq attributes (plist-put attributes :background (car bg))))
-      (pop bg)
-
-      ;; Make pair overlays for every attribute.
-      (dotimes (i 2)
-        (push (make-overlay 0 0) hl--outward-paren-overlays)
-        (overlay-put (car hl--outward-paren-overlays) 'face attributes)))
-    (setq hl--outward-paren-overlays (nreverse hl--outward-paren-overlays)))
-  ;; inward overlays.
-  (let ((fg hl-inward-paren-fg-colors)
-        (bg hl-inward-paren-bg-colors)
-        attributes)
-    (while (or fg bg)
-      (setq attributes (face-attr-construct 'hl-paren-face))
-      (when (car fg)
-        (setq attributes (plist-put attributes :foreground (car fg))))
-      (pop fg)
-      (when (car bg)
-        (setq attributes (plist-put attributes :background (car bg))))
-      (pop bg))
-
-    ;; Make pair overlays for every attribute.
-    (dotimes (i 2)
-      (push (make-overlay 0 0) hl--inward-paren-overlays)
-      (overlay-put (car hl--inward-paren-overlays) 'face attributes))))
-
-(defun hl--paren-update ()
-  "Highlight the parentheses around point."
-  (unless (= (point) hl--paren-last-point)
-    ;; Outward overlays.
-    (setq hl--paren-last-point (point))
-    (let ((overlays hl--outward-paren-overlays)
-          (pos (point))
-          pos1 pos2)
-      (save-excursion
-        (condition-case err
-            (while (and (setq pos1 (cadr (syntax-ppss pos1)))
-                        (cdr overlays))
-              (move-overlay (pop overlays) pos1 (1+ pos1))
-              (when (setq pos2 (scan-sexps pos1 1))
-                (move-overlay (pop overlays) (1- pos2) pos2)))
-          (error nil)))
-      ;; Hide unused overlays.
-      (dolist (ov overlays)
-        (move-overlay ov 1 1)))
-
-    ;; Inward overlays.
-    (let ((overlays hl--inward-paren-overlays)
-          (pos1 (point))
-          pos2)
-      (save-excursion
-        (condition-case err
-            (cond
-             ((and (or (looking-back ")")
-                       (looking-back "]")))
-              ;; TODO: skip comment.
-              (move-overlay (pop overlays) pos1 (1- pos1))
-              (setq pos2 (scan-sexps pos1 -1))
-              (move-overlay (pop overlays) pos2 (1+ pos2)))
-             ((and (or (looking-at "(")
-                       (looking-at "[")))
-              ;; TODO: skip comment.
-              (move-overlay (pop overlays) pos1 (1+ pos1))
-              (setq pos2 (scan-sexps pos1 1))
-              (move-overlay (pop overlays) pos2 (1- pos2))))
-          (error nil)))
-      ;; Hide unused overlays.
-      (dolist (ov overlays)
-        (move-overlay ov 1 1)))))
-
-(defun hl--paren-destruct-all ()
-  (mapc 'delete-overlay hl--outward-paren-overlays)
-  (mapc 'delete-overlay hl--inward-paren-overlays)
-  (kill-local-variable 'hl--outward-paren-overlays)
-  (kill-local-variable 'hl--inward-paren-overlays)
-  (kill-local-variable 'hl--paren-last-point)
-  (remove-hook 'post-command-hook 'hl--paren-update t)
-  (remove-hook 'post-command-hook 'hl--paren-destruct-all t))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Highlight things ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
 (defun hl-highlight-thingatpt ()
-  "Toggle highlighting of the thing at point."
+  "Toggle highlighting globally."
   (interactive)
-  (unless hl-highlight-mode
-    (hl-highlight-mode 1))
   ;; TODO:
-  )
+  (unless hl-highlight-mode
+    (hl-highlight-mode 1)))
 
 ;;;###autoload
 (defun hl-highlight-thingatpt-local ()
-  "Toggle highlighting of the thing at point."
+  "Toggle highlighting locally in the current buffer."
   (interactive)
   (unless hl-highlight-mode
     (hl-highlight-mode 1))
@@ -244,13 +100,13 @@
 (define-minor-mode hl-highlight-mode
   "Provide convenient menu items and tool-bar items for project feature."
   :lighter " Highlight"
-  ;; :global t
+  :global t
   (if hl-highlight-mode
       (progn
-        (add-hook 'pre-command-hook 'hl-highlight-pre-command t t)
-        (add-hook 'post-command-hook 'hl-highlight-post-command t t))
-    (remove-hook 'pre-command-hook 'hl-highlight-pre-command t)
-    (remove-hook 'post-command-hook 'hl-highlight-post-command t)))
+        (add-hook 'pre-command-hook 'hl-highlight-pre-command t nil)
+        (add-hook 'post-command-hook 'hl-highlight-post-command t nil))
+    (remove-hook 'pre-command-hook 'hl-highlight-pre-command nil)
+    (remove-hook 'post-command-hook 'hl-highlight-post-command nil)))
 
 (defcustom hl-fg-colors '("snow"
                           "snow"
@@ -293,17 +149,13 @@ Maybe you'll need it for history and navigation feature."
 (defvar hl-index 0)
 
 (defvar hl-things nil
-  "A things list. The list stores things to be highlighted globally in the 
-buffer. The things's format:
-  ((REGEXP . FACESPEC) ...)")
+  "A global things list. Format: ((REGEXP . FACESPEC) ...)")
 
 (defvar hl-index-local 0)
 (make-variable-buffer-local 'hl-index-local)
 
 (defvar hl-things-local nil
-  "A things list. The list only stores things to be highlighted locally in the 
-buffer. The things's format:
-  ((REGEXP . FACESPEC) ...)")
+  "A local things list. Format: ((REGEXP . FACESPEC) ...)")
 (make-variable-buffer-local 'hl-things-local)
 
 (defvar hl-overlays-local nil)
@@ -312,12 +164,10 @@ buffer. The things's format:
 (defun hl-thingatpt ()
   "Return a list, (REGEXP_STRING BEG END), on which the point is or just string
  of selection."
-  ;; TODO: Use the highlight if point is on it.
   (let ((bound (if mark-active
                    (cons (region-beginning) (region-end))
                  (hl-bounds-of-thingatpt))))
     (when bound
-      ;; TODO: Improve regexp translation in order to support multiple lines.
       (let ((text (regexp-quote
                    (buffer-substring-no-properties (car bound) (cdr bound)))))
         ;; Replace space as "\\s-+"
@@ -329,29 +179,30 @@ buffer. The things's format:
       (bounds-of-thing-at-point 'symbol)))
 
 (defun hl-bounds-of-highlight ()
+  "Return the start and end locations for the highlighted things at point.
+Format: (START . END)"
   (let* ((face (get-text-property (point) 'face))
          org-fg org-bg
          beg end)
-    ;; (message "hl-bounds-of-highlight 0000 %s" face)
     (when (and (not (null face))
-               (not (facep face))
-               (listp face))
+               (not (facep face)))
       (setq org-fg (assoc 'foreground-color face)
             org-bg (assoc 'background-color face))
-      ;; Find beginning.
+      ;; Find beginning locations.
       (save-excursion
         (while (and (not (null face))
-                    (listp face)
+                    (not (facep face))
                     (equal org-fg (assoc 'foreground-color face))
                     (equal org-bg (assoc 'background-color face)))
           (setq beg (point))
           (backward-char)
           (setq face (get-text-property (point) 'face))))
+      ;; Return to original point.
       (setq face (get-text-property (point) 'face))
-      ;; Find end.
+      ;; Find end locations.
       (save-excursion
         (while (and (not (null face))
-                    (listp face)
+                    (not (facep face))
                     (equal org-fg (assoc 'foreground-color face))
                     (equal org-bg (assoc 'background-color face)))
           (forward-char)
@@ -375,7 +226,7 @@ buffer. The things's format:
       (setq facespec (append facespec `((background-color . ,bg)))))
     (font-lock-add-keywords nil `((,thing 0 ',facespec prepend)) 'append)
     (font-lock-fontify-buffer)
-    (message "hl-highlight")))
+    (hl-add-highlight-overlays thing facespec)))
 
 (defun hl-unhighlight (thing &optional local)
   (let* ((keyword (assoc thing (if (eq t (car font-lock-keywords))
@@ -399,26 +250,37 @@ buffer. The things's format:
 (defun hl-is-begin ()
   (not (or (active-minibuffer-window))))
 
-;; `hl-bounds-of-highlight'
-(defun hl-add-highlight-overlays ()
-  (when (or hl-things hl-things-local)
+(defun hl-add-highlight-overlays (&optional thing facespec)
+  (when (and (featurep 'hl-line) hl-line-mode
+             (or hl-things hl-things-local))
     (let ((beg (line-beginning-position))
           (end (line-end-position))
           bound)
       (save-excursion
         (goto-char beg)
-        (message "hl-add-highlight-overlays 1111")
-        (while (<= (point) end)
-          (if (setq bound (hl-bounds-of-highlight))
-              (let* ((overlay (make-overlay (point) (cdr bound)))
-                     (face (get-text-property (point) 'face))
-                     (fg (assoc 'foreground-color face))
-                     (bg (assoc 'background-color face)))
-                (message "hl-add-highlight-overlays 3333")
-                (overlay-put overlay 'face `(,fg ,bg))
-                (push overlay hl-overlays-local)
-                (goto-char (cdr bound)))
-            (forward-char)))))))
+        (if (and thing facespec)
+            ;; If THING and FACESPEC is present, add overlays on the line.
+            ;; It is a workaround:
+            ;; It seems like the text properties are updated only after all the
+            ;; `post-command-hook' were executed. So we have to manually insert
+            ;; overlays when fontification is called at very 1st time.
+            (while (re-search-forward thing end t)
+              (let* ((match-beg (match-beginning 0))
+                     (match-end (match-end 0))
+                     (overlay (make-overlay match-beg match-end)))
+                (overlay-put overlay 'face `(,facespec))
+                (push overlay hl-overlays-local)))
+          ;; Scan every character on the line.
+          (while (<= (point) end)
+            (if (setq bound (hl-bounds-of-highlight))
+                (let* ((overlay (make-overlay (point) (cdr bound)))
+                       (face (get-text-property (point) 'face))
+                       (fg (assoc 'foreground-color face))
+                       (bg (assoc 'background-color face)))
+                  (overlay-put overlay 'face `(,fg ,bg))
+                  (push overlay hl-overlays-local)
+                  (goto-char (cdr bound)))
+              (forward-char))))))))
 
 (defun hl-remove-highlight-overlays ()
   (mapc 'delete-overlay hl-overlays-local)
@@ -462,5 +324,159 @@ buffer. The things's format:
       (setq mark-active t)
       ;; Hook after searching.
       (run-hook-with-args hl-after-find-thing-hook thing))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Parentheses ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun hl-paren-custom-set (symbol value)
+  (dolist (buffer (buffer-list))
+    (with-current-buffer buffer
+      (set symbol value)
+      (when hl-paren-mode
+        (hl-paren-mode -1)
+        (hl-paren-mode 1)))))
+
+(defcustom hl-outward-paren-fg-colors nil
+  "List of colors for the highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
+  :type '(repeat color)
+  :initialize 'custom-initialize-default
+  :set 'hl-paren-custom-set
+  :group 'hl-anything-group)
+
+(defcustom hl-outward-paren-bg-colors '("cyan" "yellow")
+  "List of colors for the background highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
+  :type '(repeat color)
+  :initialize 'custom-initialize-default
+  :set 'hl-paren-custom-set
+  :group 'hl-anything-group)
+
+(defcustom hl-inward-paren-fg-colors nil
+  "List of colors for the highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
+  :type '(repeat color)
+  :initialize 'custom-initialize-default
+  :set 'hl-paren-custom-set
+  :group 'hl-anything-group)
+
+(defcustom hl-inward-paren-bg-colors '("magenta1")
+  "List of colors for the background highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
+  :type '(repeat color)
+  :initialize 'custom-initialize-default
+  :set 'hl-paren-custom-set
+  :group 'hl-anything-group)
+
+(defface hl-paren-face nil
+  "Face used for highlighting parentheses."
+  :group 'hl-anything-group)
+
+(defvar hl--outward-paren-overlays nil
+  "This buffers currently active overlays.")
+(make-variable-buffer-local 'hl--outward-paren-overlays)
+
+(defvar hl--inward-paren-overlays nil
+  "This buffers currently active overlays.")
+(make-variable-buffer-local 'hl--inward-paren-overlays)
+
+(defvar hl--paren-last-point 0
+  "The last point for which parentheses were highlighted. This is used to prevent analyzing the same context over and over.")
+(make-variable-buffer-local 'hl--paren-last-point)
+
+;;;###autoload
+(define-minor-mode hl-paren-mode
+  "Minor mode to highlight the surrounding parentheses."
+  :lighter " hl-p"
+  (hl-remove-parens)
+  (when hl-paren-mode
+    (hl-create-paren-overlays)
+    (add-hook 'post-command-hook 'hl-update-paren-overlays nil t)
+    (add-hook 'change-major-mode-hook 'hl-remove-parens nil t)))
+
+(defun hl-create-paren-overlays ()
+  ;; outward overlays.
+  (let ((fg hl-outward-paren-fg-colors)
+        (bg hl-outward-paren-bg-colors)
+        attributes)
+    (while (or fg bg)
+      (setq attributes (face-attr-construct 'hl-paren-face))
+      (when (car fg)
+        (setq attributes (plist-put attributes :foreground (car fg))))
+      (pop fg)
+      (when (car bg)
+        (setq attributes (plist-put attributes :background (car bg))))
+      (pop bg)
+      ;; Make pair overlays for every attribute.
+      (dotimes (i 2)
+        (push (make-overlay 0 0) hl--outward-paren-overlays)
+        (overlay-put (car hl--outward-paren-overlays) 'face attributes)))
+    (setq hl--outward-paren-overlays (nreverse hl--outward-paren-overlays)))
+  ;; inward overlays.
+  (let ((fg hl-inward-paren-fg-colors)
+        (bg hl-inward-paren-bg-colors)
+        attributes)
+    (while (or fg bg)
+      (setq attributes (face-attr-construct 'hl-paren-face))
+      (when (car fg)
+        (setq attributes (plist-put attributes :foreground (car fg))))
+      (pop fg)
+      (when (car bg)
+        (setq attributes (plist-put attributes :background (car bg))))
+      (pop bg))
+
+    ;; Make pair overlays for every attribute.
+    (dotimes (i 2)
+      (push (make-overlay 0 0) hl--inward-paren-overlays)
+      (overlay-put (car hl--inward-paren-overlays) 'face attributes))))
+
+(defun hl-update-paren-overlays ()
+  "Highlight the parentheses around point."
+  (unless (= (point) hl--paren-last-point)
+    ;; Outward overlays.
+    (setq hl--paren-last-point (point))
+    (let ((overlays hl--outward-paren-overlays)
+          (pos (point))
+          pos1 pos2)
+      (save-excursion
+        (condition-case err
+            (while (and (setq pos1 (cadr (syntax-ppss pos1)))
+                        (cdr overlays))
+              (move-overlay (pop overlays) pos1 (1+ pos1))
+              (when (setq pos2 (scan-sexps pos1 1))
+                (move-overlay (pop overlays) (1- pos2) pos2)))
+          (error nil)))
+      ;; Hide unused overlays.
+      (dolist (ov overlays)
+        (move-overlay ov 1 1)))
+
+    ;; Inward overlays.
+    (let ((overlays hl--inward-paren-overlays)
+          (pos1 (point))
+          pos2)
+      (save-excursion
+        (condition-case err
+            (cond
+             ((and (or (looking-back ")")
+                       (looking-back "]")))
+              ;; TODO: skip comment.
+              (move-overlay (pop overlays) pos1 (1- pos1))
+              (setq pos2 (scan-sexps pos1 -1))
+              (move-overlay (pop overlays) pos2 (1+ pos2)))
+             ((and (or (looking-at "(")
+                       (looking-at "[")))
+              ;; TODO: skip comment.
+              (move-overlay (pop overlays) pos1 (1+ pos1))
+              (setq pos2 (scan-sexps pos1 1))
+              (move-overlay (pop overlays) pos2 (1- pos2))))
+          (error nil)))
+      ;; Hide unused overlays.
+      (dolist (ov overlays)
+        (move-overlay ov 1 1)))))
+
+(defun hl-remove-parens ()
+  (mapc 'delete-overlay hl--outward-paren-overlays)
+  (mapc 'delete-overlay hl--inward-paren-overlays)
+  (kill-local-variable 'hl--outward-paren-overlays)
+  (kill-local-variable 'hl--inward-paren-overlays)
+  (kill-local-variable 'hl--paren-last-point)
+  (remove-hook 'post-command-hook 'hl-update-paren-overlays t)
+  (remove-hook 'post-command-hook 'hl-remove-parens t))
 
 (provide 'hl-anything)
