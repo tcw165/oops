@@ -59,6 +59,16 @@
   (and (window-live-p sos-def-win)
        (setq sos-def-win-height (window-height sos-def-win))))
 
+;;;###autoload
+(defun sos-goto-definition-frontend (command &optional arg)
+  (case command
+    (:show
+     (and (featurep 'history)
+          (his-add-history))
+     (message "%s" arg)
+     (and (featurep 'history)
+          (his-add-history)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Common ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

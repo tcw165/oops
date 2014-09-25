@@ -163,7 +163,7 @@ result to the `sos-def-buf' displayed in the `sos-def-win'."
       (:hide ...)
       (:destroy ...))
 
-### Commands to be called by sos engine:
+### Commands:
 
 `:init': When the visualization should be initialized.
 
@@ -317,10 +317,13 @@ If you want to skip additional commands, try example:
       (sos-goto-def-1st-process)
     (sos-goto-def-normal-process sos-backend)))
 
-(defcustom sos-goto-definition-frontends nil
+(defcustom sos-goto-definition-frontends '(sos-goto-definition-frontend)
   "The list of front-ends for the purpose of visualization.
 
-`:show': When the visualization should be showed."
+### Commands:
+
+`:show': When the visualization should be showed. The 1st argument is the 
+         candidates."
   :type '(repeat (symbol :tag "Front-end"))
   :group 'sos-group)
 
