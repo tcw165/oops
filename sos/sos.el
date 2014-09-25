@@ -116,42 +116,6 @@ Return value will be cached to `sos-candidates'.
   :type '(repeat (symbol :tag "Back-end"))
   :group 'sos-group)
 
-(defvar sos-backend nil
-  "The back-end which takes control of current session in the back-ends list.")
-(make-variable-buffer-local 'sos-backend)
-
-(defvar sos-symbol nil
-  "Cache the return value from back-end with `:symbol' command.")
-(make-variable-buffer-local 'sos-symbol)
-
-(defvar sos-candidates nil
-  "Cache the return value from back-end with `:candidates' command.")
-(make-variable-buffer-local 'sos-candidates)
-
-(defvar sos-index 0
-  "The index of current candidate in the list.")
-(make-variable-buffer-local 'sos-index)
-
-(defvar sos-tips nil
-  "Cache the return value from back-end with `:tips' command.")
-(make-variable-buffer-local 'sos-tips)
-
-(defmacro sos-get-local (symb)
-  "Get buffer-localed variable of source code buffer. e.g. `sos-backend', 
-`sos-symbol', `sos-candidates', `sos-index' and `sos-tips'."
-  `(progn
-     (and sos-source-buffer
-          (with-current-buffer sos-source-buffer
-            ,symb))))
-
-(defmacro sos-set-local (symb value)
-  "Set buffer-localed variable of source code buffer. e.g. `sos-backend', 
-`sos-symbol', `sos-candidates', `sos-index' and `sos-tips'."
-  `(progn
-     (and sos-source-buffer
-          (with-current-buffer sos-source-buffer
-            (setq ,symb ,value)))))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Definition Window ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -209,6 +173,42 @@ result to the `sos-def-buf' displayed in the `sos-def-win'."
 (defvar sos-candidates-stack nil
   "A list containing `sos-candidates'. Engine will push the current candidates 
 into the stack when user navigate to deeper definition in the definition window.")
+
+(defvar sos-backend nil
+  "The back-end which takes control of current session in the back-ends list.")
+(make-variable-buffer-local 'sos-backend)
+
+(defvar sos-symbol nil
+  "Cache the return value from back-end with `:symbol' command.")
+(make-variable-buffer-local 'sos-symbol)
+
+(defvar sos-candidates nil
+  "Cache the return value from back-end with `:candidates' command.")
+(make-variable-buffer-local 'sos-candidates)
+
+(defvar sos-index 0
+  "The index of current candidate in the list.")
+(make-variable-buffer-local 'sos-index)
+
+(defvar sos-tips nil
+  "Cache the return value from back-end with `:tips' command.")
+(make-variable-buffer-local 'sos-tips)
+
+(defmacro sos-get-local (symb)
+  "Get buffer-localed variable of source code buffer. e.g. `sos-backend', 
+`sos-symbol', `sos-candidates', `sos-index' and `sos-tips'."
+  `(progn
+     (and sos-source-buffer
+          (with-current-buffer sos-source-buffer
+            ,symb))))
+
+(defmacro sos-set-local (symb value)
+  "Set buffer-localed variable of source code buffer. e.g. `sos-backend', 
+`sos-symbol', `sos-candidates', `sos-index' and `sos-tips'."
+  `(progn
+     (and sos-source-buffer
+          (with-current-buffer sos-source-buffer
+            (setq ,symb ,value)))))
 
 (defun sos-pre-command ()
   (when sos-timer
