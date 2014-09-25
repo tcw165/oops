@@ -243,7 +243,8 @@ Format: (START . END)"
     (hl-remove-highlight-overlays)
     ;; Highlight.
     (font-lock-remove-keywords nil `(,keyword))
-    (font-lock-fontify-buffer)))
+    (font-lock-fontify-buffer)
+    (hl-remove-highlight-overlays)))
 
 (defun hl-highlight-pre-command ()
   (when (hl-is-begin)
