@@ -117,7 +117,7 @@ The `base' should be a directory string and the `exclude' should be a list that 
 ;; F3
 (global-set-key (kbd "<f3>") 'hl-find-thing-forwardly)
 ;; F4
-(global-set-key (kbd "<f4>") 'oops-jump-to-definition-atpt)
+(global-set-key (kbd "<f4>") 'sos-goto-definition)
 
 ;; Shift + F1
 ;; Shift + F2

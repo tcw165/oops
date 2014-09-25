@@ -65,7 +65,18 @@
     (:show
      (and (featurep 'history)
           (his-add-history))
-     (message "%s" arg)
+     (setq sos-candidates arg)
+     (if (sos-is-multiple-candidates)
+         ;; TODO:
+         (progn
+           (message "yet support multiple definitions!"))
+       (let* ((candidate (nth 0 sos-candidates))
+              (file (plist-get candidate :file))
+              (linum (plist-get candidate :linum)))
+         (when (and (stringp file)
+                    (integerp linum))
+           (find-file-existing file)
+           (goto-line linum))))
      (and (featurep 'history)
           (his-add-history)))))
 
@@ -144,10 +155,6 @@
   '((t (:background "yellow" :weight bold)))
   "Default face for highlighting line in definition window."
   :group 'sos-group)
-
-(defvar sos-hl-overlay nil
-  "The highlight for keyword in `sos-definition-buffer'.")
-(make-variable-buffer-local 'sos-hl-overlay)
 
 (defvar sos-hl-line-overlay nil
   "The highlight for line in `sos-definition-buffer'.")
@@ -234,23 +241,6 @@ into the stack when user navigate to deeper definition in the definition window.
 (defun sos-is-multiple-candidates ()
   (> (length sos-candidates) 1))
 
-(defun sos-hl-word (hl-word)
-  (unless sos-hl-overlay
-    (setq sos-hl-overlay (make-overlay 1 1))
-    (overlay-put sos-hl-overlay 'face 'sos-hl-face))
-  (move-overlay sos-hl-overlay 1 1)
-  (and (stringp hl-word) (> (length hl-word) 0)
-       (if (search-forward hl-word (line-end-position) t)
-           (move-overlay sos-hl-overlay
-                         (- (point) (length hl-word))
-                         (point))
-         (message "Can't find  %s at line %s in the file!"
-                  (propertize (concat "\"" hl-word "\"")
-                              'face 'font-lock-string-face)
-                  (propertize (format "%s" linum)
-                              'face 'font-lock-string-face))))
-  (end-of-line))
-
 (defun sos-header-mode-line ()
   `("  Multiple Definitions | "
     (:eval (when sos-candidates-mode
@@ -317,10 +307,10 @@ Return (FILE . LINUM) struct."
 (defun sos-show-candidate ()
   "Show single candidate prompt."
   (let* ((candidate (nth sos-index sos-candidates))
-         (file (plist-get candidate :file))
          (doc (plist-get candidate :doc))
+         (file (plist-get candidate :file))
          (linum (plist-get candidate :linum))
-         (hl-word (plist-get candidate :hl-word))
+         (keywords (plist-get candidate :keywords))
          (mode-line (plist-get candidate :mode-line))
          (nav-tooltips (and sos-candidates-stack
                             (format "%s to back to options. "
@@ -328,56 +318,41 @@ Return (FILE . LINUM) struct."
                                                 'face 'tooltip))))
          (tooltips (concat mode-line nav-tooltips))
          (button-mode-line (sos-bottom-mode-line tooltips file linum)))
-    (cond
-     ;; A file ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-     ((and (stringp file)
-           (file-exists-p file))
-      (sos-with-definition-buffer
-        (kill-all-local-variables)
-        (remove-overlays)
-        (insert-file-contents file nil nil nil t)
-        ;; Major mode.
-        (fundamental-mode)
+    (sos-with-definition-buffer
+      (kill-all-local-variables)
+      (remove-overlays)
+      (erase-buffer)
+      (insert doc)
+      ;; Major mode.
+      (fundamental-mode)
+      (cond
+       ;; A File ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       ((and (stringp file)
+             (file-exists-p file))
+        ;; Change major-mode refer to file name.
         (dolist (mode auto-mode-alist)
           (and (not (null (cdr mode)))
                (string-match (car mode) file)
-               (funcall (cdr mode))))
-        ;; Minor mode.
-        (sos-candidate-mode 1)
-        (hl-line-unhighlight)
-        ;; Move point and recenter.
-        (and (integerp linum)
-             (goto-char (point-min))
-             (forward-line (- linum 1)))
-        (recenter 3)
-        ;; Highlight word.
-        (sos-hl-word hl-word)
-        ;; Set header line and button line.
-        (setq header-line-format (and sos-candidates-stack
-                                      (sos-header-mode-line))
-              mode-line-format button-mode-line)))
-
-     ;; A document string ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-     ((stringp doc)
-      (sos-with-definition-buffer
-        (erase-buffer)
-        (kill-all-local-variables)
-        (remove-overlays)
-        (insert doc)
-        ;; Major mode.
-        (fundamental-mode)
-        ;; Minor mode.
-        (sos-candidate-mode 1)
-        (hl-line-unhighlight)
-        ;; Highlight word.
-        (goto-char (point-min))
-        (sos-hl-word hl-word)
-        ;; Set header line and button line.
-        (setq header-line-format (and sos-candidates-stack
-                                      (sos-header-mode-line))
-              mode-line-format button-mode-line
-              ;; Hide the cursor.
-              cursor-type nil))))))
+               (funcall (cdr mode)))))
+       ;; A Document ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       (t
+        ))
+      ;; Minor mode.
+      (sos-candidate-mode 1)
+      (hl-line-unhighlight)
+      ;; Highlight word.
+      (when keywords
+        (font-lock-add-keywords nil keywords 'append)
+        (font-lock-fontify-buffer))
+      ;; Move point and recenter.
+      (and (integerp linum)
+           (goto-char (point-min))
+           (forward-line (- linum 1)))
+      (recenter 3)
+      ;; Set header line and button line.
+      (setq header-line-format (and sos-candidates-stack
+                                    (sos-header-mode-line))
+            mode-line-format button-mode-line))))
 
 (defun sos-show-candidates ()
   "Show multiple candidates prompt."
@@ -387,44 +362,50 @@ Return (FILE . LINUM) struct."
     (remove-overlays)
     (erase-buffer)
     (dolist (candidate sos-candidates)
-      (let* ((file (plist-get candidate :file))
+      (let* ((symb (plist-get candidate :symbol))
              (doc (plist-get candidate :doc))
+             (file (plist-get candidate :file))
              (linum (plist-get candidate :linum))
-             (type (plist-get candidate :type))
-             (hl-word (plist-get candidate :hl-word)))
+             (type (plist-get candidate :type)))
         (cond
+         ;; File ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
          (file
-          (insert (format "%s | %s | %s\n"
+          (insert (format "%s | %s | %s | %s\n"
+                          (propertize symb
+                                      'face 'font-lock-function-name-face)
                           (propertize type
                                       'face 'font-lock-string-face)
                           (propertize (number-to-string linum)
                                       'face 'font-lock-constant-face)
                           (propertize file
-                                      'face 'bold))))
-         (doc
+                                      'face 'link))))
+         ;; Document only ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+         (t
           (let* ((end (string-match "\n" doc))
                  (doc-line1 (substring-no-properties doc 0 (or (and (< end 48)
                                                                     end)
                                                                48))))
-            (insert (format "%s | %s | %s\n"
-                            (propertize "document"
+            (insert (format "%s | %s | %s | %s\n"
+                            (propertize symb
+                                        'face 'font-lock-function-name-face)
+                            (propertize type
                                         'face 'font-lock-string-face)
                             (propertize "0"
                                         'face 'font-lock-constant-face)
                             (propertize (concat doc-line1 " ...")
-                                        'face 'bold))))))))
+                                        'face 'font-lock-string-face))))))))
     ;; Alignment.
     (align-region 1 (point-max) 'entire
                   `((sos-multiple-candidates
-                     (regexp . "^\\(\\w\\)+\\s-\|\\s-\\([0-9no]\\)+\\s-\|\\s-\\(.\\)+$")
+                     (regexp . "^\\([- ]\\|\\w\\)+\\s-\|\\s-\\([- ]\\|\\w\\)+\\s-\|\\s-\\([0-9]\\)+\\s-\|\\s-\\(.\\)+$")
                      (group . (1 2 3))))
                   nil)
-    ;; (delete-trailing-whitespace)
     ;; Major mode.
     (fundamental-mode)
     ;; Minor modes.
     (sos-candidates-mode 1)
     (linum-mode 1)
+    ;; TODO: use `hl-line-mode' instead.
     ;; Highlight line.
     (goto-char (point-min))
     (sos-hl-line)
@@ -434,6 +415,7 @@ Return (FILE . LINUM) struct."
                             (format "%s to open it."
                                     (propertize " ENTER "
                                                 'face 'tooltip)))
+          ;; Disable mouse cursor.
           cursor-type nil)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

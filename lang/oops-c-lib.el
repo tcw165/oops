@@ -1,1 +1,0 @@
-(provide 'oops-c-lib)

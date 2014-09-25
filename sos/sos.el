@@ -87,30 +87,49 @@ also tells sos engine don't iterate the following back-ends.
 - Return `:stop' tells sos engine to stop iterating the following back-ends.
 - Return value will be cached to `sos-symbol'.
 
-`:candidates': The back-end should return a $CANDIDATES list or nil.
+`:candidates': The back-end should return a CANDIDATE list or nil.
 Return a list tells sos engine where the definition is and it must be a list
 even if there's only one candidate. It also tells sos engine don't iterate the
 following back-ends.
 Return nil tells sos engine it cannot find any definition and stop iterating
 the following back-ends.
 
- $CANDIDATES format (alist):
- ### If candidate is a file...
- ((:file STRING
-   :linum INTEGER
-   :type STRING
-   :hl-word STRING
-   :mode-line STRING) (...) ...)
+ CANDIDATE is an alist. There are must-have properties and optional properties:
+ ### Must-Have Properties:
+ `:doc': Buffer text which is the file content (buffer-string).
 
- ### If candidate is a document string...
- ((:doc STRING
-   :linum INTEGER
-   :type STRING
-   :hl-word STRING
-   :mode-line STRING) (...) ...)
+ `:linum': The line number (integer).
 
-### Optional commands:
-`:tips': ."
+ `:keywords': Regular expression to highlight keywords, see `font-lock-keywords'.
+              The 1st matcher must be for the symbol definition.
+
+ ### Optional Properties:
+ `:symbol': The symbol's name.
+
+ `:type': The String which describe the symbol.
+
+ `:file': The absolute file path.
+
+ `:show': t indicates front-ends show this CANDIDATE by default.
+
+ `:mode-line': The additional string which will be concatenate to 
+               `mode-line-format'.
+
+   ### Example - File Candidate:
+   ((:symbol STRING
+     :doc BUFFER_STRING
+     :type STRING
+     :file STRING
+     :linum INTEGER
+     :match REGEXP
+     :mode-line STRING) ...)
+
+   ### Example - Document Candidate:
+   ((:symbol STRING
+     :doc BUFFER_STRING
+     :type STRING
+     :linum INTEGER
+     :mode-line STRING) ...)"
   :type '(repeat (symbol :tag "Back-end"))
   :group 'sos-group)
 
@@ -305,7 +324,13 @@ If you want to skip additional commands, try example:
   (if sos-outline-window-mode
       (progn
         nil)
-    nil) )
+    nil))
+
+;;;###autoload
+(defun sos-goto-local-symbol ()
+  (interactive)
+  ;; TODO:
+  )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Go to Definition ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -321,7 +346,6 @@ If you want to skip additional commands, try example:
   "The list of front-ends for the purpose of visualization.
 
 ### Commands:
-
 `:show': When the visualization should be showed. The 1st argument is the 
          candidates."
   :type '(repeat (symbol :tag "Front-end"))

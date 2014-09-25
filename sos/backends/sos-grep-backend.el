@@ -43,7 +43,8 @@
            (beginning-of-line)
            (if (search-forward-regexp "^.+:[0-9]+:" (line-end-position) t)
                ;; Return (FILEPATH . NUM) struct.
-               (let* ((text (buffer-substring-no-properties (line-beginning-position) (- (point) 1)))
+               (let* ((text (buffer-substring-no-properties
+                             (line-beginning-position) (- (point) 1)))
                       (offset (string-match ":[0-9]+$" text))
                       (file (substring text 0 offset))
                       (linum (string-to-int (substring text (1+ offset)))))
@@ -54,9 +55,13 @@
      (let* ((symb arg)
             (file (car symb))
             (linum (cdr symb))
+            ;; TODO:
             (keyword (save-excursion
-                       (search-backward-regexp (concat "^" sos-grep-prefix ".+$") nil t)
-                       (buffer-substring-no-properties (+ (length sos-grep-prefix) (point)) (line-end-position)))))
-       (list `(:file ,file :linum ,linum :hl-word ,keyword))))))
+                       (search-backward-regexp
+                        (concat "^" sos-grep-prefix ".+$") nil t)
+                       (buffer-substring-no-properties
+                        (+ (length sos-grep-prefix) (point))
+                        (line-end-position)))))
+       `((:doc ,doc :file ,file :linum ,linum :keywords ,keywords))))))
 
 (provide 'sos-grep-backend)

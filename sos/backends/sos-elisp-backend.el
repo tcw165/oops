@@ -81,20 +81,24 @@
     (setq file (substring file 0 (match-beginning 1))))
   file)
 
-(defun sos-elisp-count-lines (file name regexp-temp)
-  ;; Open the file in order to get line number (waste way).
+(defun sos-elisp-get-doc&linum (filename symb-name regexp-temp)
   (let ((regexp (format regexp-temp
                         (concat "\\\\?"
-                                (regexp-quote name))))
+                                (regexp-quote symb-name))))
         (case-fold-search nil)
-        (linum 0))
+        (linum 0)
+        doc)
     (with-temp-buffer
-      (insert-file-contents file)
+      ;; Get doc.
+      (when (file-exists-p filename)
+        (insert-file-contents filename)
+        (setq doc (buffer-string)))
+      ;; Get linum.
       (with-syntax-table emacs-lisp-mode-syntax-table
         (goto-char (point-min))
         (when (re-search-forward regexp nil t)
           (setq linum (line-number-at-pos)))))
-    linum))
+    (cons doc linum)))
 
 (defun sos-elisp-find-feature (symb)
   "Return the absolute file name of the Emacs Lisp source of LIBRARY.
@@ -107,8 +111,14 @@ LIBRARY should be a string (the name of the library)."
                      (locate-file name
                                   (or find-function-source-path load-path)
                                   load-file-rep-suffixes)))
-           (linum (sos-elisp-count-lines file name sos-elisp-find-feature-regexp)))
-      `(:file ,file :linum ,linum :type "feature" :hl-word ,name))))
+           (doc&linum (sos-elisp-get-doc&linum file name
+                                               sos-elisp-find-feature-regexp))
+           (doc (car doc&linum))
+           (linum (cdr doc&linum))
+           ;; TODO:
+           (keywords nil))
+      `(:symbol ,name :doc ,doc :type "feature" :file ,file
+                :linum ,linum :keywords ,keywords))))
 
 (defun sos-elisp-find-function (symb)
   "Return the candidate pointing to the definition of `symb'. It was written 
@@ -123,30 +133,39 @@ refer to `find-function-noselect', `find-function-search-for-symbol' and
                          (find-function-advised-original real-symb))
               name (symbol-name real-symb)))
       (if (subrp (symbol-function real-symb))
-          ;; Document struct ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+          ;; Built-in Function ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           (let* ((doc-raw (documentation real-symb t))
                  (data (help-split-fundoc doc-raw real-symb))
                  (usage (car data))
-                 (doc (cdr data)))
+                 (doc (cdr data))
+                 ;; TODO:
+                 (keywords nil))
             (with-temp-buffer
               (setq standard-output (current-buffer))
               (princ usage)
               (terpri)(terpri)
               (princ doc)
-              `(:doc ,(buffer-string) :linum 1 :type "function" :hl-word ,name
-                     :mode-line ,(format "%s is a built-in Elisp function. "
-                                         (propertize (concat " " name " ")
-                                          'face 'tooltip)))))
-        ;; File struct ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+              `(:symbol ,name :doc ,(buffer-string) :type "built-in function"
+                        :linum 1 :keywords ,keywords
+                        :mode-line ,(format "%s is a built-in Elisp function. "
+                                            (propertize name
+                                                        'face 'tooltip)))))
+        ;; Normal Function ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
         (let* ((file (sos-elisp-normalize-path (symbol-file real-symb 'defun)))
-               (linum (sos-elisp-count-lines file name find-function-regexp)))
-          `(:file ,file :linum ,linum :type "function" :hl-word ,name
-                  :mode-line ,(unless (eq real-symb symb)
-                                (format "%s is an alias of %s "
-                                        (propertize (concat " " (symbol-name symb) " ")
-                                                    'face 'tooltip)
-                                        (propertize (concat " " (symbol-name real-symb) " ")
-                                                    'face 'tooltip)))))))))
+               (doc&linum (sos-elisp-get-doc&linum file name
+                                                   find-function-regexp))
+               (doc (car doc&linum))
+               (linum (cdr doc&linum))
+               ;; TODO:
+               (keywords nil))
+          `(:symbol ,name :doc ,doc :type "function" :file ,file
+                    :linum ,linum :keywords ,keywords
+                    :mode-line ,(unless (eq real-symb symb)
+                                  (format "%s is an alias of %s "
+                                          (propertize (symbol-name symb)
+                                                      'face 'tooltip)
+                                          (propertize (symbol-name real-symb)
+                                                      'face 'tooltip)))))))))
 
 (defun sos-elisp-find-variable (symb)
   "Return the candidate pointing to the definition of `symb'. It was written 
@@ -156,12 +175,20 @@ refer to `find-variable-noselect', `find-function-search-for-symbol' and
     (let ((name (symbol-name symb))
           (file (symbol-file symb 'defvar)))
       (if file
-          ;; File struct ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+          ;; Normal Variable ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           (let* ((file (sos-elisp-normalize-path file))
-                 (linum (sos-elisp-count-lines file name find-variable-regexp)))
-            `(:file ,file :linum ,linum :type "variable" :hl-word ,name))
-        ;; Document struct ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                 (doc&linum (sos-elisp-get-doc&linum file name
+                                                     find-variable-regexp))
+                 (doc (car doc&linum))
+                 (linum (cdr doc&linum))
+                 ;; TODO:
+                 (keywords nil))
+            `(:symbol ,name :doc ,doc :type "variable" :file ,file
+                :linum ,linum :keywords ,keywords))
+        ;; Built-in Variable ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
         (let ((doc (documentation-property symb 'variable-documentation))
+              ;; TODO:
+              (keywords nil)
               val locus)
           (when doc
             (with-selected-frame (selected-frame)
@@ -252,8 +279,9 @@ file-local variable.\n")
                            (format "`%s'.\n" safe-var))))
                 (and extra-line (terpri)))
               (princ (format "Documentation:\n%s" doc))
-              `(:doc ,(buffer-string) :linum 1 :type "variable" :hl-word ,name
-                     :mode-line ,(format "%s is a built-in Elisp variable."
+              `(:symbol ,name :doc ,(buffer-string) :type "built-in variable"
+                        :linum 1 :keywords ,keywords
+                        :mode-line ,(format "%s is a built-in Elisp variable."
                                          (propertize name 'face 'link))))))))))
 
 (defun sos-elisp-find-let-variable (symb)
@@ -262,10 +290,15 @@ file-local variable.\n")
 
 (defun sos-elisp-find-face (symb)
   (ignore-errors
-    (let* ((file (symbol-file symb 'defface))
-           (name (symbol-name symb))
-           (file (sos-elisp-normalize-path file))
-           (linum (sos-elisp-count-lines file name find-face-regexp)))
-      `(:file ,file :linum ,linum :type "face" :hl-word ,name))))
+    (let* ((name (symbol-name symb))
+           (file (sos-elisp-normalize-path (symbol-file symb 'defface)))
+           (doc&linum (sos-elisp-get-doc&linum file name
+                                               find-face-regexp))
+           (doc (car doc&linum))
+           (linum (cdr doc&linum))
+           ;; TODO:
+           (keywords nil))
+      `(:symbol ,name :doc ,doc :type "face" :file ,file
+                :linum ,linum :keywords ,keywords))))
 
 (provide 'sos-elisp-backend)
