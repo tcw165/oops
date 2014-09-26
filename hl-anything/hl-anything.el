@@ -99,6 +99,10 @@
 ;;;###autoload
 (defun hl-highlight-keywords-local (keywords)
   ;; TODO:
+  ;; (when keywords
+  ;;   (if (assoc str hl-things-local)
+  ;;       (hl-unhighlight keywords t)
+  ;;     (hl-highlight keywords t)))
   )
 
 ;;;###autoload
