@@ -107,6 +107,22 @@
           (setq linum (line-number-at-pos)))))
     `(,doc ,linum ((,regexp 1 'sos-hl-symbol-face prepend)))))
 
+(defun sos-elisp-function-document-keywords (usage)
+  (when usage
+    (let ((regexp (concat "^\\(?1:" (regexp-quote usage) "\\)$"))
+          keyword keywords)
+      (setq keyword `((,regexp 1 'sos-hl-symbol-face prepend))
+            keywords (append keywords keyword))
+      keywords)))
+
+(defun sos-elisp-variable-document-keywords (name)
+  (when name
+    (let* ((regexp (concat "^\\(?1:" name "\\)$"))
+           keyword keywords)
+      (setq keyword `((,regexp 1 'sos-hl-symbol-face prepend))
+            keywords (append keywords keyword))
+      keywords)))
+
 (defun sos-elisp-find-feature (symb)
   "Return the absolute file name of the Emacs Lisp source of LIBRARY.
 LIBRARY should be a string (the name of the library)."
@@ -144,8 +160,7 @@ refer to `find-function-noselect', `find-function-search-for-symbol' and
                  (data (help-split-fundoc doc-raw real-symb))
                  (usage (car data))
                  (doc (cdr data))
-                 ;; TODO:
-                 (keywords nil))
+                 (keywords (sos-elisp-function-document-keywords usage)))
             (with-temp-buffer
               (setq standard-output (current-buffer))
               (princ usage)
@@ -190,10 +205,9 @@ refer to `find-variable-noselect', `find-function-search-for-symbol' and
             `(:symbol ,name :doc ,doc :type "variable" :file ,file
                 :linum ,linum :keywords ,keywords))
         ;; Built-in Variable ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-        (let ((doc (documentation-property symb 'variable-documentation))
-              ;; TODO:
-              (keywords nil)
-              val locus)
+        (let* ((doc (documentation-property symb 'variable-documentation))
+               (keywords (sos-elisp-variable-document-keywords name))
+               val locus)
           (when doc
             (with-selected-frame (selected-frame)
               (with-current-buffer (current-buffer)

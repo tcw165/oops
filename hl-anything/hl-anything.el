@@ -265,15 +265,19 @@ Format: (START . END)"
     (hl-add-highlight-overlays regexp facespec)))
 
 (defun hl-unhighlight-internal (regexp &optional local)
-  (let* ((keyword (assoc regexp (if (eq t (car font-lock-keywords))
-                                    (cadr font-lock-keywords)
-                                  font-lock-keywords))))
+  (let* ((keyword (hl-is-font-lock-keywords regexp)))
     (setq hl-things-local (delete regexp hl-things-local))
     (hl-remove-highlight-overlays)
     ;; Unhighlight.
-    (font-lock-remove-keywords nil `(,keyword))
+    (while (setq keyword (hl-is-font-lock-keywords regexp))
+      (font-lock-remove-keywords nil `(,keyword)))
     (font-lock-fontify-buffer)
     (hl-remove-highlight-overlays)))
+
+(defun hl-is-font-lock-keywords (regexp)
+  (assoc regexp (if (eq t (car font-lock-keywords))
+                    (cadr font-lock-keywords)
+                  font-lock-keywords)))
 
 (defun hl-highlight-pre-command ()
   (when (hl-is-begin)

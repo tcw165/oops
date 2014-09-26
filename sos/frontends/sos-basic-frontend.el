@@ -340,12 +340,12 @@ Return (FILE . LINUM) struct."
                (string-match (car mode) file)
                (funcall (cdr mode)))))
        ;; A Document ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-       (t
-        ))
+       (t))
       ;; Minor mode.
       (sos-candidate-mode 1)
       (hl-line-unhighlight)
       ;; Highlight word. Try to use `hl-anything' feature or simply fontification.
+      ;; Use `hl-anything' to avoid highlight being blocked by `hl-line-mode'.
       (when keywords
         (cond
          ((and (featurep 'hl-anything)
@@ -356,10 +356,10 @@ Return (FILE . LINUM) struct."
           (font-lock-add-keywords nil keywords 'append)
           (font-lock-fontify-buffer))))
       ;; Move point and recenter.
-      (and (integerp linum)
-           (goto-char (point-min))
-           (forward-line (- linum 1)))
-      (recenter 3)
+      (when (integerp linum)
+        (goto-char (point-min))
+        (forward-line (- linum 1))
+        (recenter 3))
       ;; Set header line and button line.
       (setq header-line-format (and sos-candidates-stack
                                     (sos-header-mode-line))
