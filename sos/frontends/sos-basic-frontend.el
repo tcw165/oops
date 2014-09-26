@@ -151,10 +151,42 @@
   "Default face for highlighting keyword in definition window."
   :group 'sos-group)
 
+(defun sos-hl-symbol-face ()
+  "Concatenate (background-color . COLOR) and (foreground-color. COLOR) in order
+ to prevent to being blocked by `hl-line-mode'."
+  (let* ((fg (face-attribute 'sos-hl-symbol-face :foreground))
+         (bg (face-attribute 'sos-hl-symbol-face :background))
+         facespec)
+    (when fg
+      (setq facespec
+            (append facespec `((foreground-color . ,fg)))))
+    (when bg
+      (setq facespec
+            (append facespec `((background-color . ,bg)))))
+    (setq facespec
+          (append facespec (list 'sos-hl-symbol-face)))
+    facespec))
+
 (defface sos-hl-symbol-parameter-face
   '((t (:background "green" :foreground "black" :weight bold)))
   "Default face for highlighting keyword in definition window."
   :group 'sos-group)
+
+(defun sos-hl-symbol-parameter-face ()
+  "Concatenate (background-color . COLOR) and (foreground-color. COLOR) in order
+ to prevent to being blocked by `hl-line-mode'."
+  (let* ((fg (face-attribute 'sos-hl-symbol-parameter-face :foreground))
+         (bg (face-attribute 'sos-hl-symbol-parameter-face :background))
+         facespec)
+    (when fg
+      (setq facespec
+            (append facespec `((foreground-color . ,fg)))))
+    (when bg
+      (setq facespec
+            (append facespec `((background-color . ,bg)))))
+    (setq facespec
+          (append facespec (list 'sos-hl-symbol-parameter-face)))
+    facespec))
 
 (defface sos-hl-line-face
   '((t (:background "yellow" :weight bold)))
@@ -344,21 +376,14 @@ Return (FILE . LINUM) struct."
       ;; Minor mode.
       (sos-candidate-mode 1)
       (hl-line-unhighlight)
-      ;; Highlight word if there's a `:keywords' attribute; Highlight line instead
-      ;; if there's not.
-      ;; Highlight word: Try to use `hl-anything' feature or simply fontification.
-      ;; Use `hl-anything' to avoid highlight being blocked by `hl-line-mode'.
-      (if keywords
-          (cond
-           ((and (featurep 'hl-anything)
-                 (listp keywords))
-            (dolist (keyword keywords)
-              (hl-highlight-keyword-local keyword)))
-           (t
-            (font-lock-add-keywords nil keywords 'append)
-            (font-lock-fontify-buffer)))
-        ;; TODO:
-        )
+      ;; Highlight word.
+      (when keywords
+        (font-lock-add-keywords nil keywords 'append)
+        (font-lock-fontify-buffer)
+        ;; Use `hl-highlight-mode' to prevent highlights to being blocked.
+        (when (featurep 'hl-anything)
+          (setq hl-is-always-overlays-local t)
+          (hl-highlight-mode 1)))
       ;; Move point and recenter.
       (when (integerp linum)
         (goto-char (point-min))

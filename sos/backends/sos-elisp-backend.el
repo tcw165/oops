@@ -49,6 +49,7 @@
                              (sos-elisp-find-face symb)
                              (sos-elisp-find-variable symb)
                              (sos-elisp-find-function symb)
+                             (sos-elisp-find-function-parameter symb)
                              (sos-elisp-find-let-variable symb)))
            (and cand
                 (push cand candidates)))
@@ -105,13 +106,14 @@
         (goto-char (point-min))
         (when (re-search-forward regexp nil t)
           (setq linum (line-number-at-pos)))))
-    `(,doc ,linum ((,regexp 1 'sos-hl-symbol-face prepend)))))
+    ;; document string + line number + keywords.
+    `(,doc ,linum ((,regexp 1 ',(sos-hl-symbol-face) prepend)))))
 
 (defun sos-elisp-function-document-keywords (usage)
   (when usage
     (let ((regexp (concat "^\\(?1:" (regexp-quote usage) "\\)$"))
           keyword keywords)
-      (setq keyword `((,regexp 1 'sos-hl-symbol-face prepend))
+      (setq keyword `((,regexp 1 ',(sos-hl-symbol-face) prepend))
             keywords (append keywords keyword))
       keywords)))
 
@@ -119,7 +121,7 @@
   (when name
     (let* ((regexp (concat "^\\(?1:" name "\\)$"))
            keyword keywords)
-      (setq keyword `((,regexp 1 'sos-hl-symbol-face prepend))
+      (setq keyword `((,regexp 1 ',(sos-hl-symbol-face) prepend))
             keywords (append keywords keyword))
       keywords)))
 
@@ -303,6 +305,10 @@ file-local variable.\n")
                                          (propertize name 'face 'link))))))))))
 
 (defun sos-elisp-find-let-variable (symb)
+  ;; TODO: implement it.
+  )
+
+(defun sos-elisp-find-function-parameter (symb)
   ;; TODO: implement it.
   )
 

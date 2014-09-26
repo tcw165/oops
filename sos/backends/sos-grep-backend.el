@@ -59,14 +59,13 @@
                    (when (file-exists-p file)
                      (insert-file-contents file)
                      (buffer-string))))
-            ;; TODO:
-            ;; (keyword (save-excursion
-            ;;            (search-backward-regexp
-            ;;             (concat "^" sos-grep-prefix ".+$") nil t)
-            ;;            (buffer-substring-no-properties
-            ;;             (+ (length sos-grep-prefix) (point))
-            ;;             (line-end-position))))
-            keywords)
+            (match (save-excursion
+                     (search-backward-regexp
+                      (concat "^" sos-grep-prefix ".+$") nil t)
+                     (buffer-substring-no-properties
+                      (+ (length sos-grep-prefix) (point))
+                      (line-end-position))))
+            (keywords `((,match 0 'sos-hl-symbol-face prepend))))
        `((:doc ,doc :file ,file :linum ,linum :keywords ,keywords))))))
 
 (provide 'sos-grep-backend)

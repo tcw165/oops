@@ -72,8 +72,7 @@
   "Toggle highlighting globally."
   (interactive)
   ;; TODO:
-  (unless hl-highlight-mode
-    (hl-highlight-mode 1)))
+  )
 
 ;;;###autoload
 (defun hl-highlight-thingatpt-local ()
@@ -97,50 +96,20 @@
   (setq hl-index-local 0))
 
 ;;;###autoload
-(defun hl-highlight-keyword-local (keyword)
-  "KEYWORD must be form of (MATCHER . SUBEXP-HIGHLIGHTER). 
-See `font-lock-keywords'."
-  (unless hl-highlight-mode
-    (hl-highlight-mode 1))
-  (when (and keyword
-             (listp keyword)
-             (stringp (car keyword))
-             (integerp (nth 1 keyword))
-             (facep (cadr (nth 2 keyword))))
-    (let* ((regexp (car keyword))
-           (subexp (nth 1 keyword))
-           (face (nth 2 keyword))
-           (fg `((foreground-color . ,(face-attribute
-                                       (cadr face)
-                                       :foreground))))
-           (bg `((background-color . ,(face-attribute
-                                       (cadr face)
-                                       :background)))))
-      (if (member regexp hl-things-local)
-          (hl-unhighlight-internal regexp t)
-        (push regexp hl-things-local)
-        (font-lock-add-keywords nil `(,keyword) 'append)
-        (when fg
-          (font-lock-add-keywords nil `((,regexp ,subexp ',fg prepend)) 'append))
-        (when bg
-          (font-lock-add-keywords nil `((,regexp ,subexp ',bg prepend)) 'append))
-        (font-lock-fontify-buffer)))))
-
-;;;###autoload
 (defun hl-highlight-line (linum &optional facespec)
+  ;; TODO:
   )
 
 ;;;###autoload
 (define-minor-mode hl-highlight-mode
   "Provide convenient menu items and tool-bar items for project feature."
   :lighter " Highlight"
-  :global t
   (if hl-highlight-mode
       (progn
-        (add-hook 'pre-command-hook 'hl-highlight-pre-command t nil)
-        (add-hook 'post-command-hook 'hl-highlight-post-command t nil))
-    (remove-hook 'pre-command-hook 'hl-highlight-pre-command nil)
-    (remove-hook 'post-command-hook 'hl-highlight-post-command nil)))
+        (add-hook 'pre-command-hook 'hl-highlight-pre-command t t)
+        (add-hook 'post-command-hook 'hl-highlight-post-command t t))
+    (remove-hook 'pre-command-hook 'hl-highlight-pre-command t)
+    (remove-hook 'post-command-hook 'hl-highlight-post-command t)))
 
 (defcustom hl-fg-colors '("snow"
                           "snow"
@@ -198,8 +167,14 @@ Maybe you'll need it for history and navigation feature."
   "A local things list. Format: (REGEXP1 REGEXP2 ...)")
 (make-variable-buffer-local 'hl-things-local)
 
-(defvar hl-overlays-local nil)
+(defvar hl-overlays-local nil
+  "Overlays for highlighted things. Prevent them to being hide by 
+`hl-line-mode'.")
 (make-variable-buffer-local 'hl-overlays-local)
+
+(defvar hl-is-always-overlays-local nil
+  "Force to create `hl-overlays-local' overlays.")
+(make-variable-buffer-local 'hl-is-always-overlays-local)
 
 (defun hl-thingatpt ()
   "Return a list, (REGEXP_STRING BEG END), on which the point is or just string
@@ -297,8 +272,9 @@ Format: (START . END)"
                                 right-char)))))
 
 (defun hl-add-highlight-overlays (&optional regexp facespec)
-  (when (and (featurep 'hl-line) hl-line-mode
-             (or hl-things hl-things-local))
+  (when (or (and (featurep 'hl-line) hl-line-mode
+                 (or hl-things hl-things-local))
+            hl-is-always-overlays-local)
     (let ((beg (line-beginning-position))
           (end (line-end-position))
           bound)
