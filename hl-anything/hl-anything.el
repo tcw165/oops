@@ -127,6 +127,10 @@ See `font-lock-keywords'."
         (font-lock-fontify-buffer)))))
 
 ;;;###autoload
+(defun hl-highlight-line (linum &optional facespec)
+  )
+
+;;;###autoload
 (define-minor-mode hl-highlight-mode
   "Provide convenient menu items and tool-bar items for project feature."
   :lighter " Highlight"
@@ -378,30 +382,32 @@ Format: (START . END)"
         (hl-paren-mode -1)
         (hl-paren-mode 1)))))
 
-(defcustom hl-outward-paren-fg-colors nil
+(defcustom hl-outward-paren-fg-colors '("black"
+                                        "black")
   "List of colors for the highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
   :type '(repeat color)
   :initialize 'custom-initialize-default
   :set 'hl-paren-custom-set
   :group 'hl-anything-group)
 
-(defcustom hl-outward-paren-bg-colors '("cyan" "yellow")
+(defcustom hl-outward-paren-bg-colors '("cyan"
+                                        "gold")
   "List of colors for the background highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
   :type '(repeat color)
   :initialize 'custom-initialize-default
   :set 'hl-paren-custom-set
   :group 'hl-anything-group)
 
-(defcustom hl-inward-paren-fg-colors nil
-  "List of colors for the highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
-  :type '(repeat color)
+(defcustom hl-inward-paren-fg-color "snow"
+  "List of colors for the background highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
+  :type 'color
   :initialize 'custom-initialize-default
   :set 'hl-paren-custom-set
   :group 'hl-anything-group)
 
-(defcustom hl-inward-paren-bg-colors '("magenta1")
+(defcustom hl-inward-paren-bg-color "magenta1"
   "List of colors for the background highlighted parentheses. The list starts with the the inside parentheses and moves outwards."
-  :type '(repeat color)
+  :type 'color
   :initialize 'custom-initialize-default
   :set 'hl-paren-custom-set
   :group 'hl-anything-group)
@@ -410,115 +416,110 @@ Format: (START . END)"
   "Face used for highlighting parentheses."
   :group 'hl-anything-group)
 
-(defvar hl--outward-paren-overlays nil
-  "This buffers currently active overlays.")
-(make-variable-buffer-local 'hl--outward-paren-overlays)
+(defvar hl-paren-timer nil)
 
-(defvar hl--inward-paren-overlays nil
+(defvar hl-outward-parens nil
   "This buffers currently active overlays.")
-(make-variable-buffer-local 'hl--inward-paren-overlays)
+(make-variable-buffer-local 'hl-outward-parens)
 
-(defvar hl--paren-last-point 0
-  "The last point for which parentheses were highlighted. This is used to prevent analyzing the same context over and over.")
-(make-variable-buffer-local 'hl--paren-last-point)
+(defvar hl-inward-parens nil
+  "This buffers currently active overlays.")
+(make-variable-buffer-local 'hl-inward-parens)
 
 ;;;###autoload
 (define-minor-mode hl-paren-mode
   "Minor mode to highlight the surrounding parentheses."
   :lighter " hl-p"
-  (hl-remove-parens)
-  (when hl-paren-mode
-    (hl-create-paren-overlays)
-    (add-hook 'post-command-hook 'hl-update-paren-overlays nil t)
-    (add-hook 'change-major-mode-hook 'hl-remove-parens nil t)))
+  (if hl-paren-mode
+      (progn
+        (add-hook 'pre-command-hook 'hl-remove-parens nil t)
+        (add-hook 'post-command-hook 'hl-paren-idle-begin nil t))
+    (remove-hook 'pre-command-hook 'hl-remove-parens t)
+    (remove-hook 'post-command-hook 'hl-paren-idle-begin t)))
 
-(defun hl-create-paren-overlays ()
-  ;; outward overlays.
-  (let ((fg hl-outward-paren-fg-colors)
-        (bg hl-outward-paren-bg-colors)
-        attributes)
-    (while (or fg bg)
-      (setq attributes (face-attr-construct 'hl-paren-face))
-      (when (car fg)
-        (setq attributes (plist-put attributes :foreground (car fg))))
-      (pop fg)
-      (when (car bg)
-        (setq attributes (plist-put attributes :background (car bg))))
-      (pop bg)
-      ;; Make pair overlays for every attribute.
-      (dotimes (i 2)
-        (push (make-overlay 0 0) hl--outward-paren-overlays)
-        (overlay-put (car hl--outward-paren-overlays) 'face attributes)))
-    (setq hl--outward-paren-overlays (nreverse hl--outward-paren-overlays)))
-  ;; inward overlays.
-  (let ((fg hl-inward-paren-fg-colors)
-        (bg hl-inward-paren-bg-colors)
-        attributes)
-    (while (or fg bg)
-      (setq attributes (face-attr-construct 'hl-paren-face))
-      (when (car fg)
-        (setq attributes (plist-put attributes :foreground (car fg))))
-      (pop fg)
-      (when (car bg)
-        (setq attributes (plist-put attributes :background (car bg))))
-      (pop bg))
+(defun hl-paren-idle-begin ()
+  (when (hl-paren-is-begin)
+    (setq hl-paren-timer (run-with-timer 0 nil 'hl-create-parens))))
 
-    ;; Make pair overlays for every attribute.
-    (dotimes (i 2)
-      (push (make-overlay 0 0) hl--inward-paren-overlays)
-      (overlay-put (car hl--inward-paren-overlays) 'face attributes))))
+(defun hl-paren-is-begin ()
+  (not (or (active-minibuffer-window))))
 
-(defun hl-update-paren-overlays ()
+(defun hl-create-parens ()
   "Highlight the parentheses around point."
-  (unless (= (point) hl--paren-last-point)
+  (unless (memq (get-text-property (point) 'face)
+                '(font-lock-comment-face
+                  font-lock-string-face))
+    (hl-create-parens-internal)
     ;; Outward overlays.
-    (setq hl--paren-last-point (point))
-    (let ((overlays hl--outward-paren-overlays)
-          (pos (point))
-          pos1 pos2)
+    (let ((overlays hl-outward-parens))
       (save-excursion
         (condition-case err
-            (while (and (setq pos1 (cadr (syntax-ppss pos1)))
-                        (cdr overlays))
-              (move-overlay (pop overlays) pos1 (1+ pos1))
-              (when (setq pos2 (scan-sexps pos1 1))
-                (move-overlay (pop overlays) (1- pos2) pos2)))
+            (while overlays
+              (up-list -1)
+              (move-overlay (pop overlays) (point) (1+ (point)))
+              (forward-sexp)
+              (move-overlay (pop overlays) (1- (point)) (point)))
           (error nil)))
       ;; Hide unused overlays.
-      (dolist (ov overlays)
-        (move-overlay ov 1 1)))
-
+      (dolist (overlay overlays)
+        (move-overlay overlay 1 1)))
     ;; Inward overlays.
-    (let ((overlays hl--inward-paren-overlays)
-          (pos1 (point))
-          pos2)
+    (let ((overlays hl-inward-parens))
       (save-excursion
         (condition-case err
             (cond
-             ((and (or (looking-back ")")
-                       (looking-back "]")))
-              ;; TODO: skip comment.
-              (move-overlay (pop overlays) pos1 (1- pos1))
-              (setq pos2 (scan-sexps pos1 -1))
-              (move-overlay (pop overlays) pos2 (1+ pos2)))
-             ((and (or (looking-at "(")
-                       (looking-at "[")))
-              ;; TODO: skip comment.
-              (move-overlay (pop overlays) pos1 (1+ pos1))
-              (setq pos2 (scan-sexps pos1 1))
-              (move-overlay (pop overlays) pos2 (1- pos2))))
-          (error nil)))
-      ;; Hide unused overlays.
-      (dolist (ov overlays)
-        (move-overlay ov 1 1)))))
+             ;; Open parenthesis ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+             ((eq ?\( (char-syntax (char-after)))
+              (move-overlay (pop overlays) (point) (1+ (point)))
+              (forward-sexp)
+              (move-overlay (pop overlays) (1- (point)) (point)))
+             ;; Close parenthesis ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+             ((eq ?\) (char-syntax (char-before)))
+              (move-overlay (pop overlays) (1- (point)) (point))
+              (backward-sexp)
+              (move-overlay (pop overlays) (point) (1+ (point)))))
+          (error nil))))))
+
+(defun hl-create-parens-internal ()
+  ;; outward overlays.
+  (unless hl-outward-parens
+    (let ((fg hl-outward-paren-fg-colors)
+          (bg hl-outward-paren-bg-colors))
+      (while (or fg bg)
+        (let (facespec)
+          (when fg
+            (setq facespec (append facespec `((foreground-color . ,(car fg))))))
+          (pop fg)
+          (when bg
+            (setq facespec (append facespec `((background-color . ,(car bg))))))
+          (pop bg)
+          ;; Make pair overlays.
+          (dotimes (i 2)
+            (push (make-overlay 0 0) hl-outward-parens)
+            (overlay-put (car hl-outward-parens) 'face facespec))))
+      (setq hl-outward-parens (reverse hl-outward-parens))))
+  ;; inward overlays.
+  (unless hl-inward-parens
+    (let ((fg hl-inward-paren-fg-color)
+          (bg hl-inward-paren-bg-color)
+          facespec)
+      (when fg
+        (setq facespec (append facespec `((foreground-color . ,fg)))))
+      (when bg
+        (setq facespec (append facespec `((background-color . ,bg)))))
+      ;; Make pair overlays.
+      (dotimes (i 2)
+        (push (make-overlay 0 0) hl-inward-parens)
+        (overlay-put (car hl-inward-parens) 'face facespec)))))
 
 (defun hl-remove-parens ()
-  (mapc 'delete-overlay hl--outward-paren-overlays)
-  (mapc 'delete-overlay hl--inward-paren-overlays)
-  (kill-local-variable 'hl--outward-paren-overlays)
-  (kill-local-variable 'hl--inward-paren-overlays)
-  (kill-local-variable 'hl--paren-last-point)
-  (remove-hook 'post-command-hook 'hl-update-paren-overlays t)
-  (remove-hook 'post-command-hook 'hl-remove-parens t))
+  (when (hl-paren-is-begin)
+    (when hl-paren-timer
+      (cancel-timer hl-paren-timer)
+      (setq hl-paren-timer nil))
+    (mapc 'delete-overlay hl-outward-parens)
+    (mapc 'delete-overlay hl-inward-parens)
+    (mapc 'kill-local-variable '(hl-outward-parens
+                                 hl-inward-parens))))
 
 (provide 'hl-anything)

@@ -344,21 +344,26 @@ Return (FILE . LINUM) struct."
       ;; Minor mode.
       (sos-candidate-mode 1)
       (hl-line-unhighlight)
-      ;; Highlight word. Try to use `hl-anything' feature or simply fontification.
+      ;; Highlight word if there's a `:keywords' attribute; Highlight line instead
+      ;; if there's not.
+      ;; Highlight word: Try to use `hl-anything' feature or simply fontification.
       ;; Use `hl-anything' to avoid highlight being blocked by `hl-line-mode'.
-      (when keywords
-        (cond
-         ((and (featurep 'hl-anything)
-               (listp keywords))
-          (dolist (keyword keywords)
-            (hl-highlight-keyword-local keyword)))
-         (t
-          (font-lock-add-keywords nil keywords 'append)
-          (font-lock-fontify-buffer))))
+      (if keywords
+          (cond
+           ((and (featurep 'hl-anything)
+                 (listp keywords))
+            (dolist (keyword keywords)
+              (hl-highlight-keyword-local keyword)))
+           (t
+            (font-lock-add-keywords nil keywords 'append)
+            (font-lock-fontify-buffer)))
+        ;; TODO:
+        )
       ;; Move point and recenter.
       (when (integerp linum)
         (goto-char (point-min))
         (forward-line (- linum 1))
+        (end-of-line)
         (recenter 3))
       ;; Set header line and button line.
       (setq header-line-format (and sos-candidates-stack
