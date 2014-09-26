@@ -44,7 +44,7 @@
 ;;    3. Highlight words across multiple lines.
 ;;
 ;; 2014-05-25 (0.0.4)
-;;    Support searching thing. The thing might be a symbol text or a selection text.
+;;    Support searching thing. The regexp might be a symbol text or a selection text.
 ;;
 ;; 2014-05-20 (0.0.3)
 ;;    Support one inward parentheses highlight.
@@ -82,28 +82,49 @@
   (unless hl-highlight-mode
     (hl-highlight-mode 1))
   (let* ((thing (hl-thingatpt))
-         (str (car thing)))
+         (regexp (car thing)))
     (when thing
-      (if (assoc str hl-things-local)
-          (hl-unhighlight str t)
-        (hl-highlight str t)))))
+      (if (member regexp hl-things-local)
+          (hl-unhighlight-internal regexp t)
+        (hl-highlight-internal regexp t)))))
 
 ;;;###autoload
 (defun hl-unhighlight-all-local ()
   "Remove all the highlights in buffer."
   (interactive)
-  (dolist (thing hl-things-local)
-    (hl-unhighlight (car thing) t))
+  (dolist (regexp hl-things-local)
+    (hl-unhighlight-internal regexp t))
   (setq hl-index-local 0))
 
 ;;;###autoload
-(defun hl-highlight-keywords-local (keywords)
-  ;; TODO:
-  ;; (when keywords
-  ;;   (if (assoc str hl-things-local)
-  ;;       (hl-unhighlight keywords t)
-  ;;     (hl-highlight keywords t)))
-  )
+(defun hl-highlight-keyword-local (keyword)
+  "KEYWORD must be form of (MATCHER . SUBEXP-HIGHLIGHTER). 
+See `font-lock-keywords'."
+  (unless hl-highlight-mode
+    (hl-highlight-mode 1))
+  (when (and keyword
+             (listp keyword)
+             (stringp (car keyword))
+             (integerp (nth 1 keyword))
+             (facep (cadr (nth 2 keyword))))
+    (let* ((regexp (car keyword))
+           (subexp (nth 1 keyword))
+           (face (nth 2 keyword))
+           (fg `((foreground-color . ,(face-attribute
+                                       (cadr face)
+                                       :foreground))))
+           (bg `((background-color . ,(face-attribute
+                                       (cadr face)
+                                       :background)))))
+      (if (member regexp hl-things-local)
+          (hl-unhighlight-internal regexp t)
+        (push regexp hl-things-local)
+        (font-lock-add-keywords nil `(,keyword) 'append)
+        (when fg
+          (font-lock-add-keywords nil `((,regexp ,subexp ',fg prepend)) 'append))
+        (when bg
+          (font-lock-add-keywords nil `((,regexp ,subexp ',bg prepend)) 'append))
+        (font-lock-fontify-buffer)))))
 
 ;;;###autoload
 (define-minor-mode hl-highlight-mode
@@ -170,7 +191,7 @@ Maybe you'll need it for history and navigation feature."
 (make-variable-buffer-local 'hl-index-local)
 
 (defvar hl-things-local nil
-  "A local things list. Format: ((REGEXP . FACESPEC) ...)")
+  "A local things list. Format: (REGEXP1 REGEXP2 ...)")
 (make-variable-buffer-local 'hl-things-local)
 
 (defvar hl-overlays-local nil)
@@ -225,32 +246,31 @@ Format: (START . END)"
           (setq face (get-text-property (point) 'face))))
       (cons beg end))))
 
-(defun hl-highlight (thing &optional local)
+(defun hl-highlight-internal (regexp &optional local)
   (let* ((fg (nth hl-index-local hl-fg-colors))
          (bg (nth hl-index-local hl-bg-colors))
          (max (max (length hl-fg-colors)
                    (length hl-bg-colors)))
          (next-index (1+ hl-index-local))
          facespec)
-    (push (cons thing facespec) hl-things-local)
+    (push regexp hl-things-local)
     (setq hl-index-local (if (>= next-index max) 0 next-index))
     ;; Highlight.
     (when fg
       (setq facespec (append facespec `((foreground-color . ,fg)))))
     (when bg
       (setq facespec (append facespec `((background-color . ,bg)))))
-    (font-lock-add-keywords nil `((,thing 0 ',facespec prepend)) 'append)
+    (font-lock-add-keywords nil `((,regexp 0 ',facespec prepend)) 'append)
     (font-lock-fontify-buffer)
-    (hl-add-highlight-overlays thing facespec)))
+    (hl-add-highlight-overlays regexp facespec)))
 
-(defun hl-unhighlight (thing &optional local)
-  (let* ((keyword (assoc thing (if (eq t (car font-lock-keywords))
-                                   (cadr font-lock-keywords)
-                                 font-lock-keywords))))
-    (setq hl-things-local (delete (assoc thing hl-things-local)
-                                  hl-things-local))
+(defun hl-unhighlight-internal (regexp &optional local)
+  (let* ((keyword (assoc regexp (if (eq t (car font-lock-keywords))
+                                    (cadr font-lock-keywords)
+                                  font-lock-keywords))))
+    (setq hl-things-local (delete regexp hl-things-local))
     (hl-remove-highlight-overlays)
-    ;; Highlight.
+    ;; Unhighlight.
     (font-lock-remove-keywords nil `(,keyword))
     (font-lock-fontify-buffer)
     (hl-remove-highlight-overlays)))
@@ -264,9 +284,11 @@ Format: (START . END)"
     (hl-add-highlight-overlays)))
 
 (defun hl-is-begin ()
-  (not (or (active-minibuffer-window))))
+  (not (or (active-minibuffer-window)
+           (memq this-command '(left-char
+                                right-char)))))
 
-(defun hl-add-highlight-overlays (&optional thing facespec)
+(defun hl-add-highlight-overlays (&optional regexp facespec)
   (when (and (featurep 'hl-line) hl-line-mode
              (or hl-things hl-things-local))
     (let ((beg (line-beginning-position))
@@ -274,13 +296,13 @@ Format: (START . END)"
           bound)
       (save-excursion
         (goto-char beg)
-        (if (and thing facespec)
+        (if (and regexp facespec)
             ;; If THING and FACESPEC is present, add overlays on the line.
             ;; It is a workaround:
             ;; It seems like the text properties are updated only after all the
             ;; `post-command-hook' were executed. So we have to manually insert
             ;; overlays when fontification is called at very 1st time.
-            (while (re-search-forward thing end t)
+            (while (re-search-forward regexp end t)
               (let* ((match-beg (match-beginning 0))
                      (match-end (match-end 0))
                      (overlay (make-overlay match-beg match-end)))
@@ -306,31 +328,31 @@ Format: (START . END)"
 
 ;;;###autoload
 (defun hl-find-thing-forwardly ()
-  "Find thing forwardly and jump to it."
+  "Find regexp forwardly and jump to it."
   (interactive)
   (hl-find-thing 1))
 
 ;;;###autoload
 (defun hl-find-thing-backwardly ()
-  "Find thing backwardly and jump to it."
+  "Find regexp backwardly and jump to it."
   (interactive)
   (hl-find-thing -1))
 
 (defun hl-find-thing (step)
-  (let* ((thing (hl-thingatpt))
-         (match (nth 0 thing))
-         (beg (nth 1 thing))
-         (end (nth 2 thing))
+  (let* ((regexp (hl-thingatpt))
+         (match (nth 0 regexp))
+         (beg (nth 1 regexp))
+         (end (nth 2 regexp))
          (case-fold-search t))
-    (when thing
+    (when regexp
       ;; Hook before searching.
-      (run-hook-with-args hl-before-find-thing-hook thing)
+      (run-hook-with-args hl-before-find-thing-hook regexp)
       (setq mark-active nil)
       (goto-char (nth (if (> step 0)
                           ;; Move to end.
                           2
                         ;; Move to beginning.
-                        1) thing))
+                        1) regexp))
       (if (re-search-forward match nil t step)
           (progn
             (set-marker (mark-marker) (match-beginning 0))
@@ -339,7 +361,7 @@ Format: (START . END)"
         (goto-char end))
       (setq mark-active t)
       ;; Hook after searching.
-      (run-hook-with-args hl-after-find-thing-hook thing))))
+      (run-hook-with-args hl-after-find-thing-hook regexp))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Parentheses ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

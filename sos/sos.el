@@ -100,8 +100,9 @@ the following back-ends.
 
  `:linum': The line number (integer).
 
- `:keywords': Regular expression to highlight keywords, see `font-lock-keywords'.
-              The 1st matcher must be for the symbol definition.
+ `:keywords': A list containing elements to highlight keywords. Its format is 
+              `font-lock-keywords'. The 1st matcher must be for the symbol 
+              definition.
 
  ### Optional Properties:
  `:symbol': The symbol's name.

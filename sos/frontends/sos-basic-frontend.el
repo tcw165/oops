@@ -345,13 +345,16 @@ Return (FILE . LINUM) struct."
       ;; Minor mode.
       (sos-candidate-mode 1)
       (hl-line-unhighlight)
-      ;; Highlight word.
+      ;; Highlight word. Try to use `hl-anything' feature or simply fontification.
       (when keywords
-        (or (and (featurep 'hl-anything)
-                 (hl-highlight-keywords-local keywords))
-            (progn
-              (font-lock-add-keywords nil keywords 'append)
-              (font-lock-fontify-buffer))))
+        (cond
+         ((and (featurep 'hl-anything)
+               (listp keywords))
+          (dolist (keyword keywords)
+            (hl-highlight-keyword-local keyword)))
+         (t
+          (font-lock-add-keywords nil keywords 'append)
+          (font-lock-fontify-buffer))))
       ;; Move point and recenter.
       (and (integerp linum)
            (goto-char (point-min))
