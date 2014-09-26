@@ -146,8 +146,13 @@
           (sos-show-candidates)
         (sos-show-candidate)))))
 
-(defface sos-hl-face
+(defface sos-hl-symbol-face
   '((t (:background "yellow" :foreground "black" :weight bold :height 2.0)))
+  "Default face for highlighting keyword in definition window."
+  :group 'sos-group)
+
+(defface sos-hl-symbol-parameter-face
+  '((t (:background "green" :foreground "black" :weight bold)))
   "Default face for highlighting keyword in definition window."
   :group 'sos-group)
 
@@ -342,8 +347,11 @@ Return (FILE . LINUM) struct."
       (hl-line-unhighlight)
       ;; Highlight word.
       (when keywords
-        (font-lock-add-keywords nil keywords 'append)
-        (font-lock-fontify-buffer))
+        (or (and (featurep 'hl-anything)
+                 (hl-highlight-keywords-local keywords))
+            (progn
+              (font-lock-add-keywords nil keywords 'append)
+              (font-lock-fontify-buffer))))
       ;; Move point and recenter.
       (and (integerp linum)
            (goto-char (point-min))
