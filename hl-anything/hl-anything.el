@@ -422,24 +422,24 @@ Format: (START . END)"
 
 (defun hl-create-parens ()
   "Highlight the parentheses around point."
+  (hl-create-parens-internal)
+  ;; Outward overlays.
+  (let ((overlays hl-outward-parens))
+    (save-excursion
+      (condition-case err
+          (while overlays
+            (up-list -1)
+            (move-overlay (pop overlays) (point) (1+ (point)))
+            (forward-sexp)
+            (move-overlay (pop overlays) (1- (point)) (point)))
+        (error nil)))
+    ;; Hide unused overlays.
+    (dolist (overlay overlays)
+      (move-overlay overlay 1 1)))
+  ;; Inward overlays.
   (unless (memq (get-text-property (point) 'face)
                 '(font-lock-comment-face
                   font-lock-string-face))
-    (hl-create-parens-internal)
-    ;; Outward overlays.
-    (let ((overlays hl-outward-parens))
-      (save-excursion
-        (condition-case err
-            (while overlays
-              (up-list -1)
-              (move-overlay (pop overlays) (point) (1+ (point)))
-              (forward-sexp)
-              (move-overlay (pop overlays) (1- (point)) (point)))
-          (error nil)))
-      ;; Hide unused overlays.
-      (dolist (overlay overlays)
-        (move-overlay overlay 1 1)))
-    ;; Inward overlays.
     (let ((overlays hl-inward-parens))
       (save-excursion
         (condition-case err

@@ -333,7 +333,7 @@ If you want to skip additional commands, try example:
       (sos-goto-def-1st-process)
     (sos-goto-def-normal-process sos-backend)))
 
-(defcustom sos-goto-definition-frontends '(sos-goto-definition-frontend)
+(defcustom sos-goto-definition-frontend 'sos-goto-definition-frontend
   "The list of front-ends for the purpose of visualization.
 
 ### Commands:
@@ -367,7 +367,6 @@ If you want to skip additional commands, try example:
 
 (defun sos-call-goto-def-frontends (command &optional arg)
   "Iterate all the `sos-backends' and pass `command' by order."
-  (dolist (frontend sos-goto-definition-frontends)
-    (funcall frontend command arg)))
+  (funcall sos-goto-definition-frontend command arg))
 
 (provide 'sos)

@@ -65,18 +65,38 @@
     (:show
      (and (featurep 'history)
           (his-add-history))
-     (setq sos-candidates arg)
+     (setq mark-active nil
+           sos-candidates arg)
      (if (sos-is-multiple-candidates)
          ;; TODO:
          (progn
            (message "yet support multiple definitions!"))
        (let* ((candidate (nth 0 sos-candidates))
               (file (plist-get candidate :file))
-              (linum (plist-get candidate :linum)))
-         (when (and (stringp file)
-                    (integerp linum))
+              (linum (plist-get candidate :linum))
+              (keywords (plist-get candidate :keywords))
+              regexp)
+         (when (stringp file)
            (find-file-existing file)
-           (goto-line linum))))
+           (cond
+            ;; Keyword ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+            ((and keywords (listp keywords) (car keywords))
+             (goto-char 1)
+             (setq regexp (or (and (stringp (car keywords))
+                                   (car keywords))
+                              (and (stringp (caar keywords))
+                                   (caar keywords))))
+             (re-search-forward regexp nil t)
+             (let ((beg (match-beginning 1))
+                   (end (match-end 1)))
+               (when end
+                 (goto-char end))
+               (when beg
+                 (set-marker (mark-marker) beg)
+                 (setq mark-active t))))
+            ;; Line Number ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+            ((integerp linum)
+             (goto-line linum))))))
      (and (featurep 'history)
           (his-add-history)))))
 
