@@ -278,8 +278,8 @@ If you want to skip additional commands, try example:
 
      ;; Something ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
      (t
-      (if (and (eq symb sos-symbol)
-               (eq (buffer-modified-tick) sos-source-buffer-tick))
+      (if (and (equal symb sos-symbol)
+               (equal (buffer-modified-tick) sos-source-buffer-tick))
           (progn
             ;; If return symbol is equal to `sos-symbol', ask front-ends to do
             ;; `:update' task.

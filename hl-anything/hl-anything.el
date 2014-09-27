@@ -106,9 +106,9 @@
   :lighter " Highlight"
   (if hl-highlight-mode
       (progn
-        (add-hook 'pre-command-hook 'hl-highlight-pre-command t t)
+        (add-hook 'pre-command-hook 'hl-remove-highlight-overlays t t)
         (add-hook 'post-command-hook 'hl-highlight-post-command t t))
-    (remove-hook 'pre-command-hook 'hl-highlight-pre-command t)
+    (remove-hook 'pre-command-hook 'hl-remove-highlight-overlays t)
     (remove-hook 'post-command-hook 'hl-highlight-post-command t)))
 
 (defcustom hl-fg-colors '("snow"
@@ -258,10 +258,6 @@ Format: (START . END)"
                     (cadr font-lock-keywords)
                   font-lock-keywords)))
 
-(defun hl-highlight-pre-command ()
-  (when (hl-is-begin)
-    (hl-remove-highlight-overlays)))
-
 (defun hl-highlight-post-command ()
   (when (hl-is-begin)
     (hl-add-highlight-overlays)))
@@ -271,28 +267,38 @@ Format: (START . END)"
            (memq this-command '(left-char
                                 right-char)))))
 
+(defmacro hl-with-highlights-at-current-line (&rest body)
+  `(let ((end (line-end-position))
+         bound)
+     (save-excursion
+       (goto-char (line-beginning-position))
+       (while (<= (point) end)
+         (if (setq bound (hl-bounds-of-highlight))
+             ,@body
+           (forward-char))))))
+
 (defun hl-add-highlight-overlays (&optional regexp facespec)
   (when (or (and (featurep 'hl-line) hl-line-mode
                  (or hl-things hl-things-local))
             hl-is-always-overlays-local)
-    (let ((beg (line-beginning-position))
-          (end (line-end-position))
-          bound)
-      (save-excursion
-        (goto-char beg)
-        (if (and regexp facespec)
-            ;; If THING and FACESPEC is present, add overlays on the line.
-            ;; It is a workaround:
-            ;; It seems like the text properties are updated only after all the
-            ;; `post-command-hook' were executed. So we have to manually insert
-            ;; overlays when fontification is called at very 1st time.
+    (if (and regexp facespec)
+        ;; If THING and FACESPEC is present, add overlays on the line.
+        ;; It is a workaround:
+        ;; It seems like the text properties are updated only after all the
+        ;; `post-command-hook' were executed. So we have to manually insert
+        ;; overlays when fontification is called at very 1st time.
+        (save-excursion
+          (let ((end (line-end-position)))
             (while (re-search-forward regexp end t)
               (let* ((match-beg (match-beginning 0))
                      (match-end (match-end 0))
                      (overlay (make-overlay match-beg match-end)))
                 (overlay-put overlay 'face `(,facespec))
-                (push overlay hl-overlays-local)))
-          ;; Scan every character on the line.
+                (push overlay hl-overlays-local)))))
+      (let ((end (line-end-position))
+            bound)
+        (save-excursion
+          (goto-char (line-beginning-position))
           (while (<= (point) end)
             (if (setq bound (hl-bounds-of-highlight))
                 (let* ((overlay (make-overlay (point) (cdr bound)))

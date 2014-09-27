@@ -37,20 +37,21 @@
      (when (member major-mode '(emacs-lisp-mode
                                 lisp-interaction-mode))
        (let ((symb (sos-elisp-thingatpt)))
-         (or (and symb (intern-soft symb))
+         ;; Return the thing in string or `:stop'.
+         (or symb
              :stop))))
     (:candidates
      (when arg
-       (let ((symb arg)
+       (let ((thing arg)
              candidates)
          ;; TODO: use tag system.
          ;; The last one gets the top priority.
-         (dolist (cand (list (sos-elisp-find-feature symb)
-                             (sos-elisp-find-face symb)
-                             (sos-elisp-find-variable symb)
-                             (sos-elisp-find-function symb)
-                             (sos-elisp-find-function-parameter symb)
-                             (sos-elisp-find-let-variable symb)))
+         (dolist (cand (list (sos-elisp-find-feature thing)
+                             (sos-elisp-find-face thing)
+                             (sos-elisp-find-variable thing)
+                             (sos-elisp-find-function thing)
+                             (sos-elisp-find-function-parameter thing)
+                             (sos-elisp-find-let-variable thing)))
            (and cand
                 (push cand candidates)))
          candidates)))
@@ -125,203 +126,206 @@
             keywords (append keywords keyword))
       keywords)))
 
-(defun sos-elisp-find-feature (symb)
+(defun sos-elisp-find-feature (thing)
   "Return the absolute file name of the Emacs Lisp source of LIBRARY.
 LIBRARY should be a string (the name of the library)."
   (ignore-errors
-    (let* ((name (symbol-name symb))
-           (file (or (locate-file name
-                                  (or find-function-source-path load-path)
-                                  (find-library-suffixes))
-                     (locate-file name
-                                  (or find-function-source-path load-path)
-                                  load-file-rep-suffixes)))
-           (doc&linum (sos-elisp-get-doc&linum file name
-                                               sos-elisp-find-feature-regexp))
-           (doc (nth 0 doc&linum))
-           (linum (nth 1 doc&linum))
-           (keywords (nth 2 doc&linum)))
-      `(:symbol ,name :doc ,doc :type "feature" :file ,file
-                :linum ,linum :keywords ,keywords))))
+    (when (intern-soft thing)
+      (let* ((file (or (locate-file thing
+                                    (or find-function-source-path load-path)
+                                    (find-library-suffixes))
+                       (locate-file thing
+                                    (or find-function-source-path load-path)
+                                    load-file-rep-suffixes)))
+             (doc&linum (sos-elisp-get-doc&linum file thing
+                                                 sos-elisp-find-feature-regexp))
+             (doc (nth 0 doc&linum))
+             (linum (nth 1 doc&linum))
+             (keywords (nth 2 doc&linum)))
+        `(:symbol ,thing :doc ,doc :type "feature" :file ,file
+                  :linum ,linum :keywords ,keywords)))))
 
-(defun sos-elisp-find-function (symb)
+(defun sos-elisp-find-function (thing)
   "Return the candidate pointing to the definition of `symb'. It was written 
 refer to `find-function-noselect', `find-function-search-for-symbol' and 
 `describe-function'."
   (ignore-errors
-    (let ((name (symbol-name symb))
-          (real-symb symb))
-      ;; Try to dereference the symbol if it's a alias.
-      (while (symbolp (symbol-function real-symb))
-        (setq real-symb (symbol-function
-                         (find-function-advised-original real-symb))
-              name (symbol-name real-symb)))
-      (if (subrp (symbol-function real-symb))
-          ;; Built-in Function ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-          (let* ((doc-raw (documentation real-symb t))
-                 (data (help-split-fundoc doc-raw real-symb))
-                 (usage (car data))
-                 (doc (cdr data))
-                 (keywords (sos-elisp-function-document-keywords usage)))
-            (with-temp-buffer
-              (setq standard-output (current-buffer))
-              (princ usage)
-              (terpri)(terpri)
-              (princ doc)
-              `(:symbol ,name :doc ,(buffer-string) :type "built-in function"
-                        :linum 1 :keywords ,keywords
-                        :mode-line ,(format "%s is a built-in Elisp function. "
-                                            (propertize name
-                                                        'face 'tooltip)))))
-        ;; Normal Function ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-        (let* ((file (sos-elisp-normalize-path (symbol-file real-symb 'defun)))
-               (doc&linum (sos-elisp-get-doc&linum file name
-                                                   sos-elisp-find-function-regexp))
-               (doc (nth 0 doc&linum))
-               (linum (nth 1 doc&linum))
-               (keywords (nth 2 doc&linum)))
-          `(:symbol ,name :doc ,doc :type "function" :file ,file
-                    :linum ,linum :keywords ,keywords
-                    :mode-line ,(unless (eq real-symb symb)
-                                  (format "%s is an alias of %s "
-                                          (propertize (symbol-name symb)
-                                                      'face 'tooltip)
-                                          (propertize (symbol-name real-symb)
-                                                      'face 'tooltip)))))))))
+    (when (intern-soft thing)
+      (let* ((symb (intern-soft thing))
+             (real-symb symb))
+        ;; Try to dereference the symbol if it's a alias.
+        (while (symbolp (symbol-function real-symb))
+          (setq real-symb (symbol-function
+                           (find-function-advised-original real-symb))
+                thing (symbol-name real-symb)))
+        (if (subrp (symbol-function real-symb))
+            ;; Built-in Function ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+            (let* ((doc-raw (documentation real-symb t))
+                   (data (help-split-fundoc doc-raw real-symb))
+                   (usage (car data))
+                   (doc (cdr data))
+                   (keywords (sos-elisp-function-document-keywords usage)))
+              (with-temp-buffer
+                (setq standard-output (current-buffer))
+                (princ usage)
+                (terpri)(terpri)
+                (princ doc)
+                `(:symbol ,thing :doc ,(buffer-string) :type "built-in function"
+                          :linum 1 :keywords ,keywords
+                          :mode-line ,(format "%s is a built-in Elisp function. "
+                                              (propertize thing
+                                                          'face 'tooltip)))))
+          ;; Normal Function ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+          (let* ((file (sos-elisp-normalize-path (symbol-file real-symb 'defun)))
+                 (doc&linum (sos-elisp-get-doc&linum file thing
+                                                     sos-elisp-find-function-regexp))
+                 (doc (nth 0 doc&linum))
+                 (linum (nth 1 doc&linum))
+                 (keywords (nth 2 doc&linum)))
+            `(:symbol ,thing :doc ,doc :type "function" :file ,file
+                      :linum ,linum :keywords ,keywords
+                      :mode-line ,(unless (eq real-symb symb)
+                                    (format "%s is an alias of %s "
+                                            (propertize (symbol-name symb)
+                                                        'face 'tooltip)
+                                            (propertize (symbol-name real-symb)
+                                                        'face 'tooltip))))))))))
 
-(defun sos-elisp-find-variable (symb)
+(defun sos-elisp-find-variable (thing)
   "Return the candidate pointing to the definition of `symb'. It was written 
 refer to `find-variable-noselect', `find-function-search-for-symbol' and 
 `describe-variable'."
   (ignore-errors
-    (let ((name (symbol-name symb))
-          (file (symbol-file symb 'defvar)))
-      (if file
-          ;; Normal Variable ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-          (let* ((file (sos-elisp-normalize-path file))
-                 (doc&linum (sos-elisp-get-doc&linum file name
-                                                     sos-elisp-find-variable-regexp))
-                 (doc (nth 0 doc&linum))
-                 (linum (nth 1 doc&linum))
-                 (keywords (nth 2 doc&linum)))
-            `(:symbol ,name :doc ,doc :type "variable" :file ,file
-                :linum ,linum :keywords ,keywords))
-        ;; Built-in Variable ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-        (let* ((doc (documentation-property symb 'variable-documentation))
-               (keywords (sos-elisp-variable-document-keywords name))
-               val locus)
-          (when doc
-            (with-selected-frame (selected-frame)
-              (with-current-buffer (current-buffer)
-                (setq val (symbol-value symb)
-                      locus (variable-binding-locus symb))))
-            (with-temp-buffer
-              (setq standard-output (current-buffer))
-              (princ (format "%s\nvalue is " symb))
-              (prin1 val)
-              (terpri)(terpri)
-              ;; Print standard value if any.
-              (let* ((sv (get symb 'standard-value))
-                     (origval (and (consp sv)
-                                   (condition-case nil
-                                       (eval (car sv))
-                                     (error :help-eval-error)))))
-                (when (and (consp sv)
-                           (not (equal origval val))
-                           (not (equal origval :help-eval-error)))
-                  (princ "Original value was ")
-                  (prin1 origval)
-                  (terpri)))
-              ;; Print its locus and global value if any.
-              (when locus
-                (cond
-                 ((bufferp locus)
-                  (princ (format "- Local in buffer %s; "
-                                 (pp-to-string (buffer-name)))))
-                 ((framep locus)
-                  (princ (format "- It is a frame-local variable; ")))
-                 ((terminal-live-p locus)
-                  (princ (format "- It is a terminal-local variable; ")))
-                 (t
-                  (princ (format "- It is local to %S" locus))))
-                (if (not (default-boundp symb))
-                    (princ "globally void")
-                  (let ((global-val (default-value symb)))
-                    (with-current-buffer standard-output
-                      (princ "global value is ")
-                      (if (eq val global-val)
-                          (princ "the same.")
-                        (princ (format "%s." (pp-to-string global-val)))))))
-                (terpri))
-              ;; Print its miscellaneous attributes.
-              (let ((permanent-local (get symb 'permanent-local))
-                    (safe-var (get symb 'safe-local-variable))
-                    extra-line)
-                ;; Mention if it's a local variable.
-                (cond
-                 ((and (local-variable-if-set-p symb)
-                       (or (not (local-variable-p symb))
-                           (with-temp-buffer
-                             (local-variable-if-set-p symb))))
-                  (setq extra-line t)
-                  (princ "- Automatically becomes ")
-                  (if permanent-local
-                      (princ "permanently "))
-                  (princ "buffer-local when set.\n"))
-                 ((not permanent-local))
-                 ((bufferp locus)
-                  (princ "- This variable's buffer-local value is permanent.\n"))
-                 (t
-                  (princ "- This variable's value is permanent \
+    (when (intern-soft thing)
+      (let* ((symb (intern-soft thing))
+             (file (symbol-file symb 'defvar)))
+        (if file
+            ;; Normal Variable ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+            (let* ((file (sos-elisp-normalize-path file))
+                   (doc&linum (sos-elisp-get-doc&linum file thing
+                                                       sos-elisp-find-variable-regexp))
+                   (doc (nth 0 doc&linum))
+                   (linum (nth 1 doc&linum))
+                   (keywords (nth 2 doc&linum)))
+              `(:symbol ,thing :doc ,doc :type "variable" :file ,file
+                        :linum ,linum :keywords ,keywords))
+          ;; Built-in Variable ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+          (let* ((doc (documentation-property symb 'variable-documentation))
+                 (keywords (sos-elisp-variable-document-keywords thing))
+                 val locus)
+            (when doc
+              (with-selected-frame (selected-frame)
+                (with-current-buffer (current-buffer)
+                  (setq val (symbol-value symb)
+                        locus (variable-binding-locus symb))))
+              (with-temp-buffer
+                (setq standard-output (current-buffer))
+                (princ (format "%s\nvalue is " symb))
+                (prin1 val)
+                (terpri)(terpri)
+                ;; Print standard value if any.
+                (let* ((sv (get symb 'standard-value))
+                       (origval (and (consp sv)
+                                     (condition-case nil
+                                         (eval (car sv))
+                                       (error :help-eval-error)))))
+                  (when (and (consp sv)
+                             (not (equal origval val))
+                             (not (equal origval :help-eval-error)))
+                    (princ "Original value was ")
+                    (prin1 origval)
+                    (terpri)))
+                ;; Print its locus and global value if any.
+                (when locus
+                  (cond
+                   ((bufferp locus)
+                    (princ (format "- Local in buffer %s; "
+                                   (pp-to-string (buffer-name)))))
+                   ((framep locus)
+                    (princ (format "- It is a frame-local variable; ")))
+                   ((terminal-live-p locus)
+                    (princ (format "- It is a terminal-local variable; ")))
+                   (t
+                    (princ (format "- It is local to %S" locus))))
+                  (if (not (default-boundp symb))
+                      (princ "globally void")
+                    (let ((global-val (default-value symb)))
+                      (with-current-buffer standard-output
+                        (princ "global value is ")
+                        (if (eq val global-val)
+                            (princ "the same.")
+                          (princ (format "%s." (pp-to-string global-val)))))))
+                  (terpri))
+                ;; Print its miscellaneous attributes.
+                (let ((permanent-local (get symb 'permanent-local))
+                      (safe-var (get symb 'safe-local-variable))
+                      extra-line)
+                  ;; Mention if it's a local variable.
+                  (cond
+                   ((and (local-variable-if-set-p symb)
+                         (or (not (local-variable-p symb))
+                             (with-temp-buffer
+                               (local-variable-if-set-p symb))))
+                    (setq extra-line t)
+                    (princ "- Automatically becomes ")
+                    (if permanent-local
+                        (princ "permanently "))
+                    (princ "buffer-local when set.\n"))
+                   ((not permanent-local))
+                   ((bufferp locus)
+                    (princ "- This variable's buffer-local value is permanent.\n"))
+                   (t
+                    (princ "- This variable's value is permanent \
 if it is given a local binding.\n")))
-                (when (member (cons symb val) file-local-variables-alist)
-                  (setq extra-line t)
-                  (if (member (cons symb val) dir-local-variables-alist)
-                      (princ "- This variable's value is file-local.\n")))
-                (when (memq symb ignored-local-variables)
-                  (setq extra-line t)
-                  (princ "- This variable is ignored as a file-local \
+                  (when (member (cons symb val) file-local-variables-alist)
+                    (setq extra-line t)
+                    (if (member (cons symb val) dir-local-variables-alist)
+                        (princ "- This variable's value is file-local.\n")))
+                  (when (memq symb ignored-local-variables)
+                    (setq extra-line t)
+                    (princ "- This variable is ignored as a file-local \
 variable.\n"))
-                ;; Can be both risky and safe, eg auto-fill-function.
-                (when (risky-local-variable-p symb)
-                  (setq extra-line t)
-                  (princ "- This variable may be risky if used as a \
+                  ;; Can be both risky and safe, eg auto-fill-function.
+                  (when (risky-local-variable-p symb)
+                    (setq extra-line t)
+                    (princ "- This variable may be risky if used as a \
 file-local variable.\n")
-                  (when (assq symb safe-local-variable-values)
-                    (princ "- However, you have added it to \
+                    (when (assq symb safe-local-variable-values)
+                      (princ "- However, you have added it to \
 `safe-local-variable-values'.\n")))
-                (when safe-var
-                  (setq extra-line t)
-                  (princ "- This variable is safe as a file local variable ")
-                  (princ "if its value\n  satisfies the predicate ")
-                  (princ (if (byte-code-function-p safe-var)
-                             "which is a byte-compiled expression.\n"
-                           (format "`%s'.\n" safe-var))))
-                (and extra-line (terpri)))
-              (princ (format "Documentation:\n%s" doc))
-              `(:symbol ,name :doc ,(buffer-string) :type "built-in variable"
-                        :linum 1 :keywords ,keywords
-                        :mode-line ,(format "%s is a built-in Elisp variable."
-                                         (propertize name 'face 'link))))))))))
+                  (when safe-var
+                    (setq extra-line t)
+                    (princ "- This variable is safe as a file local variable ")
+                    (princ "if its value\n  satisfies the predicate ")
+                    (princ (if (byte-code-function-p safe-var)
+                               "which is a byte-compiled expression.\n"
+                             (format "`%s'.\n" safe-var))))
+                  (and extra-line (terpri)))
+                (princ (format "Documentation:\n%s" doc))
+                `(:symbol ,thing :doc ,(buffer-string) :type "built-in variable"
+                          :linum 1 :keywords ,keywords
+                          :mode-line ,(format "%s is a built-in Elisp variable."
+                                              (propertize thing 'face 'link)))))))))))
 
-(defun sos-elisp-find-let-variable (symb)
+(defun sos-elisp-find-let-variable (thing)
   ;; TODO: implement it.
   )
 
-(defun sos-elisp-find-function-parameter (symb)
+(defun sos-elisp-find-function-parameter (thing)
   ;; TODO: implement it.
   )
 
-(defun sos-elisp-find-face (symb)
+(defun sos-elisp-find-face (thing)
   (ignore-errors
-    (let* ((name (symbol-name symb))
-           (file (sos-elisp-normalize-path (symbol-file symb 'defface)))
-           (doc&linum (sos-elisp-get-doc&linum file name
-                                               sos-elisp-find-face-regexp))
-           (doc (nth 0 doc&linum))
-           (linum (nth 1 doc&linum))
-           (keywords (nth 2 doc&linum)))
-      `(:symbol ,name :doc ,doc :type "face" :file ,file
-                :linum ,linum :keywords ,keywords))))
+    (when (intern-soft thing)
+      (let* ((symb (intern-soft thing))
+             (file (sos-elisp-normalize-path (symbol-file symb 'defface)))
+             (doc&linum (sos-elisp-get-doc&linum file thing
+                                                 sos-elisp-find-face-regexp))
+             (doc (nth 0 doc&linum))
+             (linum (nth 1 doc&linum))
+             (keywords (nth 2 doc&linum)))
+        `(:symbol ,thing :doc ,doc :type "face" :file ,file
+                  :linum ,linum :keywords ,keywords)))))
 
 (provide 'sos-elisp-backend)
