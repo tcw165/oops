@@ -111,6 +111,12 @@
     ;; document string + line number + keywords.
     `(,doc ,linum ((,regexp 1 ',(sos-hl-symbol-face) prepend)))))
 
+(defun sos-elisp-current-doc ()
+  (let ((file (buffer-file-name)))
+    (with-temp-buffer
+      (insert-file-contents file)
+      (buffer-string))))
+
 (defun sos-elisp-function-document-keywords (usage)
   (when usage
     (let ((regexp (concat "^\\(?1:" (regexp-quote usage) "\\)$"))
@@ -306,12 +312,6 @@ file-local variable.\n")
                           :mode-line ,(format "%s is a built-in Elisp variable."
                                               (propertize thing 'face 'link)))))))))))
 
-(defun sos-elisp-current-doc ()
-  (let ((file (buffer-file-name)))
-    (with-temp-buffer
-      (insert-file-contents file)
-      (buffer-string))))
-
 (defun sos-elisp-lets-pos ()
   (let (pos)
     (ignore-errors
@@ -381,12 +381,12 @@ file-local variable.\n")
   (let ((linum 0)
         regexp
         beg end)
-    (save-excursion
-      (beginning-of-defun)
-      (setq linum (line-number-at-pos))
-      (down-list 2)
-      (catch 'break
-        (ignore-errors
+    (ignore-errors
+      (save-excursion
+        (beginning-of-defun)
+        (setq linum (line-number-at-pos))
+        (down-list 2)
+        (catch 'break
           (while (progn (forward-sexp) t)
             (save-excursion
               (setq end (point))

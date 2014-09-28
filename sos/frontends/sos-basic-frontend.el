@@ -377,7 +377,10 @@ Return (FILE . LINUM) struct."
       (kill-all-local-variables)
       (remove-overlays)
       (erase-buffer)
-      (insert doc)
+      (or (when doc
+            (insert doc))
+          (when (and file (file-exists-p file))
+            (insert-file-contents file)))
       ;; Major mode.
       (fundamental-mode)
       (cond
