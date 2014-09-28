@@ -167,7 +167,7 @@
         (sos-show-candidate)))))
 
 (defface sos-hl-symbol-face
-  '((t (:background "yellow" :foreground "black" :weight bold :height 2.0)))
+  '((t (:background "gold" :foreground "black" :weight bold :height 2.0)))
   "Default face for highlighting keyword in definition window."
   :group 'sos-group)
 
@@ -188,7 +188,7 @@
     facespec))
 
 (defface sos-hl-symbol-parameter-face
-  '((t (:background "green" :foreground "black" :weight bold)))
+  '((t (:background "gold" :foreground "black" :underline t :weight bold :height 1.5)))
   "Default face for highlighting keyword in definition window."
   :group 'sos-group)
 

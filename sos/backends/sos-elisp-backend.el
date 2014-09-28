@@ -103,7 +103,7 @@
         (insert-file-contents filename)
         (setq doc (buffer-string)))
       ;; Get linum.
-      (with-syntax-table emacs-lisp-mode-syntax-table
+      (with-syntax-table lisp-mode-syntax-table
         (goto-char (point-min))
         (when (re-search-forward regexp nil t)
           (setq linum (line-number-at-pos)))))
@@ -307,9 +307,52 @@ file-local variable.\n")
                           :mode-line ,(format "%s is a built-in Elisp variable."
                                               (propertize thing 'face 'link)))))))))))
 
+(defun sos-elisp-current-doc ()
+  (let ((file (buffer-file-name)))
+    (with-temp-buffer
+      (insert-file-contents file)
+      (buffer-string))))
+
 (defun sos-elisp-find-let-variable (thing)
-  ;; TODO: implement it.
-  )
+  (let ((doc (sos-elisp-current-doc))
+        (linum 0)
+        keywords
+        regexp
+        beg end)
+    (ignore-errors
+      (save-excursion
+        ;; Find beginning of "let" definition.
+        (while (not (looking-at "(let[*]*\\s-("))
+          (up-list -1))
+        (setq beg (point))
+        (goto-char (match-end 0))
+        ;; Scan its spec.
+        (catch 'end
+          (while (progn (forward-sexp) t)
+            (save-excursion
+              (setq end (point))
+              (backward-sexp)
+              (when (re-search-forward thing end t)
+                (setq linum (line-number-at-pos)
+                      regexp (concat
+                              "^"
+                              (regexp-quote
+                               (buffer-substring-no-properties
+                                (line-beginning-position)
+                                (match-beginning 0)))
+                              "\\(?1:"
+                              (regexp-quote thing)
+                              "\\)"
+                              (regexp-quote
+                               (buffer-substring-no-properties
+                                (match-end 0)
+                                (line-end-position)))
+                              "$")
+                      keywords `((,regexp 1 ',(sos-hl-symbol-parameter-face) prepend)))
+                (throw 'end)))))))
+    (when regexp
+      `(:symbol ,thing :doc ,doc :type "local variable" :file ,(buffer-file-name)
+                :linum ,linum :keywords ,keywords))))
 
 (defun sos-elisp-find-function-parameter (thing)
   ;; TODO: implement it.
