@@ -316,15 +316,15 @@ file-local variable.\n")
 (defun sos-elisp-find-let-variable (thing)
   (let ((doc (sos-elisp-current-doc))
         (linum 0)
-        keywords
+        regexp-thing
         regexp
+        keywords
         beg end)
     (ignore-errors
       (save-excursion
         ;; Find beginning of "let" definition.
         (while (not (looking-at "(let[*]*\\s-("))
           (up-list -1))
-        (setq beg (point))
         (goto-char (match-end 0))
         ;; Scan its spec.
         (catch 'end
@@ -332,24 +332,47 @@ file-local variable.\n")
             (save-excursion
               (setq end (point))
               (backward-sexp)
-              (when (re-search-forward thing end t)
-                (setq linum (line-number-at-pos)
-                      regexp (concat
-                              "^"
-                              (regexp-quote
-                               (buffer-substring-no-properties
-                                (line-beginning-position)
-                                (match-beginning 0)))
-                              "\\(?1:"
-                              (regexp-quote thing)
-                              "\\)"
-                              (regexp-quote
-                               (buffer-substring-no-properties
-                                (match-end 0)
-                                (line-end-position)))
-                              "$")
-                      keywords `((,regexp 1 ',(sos-hl-symbol-parameter-face) prepend)))
-                (throw 'end)))))))
+              (setq beg (point))
+              (if (equal (char-after) ?\()
+                  (progn
+                    (setq regexp-thing (concat "(\\(?1:"
+                                               (regexp-quote thing)
+                                               "\\)\\s-"))
+                    (when (re-search-forward regexp-thing end t)
+                      (setq linum (line-number-at-pos)
+                            regexp (concat
+                                    "^"
+                                    (regexp-quote
+                                     (buffer-substring-no-properties
+                                      (line-beginning-position)
+                                      (match-beginning 0)))
+                                    regexp-thing
+                                    (regexp-quote
+                                     (buffer-substring-no-properties
+                                      (match-end 0)
+                                      (line-end-position)))
+                                    "$")
+                            keywords `((,regexp 1 ',(sos-hl-symbol-parameter-face) prepend)))
+                      (throw 'end)))
+                (when (string= thing
+                               (buffer-substring-no-properties beg end))
+                  (setq linum (line-number-at-pos)
+                        regexp (concat
+                                "^"
+                                (regexp-quote
+                                 (buffer-substring-no-properties
+                                  (line-beginning-position)
+                                  beg))
+                                (concat "\\(?1:"
+                                        (regexp-quote thing)
+                                        "\\)")
+                                (regexp-quote
+                                 (buffer-substring-no-properties
+                                  end
+                                  (line-end-position)))
+                                "$")
+                        keywords `((,regexp 1 ',(sos-hl-symbol-parameter-face) prepend)))
+                  (throw 'end))))))))
     (when regexp
       `(:symbol ,thing :doc ,doc :type "local variable" :file ,(buffer-file-name)
                 :linum ,linum :keywords ,keywords))))
