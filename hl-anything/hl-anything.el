@@ -68,7 +68,7 @@
 ;; Highlight things ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
-(defun hl-highlight-thingatpt ()
+(defun hl-highlight-thingatpt-global ()
   "Toggle highlighting globally."
   (interactive)
   ;; TODO:
@@ -106,9 +106,9 @@
   :lighter " Highlight"
   (if hl-highlight-mode
       (progn
-        (add-hook 'pre-command-hook 'hl-remove-highlight-overlays t t)
+        (add-hook 'pre-command-hook 'hl-highlight-pre-command t t)
         (add-hook 'post-command-hook 'hl-highlight-post-command t t))
-    (remove-hook 'pre-command-hook 'hl-remove-highlight-overlays t)
+    (remove-hook 'pre-command-hook 'hl-highlight-pre-command t)
     (remove-hook 'post-command-hook 'hl-highlight-post-command t)))
 
 (defcustom hl-fg-colors '("snow"
@@ -155,9 +155,11 @@ Maybe you'll need it for history and navigation feature."
   :type '(repeat function)
   :group 'hl-anything-group)
 
+(defvar hl-timer nil)
+
 (defvar hl-index 0)
 
-(defvar hl-things nil
+(defvar hl-things-global nil
   "A global things list. Format: ((REGEXP . FACESPEC) ...)")
 
 (defvar hl-index-local 0)
@@ -240,79 +242,55 @@ Format: (START . END)"
     (when bg
       (setq facespec (append facespec `((background-color . ,bg)))))
     (font-lock-add-keywords nil `((,regexp 0 ',facespec prepend)) 'append)
-    (font-lock-fontify-buffer)
-    (hl-add-highlight-overlays regexp facespec)))
+    (font-lock-fontify-buffer)))
 
 (defun hl-unhighlight-internal (regexp &optional local)
   (let* ((keyword (hl-is-font-lock-keywords regexp)))
     (setq hl-things-local (delete regexp hl-things-local))
-    (hl-remove-highlight-overlays)
     ;; Unhighlight.
     (while (setq keyword (hl-is-font-lock-keywords regexp))
       (font-lock-remove-keywords nil `(,keyword)))
-    (font-lock-fontify-buffer)
-    (hl-remove-highlight-overlays)))
+    (font-lock-fontify-buffer)))
 
 (defun hl-is-font-lock-keywords (regexp)
   (assoc regexp (if (eq t (car font-lock-keywords))
                     (cadr font-lock-keywords)
                   font-lock-keywords)))
 
+(defun hl-highlight-pre-command ()
+  (when hl-timer
+    (cancel-timer hl-timer)
+    (setq hl-timer nil)))
+
 (defun hl-highlight-post-command ()
   (when (hl-is-begin)
-    (hl-add-highlight-overlays)))
+    (setq hl-timer (run-with-idle-timer 0 nil 'hl-add-highlight-overlays))))
 
 (defun hl-is-begin ()
-  (not (or (active-minibuffer-window)
-           (memq this-command '(left-char
-                                right-char)))))
+  (not (or (active-minibuffer-window))))
 
-(defmacro hl-with-highlights-at-current-line (&rest body)
-  `(let ((end (line-end-position))
-         bound)
-     (save-excursion
-       (goto-char (line-beginning-position))
-       (while (<= (point) end)
-         (if (setq bound (hl-bounds-of-highlight))
-             ,@body
-           (forward-char))))))
-
-(defun hl-add-highlight-overlays (&optional regexp facespec)
+(defun hl-add-highlight-overlays ()
   (when (or (and (featurep 'hl-line) hl-line-mode
-                 (or hl-things hl-things-local))
+                 (or hl-things-global hl-things-local hl-overlays-local))
             hl-is-always-overlays-local)
-    (if (and regexp facespec)
-        ;; If THING and FACESPEC is present, add overlays on the line.
-        ;; It is a workaround:
-        ;; It seems like the text properties are updated only after all the
-        ;; `post-command-hook' were executed. So we have to manually insert
-        ;; overlays when fontification is called at very 1st time.
-        (save-excursion
-          (let ((end (line-end-position)))
-            (while (re-search-forward regexp end t)
-              (let* ((match-beg (match-beginning 0))
-                     (match-end (match-end 0))
-                     (overlay (make-overlay match-beg match-end)))
-                (overlay-put overlay 'face `(,facespec))
-                (push overlay hl-overlays-local)))))
-      (let ((end (line-end-position))
-            bound)
-        (save-excursion
-          (goto-char (line-beginning-position))
-          (while (<= (point) end)
-            (if (setq bound (hl-bounds-of-highlight))
-                (let* ((overlay (make-overlay (point) (cdr bound)))
-                       (face (get-text-property (point) 'face))
-                       (fg (assoc 'foreground-color face))
-                       (bg (assoc 'background-color face)))
-                  (overlay-put overlay 'face `(,fg ,bg))
-                  (push overlay hl-overlays-local)
-                  (goto-char (cdr bound)))
-              (forward-char))))))))
-
-(defun hl-remove-highlight-overlays ()
-  (mapc 'delete-overlay hl-overlays-local)
-  (setq hl-overlays-local nil))
+    ;; Remove overlays.
+    (mapc 'delete-overlay hl-overlays-local)
+    (setq hl-overlays-local nil)
+    ;; Create overlays.
+    (let ((end (line-end-position))
+          bound)
+      (save-excursion
+        (beginning-of-line)
+        (while (<= (point) end)
+          (if (setq bound (hl-bounds-of-highlight))
+              (let* ((overlay (make-overlay (point) (cdr bound)))
+                     (face (get-text-property (point) 'face))
+                     (fg (assoc 'foreground-color face))
+                     (bg (assoc 'background-color face)))
+                (overlay-put overlay 'face `(,fg ,bg))
+                (push overlay hl-overlays-local)
+                (goto-char (cdr bound)))
+            (forward-char)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -432,13 +410,12 @@ Format: (START . END)"
   ;; Outward overlays.
   (let ((overlays hl-outward-parens))
     (save-excursion
-      (condition-case err
-          (while overlays
-            (up-list -1)
-            (move-overlay (pop overlays) (point) (1+ (point)))
-            (forward-sexp)
-            (move-overlay (pop overlays) (1- (point)) (point)))
-        (error nil)))
+      (ignore-errors
+        (while overlays
+          (up-list -1)
+          (move-overlay (pop overlays) (point) (1+ (point)))
+          (forward-sexp)
+          (move-overlay (pop overlays) (1- (point)) (point)))))
     ;; Hide unused overlays.
     (dolist (overlay overlays)
       (move-overlay overlay 1 1)))
@@ -448,19 +425,18 @@ Format: (START . END)"
                   font-lock-string-face))
     (let ((overlays hl-inward-parens))
       (save-excursion
-        (condition-case err
-            (cond
-             ;; Open parenthesis ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-             ((eq ?\( (char-syntax (char-after)))
-              (move-overlay (pop overlays) (point) (1+ (point)))
-              (forward-sexp)
-              (move-overlay (pop overlays) (1- (point)) (point)))
-             ;; Close parenthesis ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-             ((eq ?\) (char-syntax (char-before)))
-              (move-overlay (pop overlays) (1- (point)) (point))
-              (backward-sexp)
-              (move-overlay (pop overlays) (point) (1+ (point)))))
-          (error nil))))))
+        (ignore-errors
+          (cond
+           ;; Open parenthesis ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+           ((eq ?\( (char-syntax (char-after)))
+            (move-overlay (pop overlays) (point) (1+ (point)))
+            (forward-sexp)
+            (move-overlay (pop overlays) (1- (point)) (point)))
+           ;; Close parenthesis ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+           ((eq ?\) (char-syntax (char-before)))
+            (move-overlay (pop overlays) (1- (point)) (point))
+            (backward-sexp)
+            (move-overlay (pop overlays) (point) (1+ (point))))))))))
 
 (defun hl-create-parens-internal ()
   ;; outward overlays.
