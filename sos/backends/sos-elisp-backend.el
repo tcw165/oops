@@ -324,7 +324,8 @@ file-local variable.\n")
     pos))
 
 (defun sos-elisp-find-let-variable (thing)
-  (let ((linum 0) regexp
+  (let ((linum 0)
+        regexp
         (lets-pos (sos-elisp-lets-pos))
         beg end)
     (catch 'break
@@ -340,26 +341,26 @@ file-local variable.\n")
                 (backward-sexp)
                 (setq beg (point))
                 (if (equal (char-after) ?\()
-                    (let ((regexp-thing (concat "(\\(?1:"
-                                                (regexp-quote thing)
-                                                "\\)\\s-")))
-                      (when (re-search-forward regexp-thing end t)
-                        (setq linum (line-number-at-pos)
-                              regexp (concat
-                                      "^"
-                                      (regexp-quote
-                                       (buffer-substring-no-properties
-                                        (line-beginning-position)
-                                        (match-beginning 0)))
-                                      regexp-thing
-                                      (regexp-quote
-                                       (buffer-substring-no-properties
-                                        (match-end 0)
-                                        (line-end-position)))
-                                      "$"))
-                        (throw 'break)))
-                  (when (string= thing
-                                 (buffer-substring-no-properties beg end))
+                    (when (string= thing (car (split-string
+                                               (buffer-substring-no-properties
+                                                (1+ beg)
+                                                (1- end))
+                                               " ")))
+                      (setq linum (line-number-at-pos)
+                            regexp (concat
+                                    "^"
+                                    (regexp-quote
+                                     (buffer-substring-no-properties
+                                      (line-beginning-position)
+                                      beg))
+                                    (concat "\\(?1:"
+                                            (regexp-quote
+                                             (buffer-substring-no-properties
+                                              beg
+                                              end))
+                                            "\\)")))
+                      (throw 'break))
+                  (when (string= thing (buffer-substring-no-properties beg end))
                     (setq linum (line-number-at-pos)
                           regexp (concat
                                   "^"
@@ -369,12 +370,7 @@ file-local variable.\n")
                                     beg))
                                   (concat "\\(?1:"
                                           (regexp-quote thing)
-                                          "\\)")
-                                  (regexp-quote
-                                   (buffer-substring-no-properties
-                                    end
-                                    (line-end-position)))
-                                  "$"))
+                                          "\\)")))
                     (throw 'break)))))))))
     (when regexp
       `(:symbol ,thing :doc ,(sos-elisp-current-doc) :type "local variable"
@@ -382,7 +378,8 @@ file-local variable.\n")
                 :keywords ((,regexp 1 ',(sos-hl-symbol-parameter-face) prepend))))))
 
 (defun sos-elisp-find-function-parameter (thing)
-  (let ((linum 0) regexp
+  (let ((linum 0)
+        regexp
         beg end)
     (save-excursion
       (beginning-of-defun)
