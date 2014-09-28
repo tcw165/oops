@@ -78,10 +78,11 @@
               regexp)
          (when (stringp file)
            (find-file-existing file)
-           (cond
-            ;; Keyword ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-            ((and keywords (listp keywords) (car keywords))
-             (goto-char 1)
+           ;; Line number.
+           (when (integerp linum)
+             (goto-line linum))
+           ;; Keyword.
+           (when (and keywords (listp keywords) (car keywords))
              (setq regexp (or (and (stringp (car keywords))
                                    (car keywords))
                               (and (stringp (caar keywords))
@@ -93,10 +94,7 @@
                  (goto-char end))
                (when beg
                  (set-marker (mark-marker) beg)
-                 (setq mark-active t))))
-            ;; Line Number ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-            ((integerp linum)
-             (goto-line linum))))))
+                 (setq mark-active t)))))))
      (and (featurep 'history)
           (his-add-history)))))
 

@@ -379,6 +379,7 @@ file-local variable.\n")
 
 (defun sos-elisp-find-function-parameter (thing)
   ;; TODO: implement it.
+  ;; (beginning-of-defun)
   )
 
 (defun sos-elisp-find-face (thing)

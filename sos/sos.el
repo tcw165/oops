@@ -222,8 +222,8 @@ result to the `sos-def-buf' displayed in the `sos-def-win'."
   (when (sos-is-idle-begin)
     (setq sos-source-buffer (current-buffer)
           sos-source-window (selected-window)
-          sos-timer (run-with-timer sos-idle-delay nil
-                                    'sos-idle-begin))))
+          sos-timer (run-with-idle-timer sos-idle-delay nil
+                                         'sos-idle-begin))))
 
 (defun sos-is-idle-begin ()
   (not (or (active-minibuffer-window)
