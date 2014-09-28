@@ -119,7 +119,7 @@
           (goto-line linum)
           (and (featurep 'history)
                (his-add-position-type-history))
-          (recenter 3)))
+          (recenter 5)))
       (select-window sos-source-window))))
 
 ;;;###autoload

@@ -399,7 +399,7 @@ Format: (START . END)"
 
 (defun hl-paren-idle-begin ()
   (when (hl-paren-is-begin)
-    (setq hl-paren-timer (run-with-timer 0 nil 'hl-create-parens))))
+    (setq hl-paren-timer (run-with-idle-timer 0.1 nil 'hl-create-parens))))
 
 (defun hl-paren-is-begin ()
   (not (or (active-minibuffer-window))))
@@ -471,13 +471,12 @@ Format: (START . END)"
         (overlay-put (car hl-inward-parens) 'face facespec)))))
 
 (defun hl-remove-parens ()
-  (when (hl-paren-is-begin)
-    (when hl-paren-timer
-      (cancel-timer hl-paren-timer)
-      (setq hl-paren-timer nil))
-    (mapc 'delete-overlay hl-outward-parens)
-    (mapc 'delete-overlay hl-inward-parens)
-    (mapc 'kill-local-variable '(hl-outward-parens
-                                 hl-inward-parens))))
+  (when hl-paren-timer
+    (cancel-timer hl-paren-timer)
+    (setq hl-paren-timer nil))
+  (mapc 'delete-overlay hl-outward-parens)
+  (mapc 'delete-overlay hl-inward-parens)
+  (mapc 'kill-local-variable '(hl-outward-parens
+                               hl-inward-parens)))
 
 (provide 'hl-anything)

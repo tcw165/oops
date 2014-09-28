@@ -197,7 +197,7 @@ result to the `sos-def-buf' displayed in the `sos-def-win'."
   :type '(repeat (symbol :tag "Front-end"))
   :group 'sos-group)
 
-(defcustom sos-idle-delay 0.15
+(defcustom sos-idle-delay 0.2
   "The idle delay in seconds until sos starts automatically."
   :type '(number :tag "Seconds"))
 

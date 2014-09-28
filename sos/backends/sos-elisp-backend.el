@@ -42,14 +42,15 @@
              :stop))))
     (:candidates
      (when arg
-       (let ((thing arg)
-             candidates)
+       (let* ((thing arg)
+              (symb (intern-soft thing))
+              candidates)
          ;; TODO: use tag system.
          ;; The last one gets the top priority.
-         (dolist (cand (list (sos-elisp-find-feature thing)
-                             (sos-elisp-find-face thing)
-                             (sos-elisp-find-variable thing)
-                             (sos-elisp-find-function thing)
+         (dolist (cand (list (sos-elisp-find-feature thing symb)
+                             (sos-elisp-find-face thing symb)
+                             (sos-elisp-find-variable thing symb)
+                             (sos-elisp-find-function thing symb)
                              (sos-elisp-find-function-parameter thing)
                              (sos-elisp-find-let-variable thing)))
            (and cand
@@ -126,11 +127,11 @@
             keywords (append keywords keyword))
       keywords)))
 
-(defun sos-elisp-find-feature (thing)
+(defun sos-elisp-find-feature (thing symb)
   "Return the absolute file name of the Emacs Lisp source of LIBRARY.
 LIBRARY should be a string (the name of the library)."
   (ignore-errors
-    (when (intern-soft thing)
+    (when symb
       (let* ((file (or (locate-file thing
                                     (or find-function-source-path load-path)
                                     (find-library-suffixes))
@@ -145,14 +146,13 @@ LIBRARY should be a string (the name of the library)."
         `(:symbol ,thing :doc ,doc :type "feature" :file ,file
                   :linum ,linum :keywords ,keywords)))))
 
-(defun sos-elisp-find-function (thing)
+(defun sos-elisp-find-function (thing symb)
   "Return the candidate pointing to the definition of `symb'. It was written 
 refer to `find-function-noselect', `find-function-search-for-symbol' and 
 `describe-function'."
   (ignore-errors
-    (when (intern-soft thing)
-      (let* ((symb (intern-soft thing))
-             (real-symb symb))
+    (when symb
+      (let* ((real-symb symb))
         ;; Try to dereference the symbol if it's a alias.
         (while (symbolp (symbol-function real-symb))
           (setq real-symb (symbol-function
@@ -191,14 +191,13 @@ refer to `find-function-noselect', `find-function-search-for-symbol' and
                                             (propertize (symbol-name real-symb)
                                                         'face 'tooltip))))))))))
 
-(defun sos-elisp-find-variable (thing)
+(defun sos-elisp-find-variable (thing symb)
   "Return the candidate pointing to the definition of `symb'. It was written 
 refer to `find-variable-noselect', `find-function-search-for-symbol' and 
 `describe-variable'."
   (ignore-errors
-    (when (intern-soft thing)
-      (let* ((symb (intern-soft thing))
-             (file (symbol-file symb 'defvar)))
+    (when symb
+      (let* ((file (symbol-file symb 'defvar)))
         (if file
             ;; Normal Variable ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
             (let* ((file (sos-elisp-normalize-path file))
@@ -313,80 +312,116 @@ file-local variable.\n")
       (insert-file-contents file)
       (buffer-string))))
 
-(defun sos-elisp-find-let-variable (thing)
-  (let ((doc (sos-elisp-current-doc))
-        (linum 0)
-        regexp-thing
-        regexp
-        keywords
-        beg end)
+(defun sos-elisp-lets-pos ()
+  (let (pos)
     (ignore-errors
       (save-excursion
-        ;; Find beginning of "let" definition.
-        (while (not (looking-at "(let[*]*\\s-("))
-          (up-list -1))
-        (goto-char (match-end 0))
-        ;; Scan its spec.
-        (catch 'end
+        (while t
+          (up-list -1)
+          ;; Find beginning of "let" definition.
+          (when (looking-at "(let[*]*\\s-(")
+            (setq pos (append pos `(,(point))))))))
+    pos))
+
+(defun sos-elisp-find-let-variable (thing)
+  (let ((linum 0) regexp
+        (lets-pos (sos-elisp-lets-pos))
+        beg end)
+    (catch 'break
+      (dolist (pos lets-pos)
+        (save-excursion
+          (goto-char pos)
+          (down-list 2)
+          ;; Scan its spec.
+          (ignore-errors
+            (while (progn (forward-sexp) t)
+              (save-excursion
+                (setq end (point))
+                (backward-sexp)
+                (setq beg (point))
+                (if (equal (char-after) ?\()
+                    (let ((regexp-thing (concat "(\\(?1:"
+                                                (regexp-quote thing)
+                                                "\\)\\s-")))
+                      (when (re-search-forward regexp-thing end t)
+                        (setq linum (line-number-at-pos)
+                              regexp (concat
+                                      "^"
+                                      (regexp-quote
+                                       (buffer-substring-no-properties
+                                        (line-beginning-position)
+                                        (match-beginning 0)))
+                                      regexp-thing
+                                      (regexp-quote
+                                       (buffer-substring-no-properties
+                                        (match-end 0)
+                                        (line-end-position)))
+                                      "$"))
+                        (throw 'break)))
+                  (when (string= thing
+                                 (buffer-substring-no-properties beg end))
+                    (setq linum (line-number-at-pos)
+                          regexp (concat
+                                  "^"
+                                  (regexp-quote
+                                   (buffer-substring-no-properties
+                                    (line-beginning-position)
+                                    beg))
+                                  (concat "\\(?1:"
+                                          (regexp-quote thing)
+                                          "\\)")
+                                  (regexp-quote
+                                   (buffer-substring-no-properties
+                                    end
+                                    (line-end-position)))
+                                  "$"))
+                    (throw 'break)))))))))
+    (when regexp
+      `(:symbol ,thing :doc ,(sos-elisp-current-doc) :type "local variable"
+                :file ,(buffer-file-name) :linum ,linum
+                :keywords ((,regexp 1 ',(sos-hl-symbol-parameter-face) prepend))))))
+
+(defun sos-elisp-find-function-parameter (thing)
+  (let ((linum 0) regexp
+        beg end)
+    (save-excursion
+      (beginning-of-defun)
+      (setq linum (line-number-at-pos))
+      (down-list 2)
+      (catch 'break
+        (ignore-errors
           (while (progn (forward-sexp) t)
             (save-excursion
               (setq end (point))
               (backward-sexp)
               (setq beg (point))
-              (if (equal (char-after) ?\()
-                  (progn
-                    (setq regexp-thing (concat "(\\(?1:"
-                                               (regexp-quote thing)
-                                               "\\)\\s-"))
-                    (when (re-search-forward regexp-thing end t)
-                      (setq linum (line-number-at-pos)
-                            regexp (concat
-                                    "^"
-                                    (regexp-quote
-                                     (buffer-substring-no-properties
-                                      (line-beginning-position)
-                                      (match-beginning 0)))
-                                    regexp-thing
-                                    (regexp-quote
-                                     (buffer-substring-no-properties
-                                      (match-end 0)
-                                      (line-end-position)))
-                                    "$")
-                            keywords `((,regexp 1 ',(sos-hl-symbol-parameter-face) prepend)))
-                      (throw 'end)))
-                (when (string= thing
-                               (buffer-substring-no-properties beg end))
-                  (setq linum (line-number-at-pos)
-                        regexp (concat
-                                "^"
-                                (regexp-quote
-                                 (buffer-substring-no-properties
-                                  (line-beginning-position)
-                                  beg))
-                                (concat "\\(?1:"
-                                        (regexp-quote thing)
-                                        "\\)")
-                                (regexp-quote
-                                 (buffer-substring-no-properties
-                                  end
-                                  (line-end-position)))
-                                "$")
-                        keywords `((,regexp 1 ',(sos-hl-symbol-parameter-face) prepend)))
-                  (throw 'end))))))))
+              (when (string= thing (buffer-substring-no-properties
+                                    beg
+                                    end))
+                (setq regexp (concat
+                              "^"
+                              (regexp-quote
+                               (buffer-substring-no-properties
+                                (line-beginning-position)
+                                beg))
+                              (concat "\\(?1:"
+                                      (regexp-quote thing)
+                                      "\\)")
+                              (regexp-quote
+                               (buffer-substring-no-properties
+                                end
+                                (line-end-position)))
+                              "$"))
+                (throw 'break)))))))
     (when regexp
-      `(:symbol ,thing :doc ,doc :type "local variable" :file ,(buffer-file-name)
-                :linum ,linum :keywords ,keywords))))
+      `(:symbol ,thing :doc ,(sos-elisp-current-doc) :type "function parameter"
+                :file ,(buffer-file-name) :linum ,linum
+                :keywords ((,regexp 1 ',(sos-hl-symbol-parameter-face) prepend))))))
 
-(defun sos-elisp-find-function-parameter (thing)
-  ;; TODO: implement it.
-  ;; (beginning-of-defun)
-  )
-
-(defun sos-elisp-find-face (thing)
+(defun sos-elisp-find-face (thing symb)
   (ignore-errors
-    (when (intern-soft thing)
-      (let* ((symb (intern-soft thing))
-             (file (sos-elisp-normalize-path (symbol-file symb 'defface)))
+    (when symb
+      (let* ((file (sos-elisp-normalize-path (symbol-file symb 'defface)))
              (doc&linum (sos-elisp-get-doc&linum file thing
                                                  sos-elisp-find-face-regexp))
              (doc (nth 0 doc&linum))
