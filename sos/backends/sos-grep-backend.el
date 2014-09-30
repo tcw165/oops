@@ -55,10 +55,6 @@
      (let* ((symb arg)
             (file (car symb))
             (linum (cdr symb))
-            (doc (with-temp-buffer
-                   (when (file-exists-p file)
-                     (insert-file-contents file)
-                     (buffer-string))))
             (match (save-excursion
                      (search-backward-regexp
                       (concat "^" sos-grep-prefix ".+$") nil t)
@@ -66,6 +62,6 @@
                       (+ (length sos-grep-prefix) (point))
                       (line-end-position))))
             (keywords `((,match 0 'sos-hl-symbol-face prepend))))
-       `((:doc ,doc :file ,file :linum ,linum :keywords ,keywords))))))
+       `((:file ,file :linum ,linum :keywords ,keywords))))))
 
 (provide 'sos-grep-backend)

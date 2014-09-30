@@ -129,7 +129,6 @@ remove one.\n"
              (widget-create 'editable-list
                             :entry-format "%i %d path: %v"
                             :value '("")
-                            ;; Put :company to make company work for it.
                             '(editable-field :company prj-browse-file-backend)))))
     (:hide
      (and (get-buffer "*Create Project*")
@@ -317,7 +316,6 @@ remove one.\n"
          (setq prj-widget-textfield
                (widget-create 'editable-field
                               :format "Search: %v"
-                              :company 'prj-search-backend
                               ;; Get thing on the point, latest history or empty.
                               :value (or thing
                                          (and (stringp history)
@@ -427,8 +425,7 @@ remove one.\n"
      (when (featurep 'company)
        (company-mode)
        (make-local-variable 'company-backends)
-       (add-to-list 'company-backends 'prj-browse-file-backend)
-       (add-to-list 'company-backends 'prj-search-backend))))
+       (add-to-list 'company-backends 'prj-browse-file-backend))))
 
 (defmacro prj-widget-checkbox-select-all (checkboxes)
   `(lambda (&rest ignore)
@@ -526,16 +523,6 @@ remove one.\n"
                         (cdr prj-browse-file-cache))))
     (ignore-case t)))
 
-;;;###autoload
-(defun prj-search-backend (command &optional arg &rest ign)
-  "Following are for `company' when searching project."
-  (case command
-    (prefix
-     (prj-common-prefix 'prj-search-backend))
-    (candidates
-     (all-completions arg (prj-search-cache)))
-    (ignore-case t)))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defvar prj-browse-file-cache nil
@@ -585,8 +572,7 @@ remove one.\n"
 (defun prj-widget-forward-or-company ()
   "It is for `widget-forward-hook' to continue forward to next widget or show company prompt."
   (interactive)
-  (and (or (prj-common-prefix 'prj-browse-file-backend)
-           (prj-common-prefix 'prj-search-backend))
+  (and (or (prj-common-prefix 'prj-browse-file-backend))
        (company-complete)
        (top-level)))
 
