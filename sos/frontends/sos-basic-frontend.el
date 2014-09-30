@@ -514,9 +514,9 @@ mouse-3: Copy the path."
   "sos:goto-definitions"
   "doc"
   :group 'sos-group
-  (suppress-keymap sos-goto-definitions-mode-map t)
-  (define-key sos-goto-definitions-mode-map [?e] (sos-goto-definition-from-candidates))
-  (define-key sos-goto-definitions-mode-map [return] (sos-goto-definition-from-candidates))
+  (suppress-keymap sos-candidates-preview-mode-map t)
+  (define-key sos-candidates-preview-mode-map [?e] (sos-goto-definition-from-candidates))
+  (define-key sos-candidates-preview-mode-map [return] (sos-goto-definition-from-candidates))
   ;; Make highlight line sticky only for current buffer.
   (setq-local hl-line-sticky-flag t)
   ;; Mode line.
