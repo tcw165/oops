@@ -213,6 +213,10 @@ result to the `sos-def-buf' displayed in the `sos-def-win'."
 (defvar sos-source-window nil
   "The current window where the source code buffer is at.")
 
+(defvar sos-is-skip-current-buffer nil
+  "t to skip `sos-idle-begin'.")
+(make-variable-buffer-local 'sos-is-skip-current-buffer)
+
 (defun sos-pre-command ()
   (when sos-timer
     (cancel-timer sos-timer)
@@ -227,11 +231,8 @@ result to the `sos-def-buf' displayed in the `sos-def-win'."
 
 (defun sos-is-idle-begin ()
   (not (or (active-minibuffer-window)
-           (sos-is-valid-buffer)
+           sos-is-skip-current-buffer
            (sos-is-skip-command))))
-
-(defun sos-is-valid-buffer ()
-  (string-match "\\*[Dd]efinition\\*" (buffer-name (current-buffer))))
 
 (defun sos-is-skip-command (&rest commands)
   "Return t if `this-command' should be skipped.

@@ -263,7 +263,8 @@ into the stack when user navigate to deeper definition in the definition window.
        (with-current-buffer sos-def-buf
          (setq buffer-read-only nil)
          ,@body
-         (setq buffer-read-only t)))))
+         (setq sos-is-skip-current-buffer t
+               buffer-read-only t)))))
 
 (defun sos-toggle-definition-buffer&window (toggle)
   "Display or hide the `sos-def-buf' and `sos-def-win'."
