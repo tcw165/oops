@@ -334,7 +334,7 @@ If you want to skip additional commands, try example:
       (sos-goto-def-1st-process)
     (sos-goto-def-normal-process sos-backend)))
 
-(defcustom sos-goto-definition-frontend 'sos-goto-definition-frontend
+(defcustom sos-goto-definition-frontend 'sos-goto-definitions-frontend
   "The list of front-ends for the purpose of visualization.
 
 ### Commands:

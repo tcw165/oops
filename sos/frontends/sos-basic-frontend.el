@@ -61,7 +61,7 @@
        (setq sos-def-win-height (window-height sos-def-win))))
 
 ;;;###autoload
-(defun sos-goto-definition-frontend (command &optional arg)
+(defun sos-goto-definitions-frontend (command &optional arg)
   (case command
     (:show
      (and (featurep 'history)
@@ -69,9 +69,20 @@
      (setq mark-active nil
            sos-candidates arg)
      (if (sos-is-multiple-candidates)
-         ;; TODO:
-         (progn
-           (message "yet support multiple definitions!"))
+         ;; Multiple Candidates ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+         (let ((buffer (get-buffer-create "*Goto Definition*")))
+           (switch-to-buffer buffer)
+           (setq buffer-read-only nil)
+           ;; Insert condidates.
+           (sos-show-candidates-common)
+           ;; Major mode.
+           (sos-candidates-preview-mode)
+           (tabulated-list-init-header)
+           (tabulated-list-print)
+           ;; Minor mode.
+           (linum-mode 1)
+           (hl-line-mode 1))
+       ;; Single Candidate ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        (let* ((candidate (nth 0 sos-candidates))
               (file (plist-get candidate :file))
               (linum (plist-get candidate :linum))
@@ -79,6 +90,8 @@
               regexp)
          (when (stringp file)
            (find-file-existing file)
+           ;; (when (get-buffer "*Goto Definition*")
+           ;;   (kill-buffer "*Goto Definition*"))
            ;; Line number.
            (when (integerp linum)
              (goto-line linum))
@@ -106,9 +119,9 @@
 (defun sos-open-definition-file ()
   "Open file refer to `mode-line-format'."
   (interactive)
-  (let* ((info (sos-ml-info))
-         (file (car info))
-         (linum (cdr info)))
+  (let* ((candidate (nth 0 sos-candidates))
+         (file (plist-get candidate :file))
+         (linum (plist-get candidate :linum)))
     (when (and (file-exists-p file)
                (integerp linum)
                (window-live-p sos-source-window))
@@ -127,24 +140,24 @@
 (defun sos-copy-definition-file-path ()
   "Copy file path refer to `mode-line-format'."
   (interactive)
-  (let* ((info (sos-ml-info))
-         (file (car info)))
-    (and file
-         (with-temp-buffer
-           (insert file)
-           (clipboard-kill-ring-save 1 (point-max)))
-         (message "File path is copied to clipboard!"))))
+  (let* ((candidate (nth 0 sos-candidates))
+         (file (plist-get candidate :file)))
+    (when (and file (stringp file))
+      (with-temp-buffer
+        (insert file)
+        (clipboard-kill-ring-save 1 (point-max)))
+      (message "File path is copied to clipboard!"))))
 
 ;;;###autoload
 (defun sos-goto-definition-line ()
   "Go to line refer to `mode-line-format'."
   (interactive)
-  (let* ((info (sos-ml-info))
-         (linum (cdr info)))
-    (and (integerp linum)
-         (sos-with-definition-buffer
-           (goto-line linum)
-           (recenter 3)))))
+  (let* ((candidate (nth 0 sos-candidates))
+         (linum (plist-get candidate :linum)))
+    (when (and linum (integerp linum))
+      (sos-with-definition-buffer
+        (goto-line linum)
+        (recenter 5)))))
 
 ;;;###autoload
 (defun sos-jump-in-candidate ()
@@ -156,7 +169,7 @@
             (push (cons select-index sos-candidates) sos-candidates-stack)
             (setq sos-candidates `(,(nth select-index sos-candidates)))
             (sos-show-candidate))
-        (message "Empty item!")))))
+        (message "Invalid choice!")))))
 
 ;;;###autoload
 (defun sos-jump-out-candidate ()
@@ -263,6 +276,7 @@ into the stack when user navigate to deeper definition in the definition window.
        (with-current-buffer sos-def-buf
          (setq buffer-read-only nil)
          ,@body
+         ;; Avoid the engine to scan this buffer.
          (setq sos-is-skip-current-buffer t
                buffer-read-only t)))))
 
@@ -284,31 +298,6 @@ into the stack when user navigate to deeper definition in the definition window.
 
 (defun sos-is-multiple-candidates ()
   (> (length sos-candidates) 1))
-
-;; (defun sos-header-mode-line ()
-;;   `("  Multiple Definitions | "
-;;     (:eval (when sos-candidates-mode
-;;              (format "Choose definition: %s %s "
-;;                      (propertize " Up "
-;;                                  'face 'custom-button
-;;                                  'mouse-face 'custom-button-mouse
-;;                                  'local-map sos-prev-candidate-button-map)
-;;                      (propertize " Down "
-;;                                  'face 'custom-button
-;;                                  'mouse-face 'custom-button-mouse
-;;                                  'local-map sos-next-candidate-button-map))))
-;;     (:eval (if sos-candidates-stack
-;;                (format "Back to options: %s "
-;;                        (propertize " Back "
-;;                                    'face 'custom-button
-;;                                    'mouse-face 'custom-button-mouse
-;;                                    'local-map sos-jump-out-button-map))
-;;              (format "Open definition: %s "
-;;                      (propertize " Go "
-;;                                  'face 'custom-button
-;;                                  'mouse-face 'custom-button-mouse
-;;                                  'local-map sos-jump-in-button-map))))))
-;; `sos-candidate-mode'
 
 (defun sos-bottom-mode-line (&optional desc file line)
   `(,(propertize "  Definition "
@@ -344,26 +333,6 @@ mouse-3: Copy the path."
                                     'local-map sos-linum-map))))
     (:eval (and ,desc (> (length ,desc) 0)
                 (format "| %s " ,desc)))))
-
-(defun sos-ml-info ()
-  "Get file and line number from definition buffer's `mode-line-format'.
-Return (FILE . LINUM) struct."
-  (sos-with-definition-buffer
-    (let* ((text (pp-to-string mode-line-format))
-           (beg (string-match "(file-exists-p \".+\")" text))
-           (end (match-end 0))
-           (file (and beg end
-                      (substring text
-                                 (+ beg 16)
-                                 (- end 2))))
-           (beg (string-match "(integerp [0-9]+)" text))
-           (end (match-end 0))
-           (linum (and beg end
-                       (string-to-int
-                        (substring text
-                                   (+ beg 10)
-                                   (- end 1))))))
-      (cons file linum))))
 
 (defun sos-show-candidate ()
   "Show single candidate prompt."
@@ -414,39 +383,8 @@ Return (FILE . LINUM) struct."
   "Show multiple candidates prompt."
   ;; TODO: Check if there're candidates need to be showed immediately.
   (sos-with-definition-buffer
-    (kill-all-local-variables)
-    (remove-overlays)
-    (erase-buffer)
-    ;; Content
-    (let ((id 0)
-          entries)
-      (dolist (candidate sos-candidates)
-        (let* ((symb (plist-get candidate :symbol))
-               (type (plist-get candidate :type))
-               (doc (plist-get candidate :doc))
-               (linum (plist-get candidate :linum))
-               (file (plist-get candidate :file))
-               (show (plist-get candidate :show))
-               (entry (when (and symb (stringp symb)
-                                 type (stringp type)
-                                 linum (integerp linum)
-                                 (or (and file (stringp file))
-                                     (and doc (stringp doc))))
-                        `(,id [,symb ,type ,(number-to-string linum)
-                                     ,(or file
-                                          (with-temp-buffer
-                                            (insert doc)
-                                            (goto-char 1)
-                                            (buffer-substring-no-properties
-                                             1 (line-end-position))))]))))
-          (when entry
-            (setq entries (append entries `(,entry))
-                  id (1+ id)))))
-      (setq tabulated-list-format '[("symbol" 24 t)
-                                    ("type" 20 t)
-                                    ("linum" 6 t)
-                                    ("file" 64 t)]
-            tabulated-list-entries entries))
+    ;; Insert condidates.
+    (sos-show-candidates-common)
     ;; Major mode.
     (tabulated-list-mode)
     (tabulated-list-init-header)
@@ -460,6 +398,43 @@ Return (FILE . LINUM) struct."
       (goto-line (1+ select-index)))
     ;; Set header line and button line.
     (setq mode-line-format (sos-bottom-mode-line))))
+
+(defun sos-show-candidates-common ()
+  "Show multiple candidates prompt."
+  ;; TODO: Check if there're candidates need to be showed immediately.
+  (kill-all-local-variables)
+  (remove-overlays)
+  (erase-buffer)
+  ;; Content
+  (let ((id 0)
+        entries)
+    (dolist (candidate sos-candidates)
+      (let* ((symb (plist-get candidate :symbol))
+             (type (plist-get candidate :type))
+             (doc (plist-get candidate :doc))
+             (linum (plist-get candidate :linum))
+             (file (plist-get candidate :file))
+             (show (plist-get candidate :show))
+             (entry (when (and symb (stringp symb)
+                               type (stringp type)
+                               linum (integerp linum)
+                               (or (and file (stringp file))
+                                   (and doc (stringp doc))))
+                      `(,id [,symb ,type ,(number-to-string linum)
+                                   ,(or file
+                                        (with-temp-buffer
+                                          (insert doc)
+                                          (goto-char 1)
+                                          (buffer-substring-no-properties
+                                           1 (line-end-position))))]))))
+        (when entry
+          (setq entries (append entries `(,entry))
+                id (1+ id)))))
+    (setq tabulated-list-format '[("symbol" 24 t)
+                                  ("type" 20 t)
+                                  ("linum" 6 t)
+                                  ("file" 64 t)]
+          tabulated-list-entries entries)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Signle Candidate ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -495,6 +470,7 @@ Return (FILE . LINUM) struct."
       (progn
         (use-local-map sos-candidates-mode-map)
         (setq buffer-read-only t)
+        ;; Make highlight line sticky only for current buffer.
         (setq-local hl-line-sticky-flag t))
     (setq buffer-read-only nil)))
 
@@ -529,5 +505,34 @@ Return (FILE . LINUM) struct."
   (let ((map (make-sparse-keymap)))
     (define-key map [mode-line mouse-1] 'sos-jump-out-candidate)
     map))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Go To Definitions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;###autoload
+(define-derived-mode sos-candidates-preview-mode tabulated-list-mode
+  "sos:goto-definitions"
+  "doc"
+  :group 'sos-group
+  (suppress-keymap sos-goto-definitions-mode-map t)
+  (define-key sos-goto-definitions-mode-map [?e] (sos-goto-definition-from-candidates))
+  (define-key sos-goto-definitions-mode-map [return] (sos-goto-definition-from-candidates))
+  ;; Make highlight line sticky only for current buffer.
+  (setq-local hl-line-sticky-flag t)
+  ;; Mode line.
+  (setq mode-line-format `(,(propertize "  Goto Definition "
+                                        'face 'mode-line-buffer-id)
+                           ,(format "| UP/DOWN to select; ENTER to open; Q to exit."))))
+
+(defun sos-goto-definition-from-candidates ()
+  `(lambda ()
+     (interactive)
+     (let ((select-index (tabulated-list-get-id)))
+       (if select-index
+           (progn
+             (kill-buffer)
+             (setq sos-candidates `(,(nth select-index sos-candidates)))
+             (sos-goto-definitions-frontend :show sos-candidates))
+         (message "Invalid choice!")))))
 
 (provide 'sos-basic-frontend)

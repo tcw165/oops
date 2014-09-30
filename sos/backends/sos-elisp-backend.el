@@ -111,12 +111,6 @@
     ;; document string + line number + keywords.
     `(,doc ,linum ((,regexp 1 ',(sos-hl-symbol-face) prepend)))))
 
-(defun sos-elisp-current-doc ()
-  (let ((file (buffer-file-name)))
-    (with-temp-buffer
-      (insert-file-contents file)
-      (buffer-string))))
-
 (defun sos-elisp-function-document-keywords (usage)
   (when usage
     (let ((regexp (concat "^\\(?1:" (regexp-quote usage) "\\)$"))
@@ -146,11 +140,10 @@ LIBRARY should be a string (the name of the library)."
                                     load-file-rep-suffixes)))
              (doc&linum (sos-elisp-get-doc&linum file thing
                                                  sos-elisp-find-feature-regexp))
-             (doc (nth 0 doc&linum))
              (linum (nth 1 doc&linum))
              (keywords (nth 2 doc&linum)))
-        `(:symbol ,thing :doc ,doc :type "feature" :file ,file
-                  :linum ,linum :keywords ,keywords)))))
+        `(:symbol ,thing :type "feature" :file ,file :linum ,linum
+                  :keywords ,keywords)))))
 
 (defun sos-elisp-find-function (thing symb)
   "Return the candidate pointing to the definition of `symb'. It was written 
@@ -185,11 +178,10 @@ refer to `find-function-noselect', `find-function-search-for-symbol' and
           (let* ((file (sos-elisp-normalize-path (symbol-file real-symb 'defun)))
                  (doc&linum (sos-elisp-get-doc&linum file thing
                                                      sos-elisp-find-function-regexp))
-                 (doc (nth 0 doc&linum))
                  (linum (nth 1 doc&linum))
                  (keywords (nth 2 doc&linum)))
-            `(:symbol ,thing :doc ,doc :type "function" :file ,file
-                      :linum ,linum :keywords ,keywords
+            `(:symbol ,thing :type "function" :file ,file :linum ,linum
+                      :keywords ,keywords
                       :mode-line ,(unless (eq real-symb symb)
                                     (format "%s is an alias of %s "
                                             (propertize (symbol-name symb)
@@ -209,11 +201,10 @@ refer to `find-variable-noselect', `find-function-search-for-symbol' and
             (let* ((file (sos-elisp-normalize-path file))
                    (doc&linum (sos-elisp-get-doc&linum file thing
                                                        sos-elisp-find-variable-regexp))
-                   (doc (nth 0 doc&linum))
                    (linum (nth 1 doc&linum))
                    (keywords (nth 2 doc&linum)))
-              `(:symbol ,thing :doc ,doc :type "variable" :file ,file
-                        :linum ,linum :keywords ,keywords))
+              `(:symbol ,thing :type "variable" :file ,file :linum ,linum
+                        :keywords ,keywords))
           ;; Built-in Variable ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           (let* ((doc (documentation-property symb 'variable-documentation))
                  (keywords (sos-elisp-variable-document-keywords thing))
@@ -373,8 +364,8 @@ file-local variable.\n")
                                           "\\)")))
                     (throw 'break)))))))))
     (when regexp
-      `(:symbol ,thing :doc ,(sos-elisp-current-doc) :type "local variable"
-                :file ,(buffer-file-name) :linum ,linum
+      `(:symbol ,thing :type "local variable" :file ,(buffer-file-name)
+                :linum ,linum
                 :keywords ((,regexp 1 ',(sos-hl-symbol-parameter-face) prepend))))))
 
 (defun sos-elisp-find-function-parameter (thing)
@@ -411,8 +402,8 @@ file-local variable.\n")
                               "$"))
                 (throw 'break)))))))
     (when regexp
-      `(:symbol ,thing :doc ,(sos-elisp-current-doc) :type "function parameter"
-                :file ,(buffer-file-name) :linum ,linum
+      `(:symbol ,thing :type "function parameter" :file ,(buffer-file-name)
+                :linum ,linum
                 :keywords ((,regexp 1 ',(sos-hl-symbol-parameter-face) prepend))))))
 
 (defun sos-elisp-find-face (thing symb)
@@ -421,10 +412,9 @@ file-local variable.\n")
       (let* ((file (sos-elisp-normalize-path (symbol-file symb 'defface)))
              (doc&linum (sos-elisp-get-doc&linum file thing
                                                  sos-elisp-find-face-regexp))
-             (doc (nth 0 doc&linum))
              (linum (nth 1 doc&linum))
              (keywords (nth 2 doc&linum)))
-        `(:symbol ,thing :doc ,doc :type "face" :file ,file
-                  :linum ,linum :keywords ,keywords)))))
+        `(:symbol ,thing :type "face" :file ,file :linum ,linum
+                  :keywords ,keywords)))))
 
 (provide 'sos-elisp-backend)
