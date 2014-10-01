@@ -96,11 +96,6 @@
   (setq hl-index-local 0))
 
 ;;;###autoload
-(defun hl-highlight-line (linum &optional facespec)
-  ;; TODO:
-  )
-
-;;;###autoload
 (define-minor-mode hl-highlight-mode
   "Provide convenient menu items and tool-bar items for project feature."
   :lighter " Highlight"

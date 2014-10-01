@@ -34,31 +34,28 @@
 (defun sos-candidates-preview-backend (command &optional arg)
   (case command
     (:symbol
-     (when (eq major-mode sos-candidates-preview-mode)
-       (unless mark-active
-         (save-excursion
-           (beginning-of-line)
-           (if (search-forward-regexp "^.+:[0-9]+:" (line-end-position) t)
-               ;; Return (FILEPATH . NUM) struct.
-               (let* ((text (buffer-substring-no-properties
-                             (line-beginning-position) (- (point) 1)))
-                      (offset (string-match ":[0-9]+$" text))
-                      (file (substring text 0 offset))
-                      (linum (string-to-int (substring text (1+ offset)))))
-                 (cons file linum))
-             :stop)))))
+     (when (memq major-mode '(sos-candidates-preview-mode))
+       (let ((entry (tabulated-list-get-entry)))
+         (if (and entry (not mark-active))
+             ;; Return the entry of `tabulated-list-entries'.
+             entry
+           :stop))))
     (:candidates
-     ;; 1st argument is (FILEPATH . NUM) struct.
-     (let* ((symb arg)
-            (file (car symb))
-            (linum (cdr symb))
-            (match (save-excursion
-                     (search-backward-regexp
-                      (concat "^" sos-grep-prefix ".+$") nil t)
-                     (buffer-substring-no-properties
-                      (+ (length sos-grep-prefix) (point))
-                      (line-end-position))))
-            (keywords `((,match 0 'sos-hl-symbol-face prepend))))
-       `((:file ,file :linum ,linum :keywords ,keywords))))))
+     ;; 1st argument is an entry of `tabulated-list-entries'.
+     (let* ((entry arg)
+            (linum (string-to-int (aref entry 2)))
+            (file (aref entry 3))
+            (doc (aref entry 4))
+            keywords)
+       (or (when doc
+             (setq keywords `((,(regexp-quote (with-temp-buffer
+                                                (insert doc)
+                                                (goto-char 1)
+                                                (buffer-substring-no-properties
+                                                 1 (line-end-position))))
+                               0 'sos-hl-symbol-face prepend)))
+             `((:doc ,doc :linum ,linum :keywords ,keywords)))
+           (when file
+             `((:file ,file :linum ,linum))))))))
 
-(provide 'sos-grep-backend)
+(provide 'sos-candidates-preview-backend)

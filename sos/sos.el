@@ -35,6 +35,7 @@
 
 ;; Back-ends.
 (require 'sos-grep-backend)
+(require 'sos-candidates-preview-backend)
 (require 'sos-elisp-backend)
 (require 'sos-semantic-backend)
 
@@ -49,6 +50,7 @@ meaningful information around the point."
   :tag "Sos")
 
 (defcustom sos-backends '(sos-grep-backend
+                          sos-candidates-preview-backend
                           sos-elisp-backend)
   "The list of back-ends for the purpose of collecting candidates. The sos 
 engine will dispatch all the back-ends and pass specific commands in order. 
@@ -98,18 +100,18 @@ the following back-ends.
  ### Must-Have Properties:
  `:doc': Buffer text which is the file content (buffer-string).
 
+ `:file': The absolute file path.
+
  `:linum': The line number (integer).
 
+ ### Optional Properties:
  `:keywords': A list containing elements to highlight keywords. Its format is 
               `font-lock-keywords'. The 1st matcher must be for the symbol 
               definition.
 
- ### Optional Properties:
  `:symbol': The symbol's name.
 
  `:type': The String which describe the symbol.
-
- `:file': The absolute file path.
 
  `:show': t indicates front-ends show this CANDIDATE by default.
 
