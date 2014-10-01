@@ -508,7 +508,7 @@ mouse-3: Copy the path."
                (progn
                  (kill-buffer)
                  (sos-goto-definition-from-candidates-common))
-             (message "There's no valid file."))
+             (message "It is only a doucmentation, so cannot open this type of definition."))
          (message "Invalid choice!")))))
 
 (defun sos-goto-definition-from-candidates-common ()
