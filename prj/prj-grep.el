@@ -42,23 +42,45 @@
 (defvar prj-grep-mode-map
   (let ((map (make-sparse-keymap)))
     (suppress-keymap map t)
-    (when (featurep 'sos)
-      (define-key map [return] 'sos-goto-definition))
+    (if (featurep 'sos)
+        (progn
+          (define-key map [return] '(lambda ()
+                                      (interactive)
+                                      (beginning-of-line)
+                                      (sos-goto-definition))))
+      )
+    ;; (define-key map [up] )
+    ;; (define-key map [down] )
+    (define-key map [?q] '(lambda ()
+                            (interactive)
+                            (prj-kill-grep-buffer)))
+    (define-key map [?d] '(lambda () (interactive) (prj-kill-grep-item-at-point)))
     map))
 
 (defvar prj-grep-mode-font-lock-keywords
   '((("^\\([[:alnum:] $_\/.+-]+\\):\\([0-9]+\\):.*$" (1 'hl-file-face) (2 'hl-number-face))
      ("^\\(>>>>>\\s-\\)\\(.+\\)$" (1 'hl-title-3-face) (2 'hl-symbol-face))
      ("^\\(<<<<<\\)$" (1 'hl-title-3-face)))
-    t nil))
+    ;; don't use syntactic fontification.
+    t
+    ;; Case insensitive.
+    nil))
 
 (defvar prj-grep-mode-header-line
-  `(,(format "  Tips: %s and %s to navigate; %s to open file; %s or %s to delete item;"
+  `(,(format "  Tips: %s and %s to navigate; %s to open item; %s to delete item; %s to quit"
              (propertize "UP" 'face 'tooltip)
              (propertize "DOWN" 'face 'tooltip)
              (propertize "ENTER" 'face 'tooltip)
-             (propertize "DEL" 'face 'tooltip)
+             (propertize "d" 'face 'tooltip)
              (propertize "q" 'face 'tooltip))))
+
+(defun prj-kill-grep-item-at-point ()
+  (message "Yet implement..."))
+
+(defun prj-kill-grep-buffer ()
+  (when (buffer-modified-p)
+    (save-buffer))
+  (kill-buffer))
 
 ;;;###autoload
 (define-derived-mode prj-grep-mode nil "prj:grep"

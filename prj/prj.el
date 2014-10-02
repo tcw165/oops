@@ -296,6 +296,8 @@ project to be loaded."
     ;; Go to search buffer.
     (unless (prj-project-p)
       (prj-load-project))
+    (and (featurep 'history)
+         (his-add-position-type-history))
     (prj-with-search-buffer
       (switch-to-buffer (current-buffer) nil t)
       ;; (setq buffer-read-only t)
