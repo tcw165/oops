@@ -30,36 +30,6 @@
 
 (require 'thingatpt)
 
-;;;###autoload
-(defun sos-elisp-backend (command &optional arg)
-  (case command
-    (:symbol
-     (when (member major-mode '(emacs-lisp-mode
-                                lisp-interaction-mode))
-       (let ((symb (sos-elisp-thingatpt)))
-         ;; Return the thing in string or `:stop'.
-         (or symb
-             :stop))))
-    (:candidates
-     (when arg
-       (let* ((thing arg)
-              (symb (intern-soft thing))
-              candidates)
-         ;; TODO: use tag system.
-         ;; The last one gets the top priority.
-         (dolist (cand (list (sos-elisp-find-feature thing symb)
-                             (sos-elisp-find-face thing symb)
-                             (sos-elisp-find-variable thing symb)
-                             (sos-elisp-find-function thing symb)
-                             (sos-elisp-find-function-parameter thing)
-                             (sos-elisp-find-let-variable thing)))
-           (and cand
-                (push cand candidates)))
-         candidates)))
-    (:tips
-     (when arg
-       (list (format "%s" arg))))))
-
 (defconst sos-elisp-find-function-regexp "^\\s-*(\\(?:def\\(ine-skeleton\\|ine-generic-mode\\|ine-derived-mode\\|ine\\(?:-global\\)?-minor-mode\\|ine-compilation-mode\\|un-cvs-mode\\|foo\\|[^icfgv]\\(\\w\\|\\s_\\)+\\*?\\)\\|easy-mmode-define-[a-z-]+\\|easy-menu-define\\|menu-bar-make-toggle\\)\\(?:\\s-\\|\\|;.*\n\\)+\\(?:'\\|(quote \\)?\\\\?\\(?1:%s\\)\\(?:\\s-\\|$\\|(\\|)\\)"
   "Refer to `find-function-regexp'.")
 
@@ -366,7 +336,7 @@ file-local variable.\n")
     (when regexp
       `(:symbol ,thing :type "local variable" :file ,(buffer-file-name)
                 :linum ,linum
-                :keywords ((,regexp 1 ',(sos-hl-symbol-parameter-face) prepend))))))
+                :keywords ((,regexp 1 ',(sos-hl-symbol-face) prepend))))))
 
 (defun sos-elisp-find-function-parameter (thing)
   (let ((linum 0)
@@ -404,7 +374,7 @@ file-local variable.\n")
     (when regexp
       `(:symbol ,thing :type "function parameter" :file ,(buffer-file-name)
                 :linum ,linum
-                :keywords ((,regexp 1 ',(sos-hl-symbol-parameter-face) prepend))))))
+                :keywords ((,regexp 1 ',(sos-hl-symbol-face) prepend))))))
 
 (defun sos-elisp-find-face (thing symb)
   (ignore-errors
@@ -416,5 +386,35 @@ file-local variable.\n")
              (keywords (nth 2 doc&linum)))
         `(:symbol ,thing :type "face" :file ,file :linum ,linum
                   :keywords ,keywords)))))
+
+;;;###autoload
+(defun sos-elisp-backend (command &optional arg)
+  (case command
+    (:symbol
+     (when (member major-mode '(emacs-lisp-mode
+                                lisp-interaction-mode))
+       (let ((symb (sos-elisp-thingatpt)))
+         ;; Return the thing in string or `:stop'.
+         (or symb
+             :stop))))
+    (:candidates
+     (when arg
+       (let* ((thing arg)
+              (symb (intern-soft thing))
+              candidates)
+         ;; TODO: use tag system.
+         ;; The last one gets the top priority.
+         (dolist (cand (list (sos-elisp-find-feature thing symb)
+                             (sos-elisp-find-face thing symb)
+                             (sos-elisp-find-variable thing symb)
+                             (sos-elisp-find-function thing symb)
+                             (sos-elisp-find-function-parameter thing)
+                             (sos-elisp-find-let-variable thing)))
+           (and cand
+                (push cand candidates)))
+         candidates)))
+    (:tips
+     (when arg
+       (list (format "%s" arg))))))
 
 (provide 'sos-elisp-backend)

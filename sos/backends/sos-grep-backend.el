@@ -28,6 +28,8 @@
 ;; 2014-10-01 (0.0.1)
 ;;    Initial release.
 
+(require 'hl-faces)
+
 (defconst sos-grep-prefix ">>>>> ")
 
 ;;;###autoload
@@ -61,7 +63,7 @@
                      (buffer-substring-no-properties
                       (+ (length sos-grep-prefix) (point))
                       (line-end-position))))
-            (keywords `((,match 0 'sos-hl-symbol-face prepend))))
+            (keywords `((,match 0 'hl-symbol-face prepend))))
        `((:file ,file :linum ,linum :keywords ,keywords))))))
 
 (provide 'sos-grep-backend)

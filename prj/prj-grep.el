@@ -28,19 +28,49 @@
 ;; 2014-08-01 (0.0.1)
 ;;    Initial release.
 
+(require 'font-lock)
+
+(require 'hl-faces)
+
 (defcustom prj-grep-mode-hook `(linum-mode
                                 hl-line-mode
-                                ,(and (featurep 'sos)
-                                      'sos-definition-window-mode))
+                                font-lock-mode)
   "Hook run when entering `prj-grep-mode' mode."
   :type 'hook
   :group 'prj-group)
 
+(defvar prj-grep-mode-map
+  (let ((map (make-sparse-keymap)))
+    (suppress-keymap map t)
+    (when (featurep 'sos)
+      (define-key map [return] 'sos-goto-definition))
+    map))
+
+(defvar prj-grep-mode-font-lock-keywords
+  '((("^\\([[:alnum:] $_\/.+-]+\\):\\([0-9]+\\):.*$" (1 'hl-file-face) (2 'hl-number-face))
+     ("^\\(>>>>>\\s-\\)\\(.+\\)$" (1 'hl-title-3-face) (2 'hl-symbol-face))
+     ("^\\(<<<<<\\)$" (1 'hl-title-3-face)))
+    t nil))
+
+(defvar prj-grep-mode-header-line
+  `(,(format "  Tips: %s and %s to navigate; %s to open file; %s or %s to delete item;"
+             (propertize "UP" 'face 'tooltip)
+             (propertize "DOWN" 'face 'tooltip)
+             (propertize "ENTER" 'face 'tooltip)
+             (propertize "DEL" 'face 'tooltip)
+             (propertize "q" 'face 'tooltip))))
+
 ;;;###autoload
-(define-derived-mode prj-grep-mode nil "Grep"
+(define-derived-mode prj-grep-mode nil "prj:grep"
   "Major mode for search buffers."
   :group 'prj-group
   ;; TODO: highlight words behind ">>>>>".
-  )
+  ;; (use-local-map prj-grep-mode-map)
+  ;; (font-lock-add-keywords nil prj-grep-mode-font-lock-keywords)
+  (remove-overlays)
+  (setq font-lock-defaults prj-grep-mode-font-lock-keywords
+        truncate-lines t
+        ;; Header line.
+        header-line-format prj-grep-mode-header-line))
 
 (provide 'prj-grep)

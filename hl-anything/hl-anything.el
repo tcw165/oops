@@ -62,6 +62,7 @@
   "Highlight anything."
   :tag "hl-anything"
   :group 'faces
+  :group 'font-lock
   :group 'matching)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -242,6 +243,8 @@ Format: (START . END)"
 (defun hl-unhighlight-internal (regexp &optional local)
   (let* ((keyword (hl-is-font-lock-keywords regexp)))
     (setq hl-things-local (delete regexp hl-things-local))
+    (unless hl-things-local
+      (setq hl-index-local 0))
     ;; Unhighlight.
     (while (setq keyword (hl-is-font-lock-keywords regexp))
       (font-lock-remove-keywords nil `(,keyword)))

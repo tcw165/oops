@@ -298,7 +298,7 @@ project to be loaded."
       (prj-load-project))
     (prj-with-search-buffer
       (switch-to-buffer (current-buffer) nil t)
-      (setq buffer-read-only t)
+      ;; (setq buffer-read-only t)
       ;; TODO: goto last search result.
       )))
 

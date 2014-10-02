@@ -38,166 +38,10 @@
 (require 'tabulated-list)
 (require 'thingatpt)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Front-ends ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;;###autoload
-(defun sos-definition-buffer-frontend (command &optional arg)
-  (case command
-    (:init (sos-toggle-definition-buffer&window 1))
-    (:destroy (sos-toggle-definition-buffer&window -1))
-    (:show
-     ;; TODO: remember user choice at last session in the prj.
-     (setq sos-candidates arg
-           sos-index 0
-           ;; Clean the stack.
-           sos-candidates-stack nil)
-     (sos-toggle-definition-buffer&window 1)
-     (if (sos-is-multiple-candidates)
-         (sos-show-candidates)
-       (sos-show-candidate))))
-  ;; Save the height of definition window.
-  (and (window-live-p sos-def-win)
-       (setq sos-def-win-height (window-height sos-def-win))))
-
-;;;###autoload
-(defun sos-goto-definitions-frontend (command &optional arg)
-  (case command
-    (:show
-     (setq mark-active nil
-           sos-candidates arg)
-     (let ((buf-name "*Goto Definition*"))
-       (if (sos-is-multiple-candidates)
-           ;; Multiple Candidates ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-           (let ((buffer (get-buffer-create buf-name)))
-             (switch-to-buffer buffer)
-             (setq buffer-read-only nil)
-             ;; Insert condidates.
-             (sos-show-candidates-common)
-             ;; Major mode.
-             (sos-candidates-preview-mode)
-             (tabulated-list-init-header)
-             (tabulated-list-print)
-             ;; Minor mode.
-             (linum-mode 1)
-             (hl-line-mode 1))
-         ;; Single Candidate ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-         (ignore-errors
-           (kill-buffer buf-name))
-         (sos-goto-definition-from-candidates-common))))))
+(require 'hl-faces)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Common ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;;###autoload
-(defun sos-open-definition-file ()
-  "Open file refer to `mode-line-format'."
-  (interactive)
-  (let* ((candidate (nth 0 sos-candidates))
-         (file (plist-get candidate :file))
-         (linum (plist-get candidate :linum)))
-    (when (and (file-exists-p file)
-               (integerp linum)
-               (window-live-p sos-source-window))
-      (with-selected-window sos-source-window
-        (and (featurep 'history)
-             (his-add-position-type-history))
-        (unless (string= file (buffer-file-name (window-buffer)))
-          (find-file file))
-        (goto-line linum)
-        (and (featurep 'history)
-             (his-add-position-type-history))
-        (recenter 5))
-      (select-window sos-source-window))))
-
-;;;###autoload
-(defun sos-copy-definition-file-path ()
-  "Copy file path refer to `mode-line-format'."
-  (interactive)
-  (let* ((candidate (nth 0 sos-candidates))
-         (file (plist-get candidate :file)))
-    (when (and file (stringp file))
-      (with-temp-buffer
-        (insert file)
-        (clipboard-kill-ring-save 1 (point-max)))
-      (message "File path is copied to clipboard!"))))
-
-;;;###autoload
-(defun sos-goto-definition-line ()
-  "Go to line refer to `mode-line-format'."
-  (interactive)
-  (let* ((candidate (nth 0 sos-candidates))
-         (linum (plist-get candidate :linum)))
-    (when (and linum (integerp linum))
-      (sos-with-definition-buffer
-        (goto-line linum)
-        (recenter 5)))))
-
-;;;###autoload
-(defun sos-jump-in-candidate ()
-  (interactive)
-  (sos-with-definition-buffer
-    (let ((select-index (tabulated-list-get-id)))
-      (if select-index
-          (progn
-            (push (cons select-index sos-candidates) sos-candidates-stack)
-            (setq sos-candidates `(,(nth select-index sos-candidates)))
-            (sos-show-candidate))
-        (message "Invalid choice!")))))
-
-;;;###autoload
-(defun sos-jump-out-candidate ()
-  (interactive)
-  (let* ((info (pop sos-candidates-stack))
-         (select-index (car info))
-         (candidates (cdr info)))
-    (when candidates
-      (setq sos-candidates candidates)
-      (if (sos-is-multiple-candidates)
-          (sos-show-candidates select-index)
-        (sos-show-candidate)))))
-
-(defface sos-hl-symbol-face
-  '((t (:background "gold" :foreground "black" :weight bold :height 2.0)))
-  "Default face for highlighting keyword in definition window."
-  :group 'sos-group)
-
-(defun sos-hl-symbol-face ()
-  "Concatenate (background-color . COLOR) and (foreground-color. COLOR) in order
- to prevent to being blocked by `hl-line-mode'."
-  (let* ((fg (face-attribute 'sos-hl-symbol-face :foreground))
-         (bg (face-attribute 'sos-hl-symbol-face :background))
-         facespec)
-    (when fg
-      (setq facespec
-            (append facespec `((foreground-color . ,fg)))))
-    (when bg
-      (setq facespec
-            (append facespec `((background-color . ,bg)))))
-    (setq facespec
-          (append facespec (list 'sos-hl-symbol-face)))
-    facespec))
-
-(defface sos-hl-symbol-parameter-face
-  '((t (:background "gold" :foreground "black" :underline t :weight bold :height 1.5)))
-  "Default face for highlighting keyword in definition window."
-  :group 'sos-group)
-
-(defun sos-hl-symbol-parameter-face ()
-  "Concatenate (background-color . COLOR) and (foreground-color. COLOR) in order
- to prevent to being blocked by `hl-line-mode'."
-  (let* ((fg (face-attribute 'sos-hl-symbol-parameter-face :foreground))
-         (bg (face-attribute 'sos-hl-symbol-parameter-face :background))
-         facespec)
-    (when fg
-      (setq facespec
-            (append facespec `((foreground-color . ,fg)))))
-    (when bg
-      (setq facespec
-            (append facespec `((background-color . ,bg)))))
-    (setq facespec
-          (append facespec (list 'sos-hl-symbol-parameter-face)))
-    facespec))
 
 (defvar sos-def-buf nil
   "Definition buffer.")
@@ -253,6 +97,22 @@ into the stack when user navigate to deeper definition in the definition window.
          ;; Avoid the engine to scan this buffer.
          (setq sos-is-skip-current-buffer t
                buffer-read-only t)))))
+
+(defun sos-hl-symbol-face ()
+  "Concatenate (background-color . COLOR) and (foreground-color. COLOR) in order
+ to prevent to being blocked by `hl-line-mode'."
+  (let* ((fg (face-attribute 'hl-symbol-face :foreground))
+         (bg (face-attribute 'hl-symbol-face :background))
+         facespec)
+    (when fg
+      (setq facespec
+            (append facespec `((foreground-color . ,fg)))))
+    (when bg
+      (setq facespec
+            (append facespec `((background-color . ,bg)))))
+    (setq facespec
+          (append facespec (list 'hl-symbol-face)))
+    facespec))
 
 (defun sos-toggle-definition-buffer&window (toggle)
   "Display or hide the `sos-def-buf' and `sos-def-win'."
@@ -337,9 +197,10 @@ mouse-3: Copy the path."
       (sos-candidate-mode 1)
       ;; Move point and recenter.
       (when (integerp linum)
-        (goto-line linum)
+        (goto-char 1)
+        (forward-line (1- linum))
         (end-of-line)
-        (recenter 3))
+        (recenter 5))
       ;; Highlight word.
       (if keywords
           (progn
@@ -410,8 +271,118 @@ mouse-3: Copy the path."
                                   ("file" 128 t)]
           tabulated-list-entries entries)))
 
+(defun sos-goto-definition-from-candidates-common ()
+  (let* ((candidate (nth 0 sos-candidates))
+         (file (plist-get candidate :file))
+         (linum (plist-get candidate :linum))
+         (keywords (plist-get candidate :keywords))
+         regexp)
+    (when (and (stringp file)
+               (file-exists-p file))
+      (and (featurep 'history)
+           (his-add-history))
+      (find-file file)
+      ;; Line number.
+      (when (integerp linum)
+        (goto-char 1)
+        (forward-line (1- linum))
+        (end-of-line)
+        (recenter 5))
+      (and (featurep 'history)
+           (his-add-history))
+      ;; Keyword.
+      (when (and keywords (listp keywords) (car keywords))
+        (setq regexp (or (and (stringp (car keywords))
+                              (car keywords))
+                         (and (stringp (caar keywords))
+                              (caar keywords))))
+        (re-search-forward regexp nil t)
+        (let ((beg (match-beginning 1))
+              (end (match-end 1)))
+          (when end
+            (goto-char end))
+          (when beg
+            (set-marker (mark-marker) beg)
+            (setq mark-active t)))))))
+
+;;;###autoload
+(defun sos-open-definition-file ()
+  "Open file refer to `mode-line-format'."
+  (interactive)
+  (let* ((candidate (nth 0 sos-candidates))
+         (file (plist-get candidate :file))
+         (linum (plist-get candidate :linum)))
+    (when (and (file-exists-p file)
+               (integerp linum)
+               (window-live-p sos-source-window))
+      (with-selected-window sos-source-window
+        (and (featurep 'history)
+             (his-add-position-type-history))
+        (unless (string= file (buffer-file-name (window-buffer)))
+          (find-file file))
+        (goto-line linum)
+        (and (featurep 'history)
+             (his-add-position-type-history))
+        (recenter 5))
+      (select-window sos-source-window))))
+
+;;;###autoload
+(defun sos-copy-definition-file-path ()
+  "Copy file path refer to `mode-line-format'."
+  (interactive)
+  (let* ((candidate (nth 0 sos-candidates))
+         (file (plist-get candidate :file)))
+    (when (and file (stringp file))
+      (with-temp-buffer
+        (insert file)
+        (clipboard-kill-ring-save 1 (point-max)))
+      (message "File path is copied to clipboard!"))))
+
+;;;###autoload
+(defun sos-goto-definition-line ()
+  "Go to line refer to `mode-line-format'."
+  (interactive)
+  (let* ((candidate (nth 0 sos-candidates))
+         (linum (plist-get candidate :linum)))
+    (when (and linum (integerp linum))
+      (sos-with-definition-buffer
+        (goto-line linum)
+        (recenter 5)))))
+
+;;;###autoload
+(defun sos-jump-in-candidate ()
+  (interactive)
+  (sos-with-definition-buffer
+    (let ((select-index (tabulated-list-get-id)))
+      (if select-index
+          (progn
+            (push (cons select-index sos-candidates) sos-candidates-stack)
+            (setq sos-candidates `(,(nth select-index sos-candidates)))
+            (sos-show-candidate))
+        (message "Invalid choice!")))))
+
+;;;###autoload
+(defun sos-jump-out-candidate ()
+  (interactive)
+  (let* ((info (pop sos-candidates-stack))
+         (select-index (car info))
+         (candidates (cdr info)))
+    (when candidates
+      (setq sos-candidates candidates)
+      (if (sos-is-multiple-candidates)
+          (sos-show-candidates select-index)
+        (sos-show-candidate)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Signle Candidate ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defvar sos-candidate-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [?q] 'sos-jump-out-candidate)
+    (define-key map [return] (lambda ()
+                               (interactive)
+                               (message "\"Jump to definition\" is yet supported!")))
+    map))
 
 ;;;###autoload
 (define-minor-mode sos-candidate-mode
@@ -424,43 +395,8 @@ mouse-3: Copy the path."
         (setq buffer-read-only t))
     (setq buffer-read-only nil)))
 
-(defvar sos-candidate-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map [?q] 'sos-jump-out-candidate)
-    (define-key map [return] (lambda ()
-                               (interactive)
-                               (message "\"Jump to definition\" is yet supported!")))
-    map))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Multiple Candidates ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;;###autoload
-(define-minor-mode sos-candidates-mode
-  "doc"
-  :lighter "sos:candidates"
-  :group 'sos-group
-  (if sos-candidates-mode
-      (progn
-        (use-local-map sos-candidates-mode-map)
-        (setq buffer-read-only t)
-        ;; Make highlight line sticky only for current buffer.
-        (setq-local hl-line-sticky-flag t))
-    (setq buffer-read-only nil)))
-
-;;;###autoload
-(defun sos-next-candidate ()
-  (interactive)
-  (sos-with-definition-buffer
-    (when sos-candidates-mode
-      (next-line))))
-
-;;;###autoload
-(defun sos-prev-candidate ()
-  (interactive)
-  (sos-with-definition-buffer
-    (when sos-candidates-mode
-      (previous-line))))
 
 (defvar sos-candidates-mode-map
   (let ((map (make-sparse-keymap)))
@@ -480,17 +416,59 @@ mouse-3: Copy the path."
     (define-key map [mode-line mouse-1] 'sos-jump-out-candidate)
     map))
 
+;;;###autoload
+(defun sos-next-candidate ()
+  (interactive)
+  (sos-with-definition-buffer
+    (when sos-candidates-mode
+      (next-line))))
+
+;;;###autoload
+(defun sos-prev-candidate ()
+  (interactive)
+  (sos-with-definition-buffer
+    (when sos-candidates-mode
+      (previous-line))))
+
+;;;###autoload
+(define-minor-mode sos-candidates-mode
+  "doc"
+  :lighter "sos:candidates"
+  :group 'sos-group
+  (if sos-candidates-mode
+      (progn
+        (use-local-map sos-candidates-mode-map)
+        (setq buffer-read-only t)
+        ;; Make highlight line sticky only for current buffer.
+        (setq-local hl-line-sticky-flag t))
+    (setq buffer-read-only nil)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Go To Definitions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defvar sos-candidates-preview-mode-map
+  (let ((map (make-sparse-keymap)))
+    (suppress-keymap map t)
+    (define-key map [?e] '(lambda () (interactive) (sos-goto-definition-from-candidates)))
+    (define-key map [return] '(lambda () (interactive) (sos-goto-definition-from-candidates)))
+    map))
+
+(defun sos-goto-definition-from-candidates ()
+  (let ((entry (tabulated-list-get-entry)))
+    (if entry
+        ;; Open definition if there is a file.
+        (if (file-exists-p (aref entry 3))
+            (progn
+              (kill-buffer)
+              (sos-goto-definition-from-candidates-common))
+          (message "It is only a doucmentation, so cannot open this type of definition."))
+      (message "Invalid choice!"))))
 
 ;;;###autoload
 (define-derived-mode sos-candidates-preview-mode tabulated-list-mode
   "sos:goto-definitions"
   "doc"
   :group 'sos-group
-  (suppress-keymap sos-candidates-preview-mode-map t)
-  (define-key sos-candidates-preview-mode-map [?e] (sos-goto-definition-from-candidates))
-  (define-key sos-candidates-preview-mode-map [return] (sos-goto-definition-from-candidates))
   ;; Make highlight line sticky only for current buffer.
   (setq-local hl-line-sticky-flag t)
   ;; Mode line.
@@ -498,48 +476,54 @@ mouse-3: Copy the path."
                                         'face 'mode-line-buffer-id)
                            ,(format "| UP/DOWN to select; ENTER to open; Q to exit."))))
 
-(defun sos-goto-definition-from-candidates ()
-  `(lambda ()
-     (interactive)
-     (let ((entry (tabulated-list-get-entry)))
-       (if entry
-           ;; Open definition if there is a file.
-           (if (file-exists-p (aref entry 3))
-               (progn
-                 (kill-buffer)
-                 (sos-goto-definition-from-candidates-common))
-             (message "It is only a doucmentation, so cannot open this type of definition."))
-         (message "Invalid choice!")))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Front-ends ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun sos-goto-definition-from-candidates-common ()
-  (let* ((candidate (nth 0 sos-candidates))
-         (file (plist-get candidate :file))
-         (linum (plist-get candidate :linum))
-         (keywords (plist-get candidate :keywords))
-         regexp)
-    (when (and (stringp file)
-               (file-exists-p file))
-      (and (featurep 'history)
-           (his-add-history))
-      (find-file file)
-      ;; Line number.
-      (when (integerp linum)
-        (goto-line linum))
-      (and (featurep 'history)
-           (his-add-history))
-      ;; Keyword.
-      (when (and keywords (listp keywords) (car keywords))
-        (setq regexp (or (and (stringp (car keywords))
-                              (car keywords))
-                         (and (stringp (caar keywords))
-                              (caar keywords))))
-        (re-search-forward regexp nil t)
-        (let ((beg (match-beginning 1))
-              (end (match-end 1)))
-          (when end
-            (goto-char end))
-          (when beg
-            (set-marker (mark-marker) beg)
-            (setq mark-active t)))))))
+;;;###autoload
+(defun sos-definition-buffer-frontend (command &optional arg)
+  (case command
+    (:init (sos-toggle-definition-buffer&window 1))
+    (:destroy (sos-toggle-definition-buffer&window -1))
+    (:show
+     ;; TODO: remember user choice at last session in the prj.
+     (setq sos-candidates arg
+           sos-index 0
+           ;; Clean the stack.
+           sos-candidates-stack nil)
+     (sos-toggle-definition-buffer&window 1)
+     (if (sos-is-multiple-candidates)
+         (sos-show-candidates)
+       (sos-show-candidate))))
+  ;; Save the height of definition window.
+  (and (window-live-p sos-def-win)
+       (setq sos-def-win-height (window-height sos-def-win))))
+
+;;;###autoload
+(defun sos-goto-definitions-frontend (command &optional arg)
+  (case command
+    (:show
+     (setq mark-active nil
+           sos-candidates arg)
+     (let ((buf-name "*Goto Definition*"))
+       (if (sos-is-multiple-candidates)
+           ;; Multiple Candidates ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+           (let ((buffer (get-buffer-create buf-name)))
+             (and (featurep 'history)
+                  (his-add-history))
+             (switch-to-buffer buffer)
+             (setq buffer-read-only nil)
+             ;; Insert condidates.
+             (sos-show-candidates-common)
+             ;; Major mode.
+             (sos-candidates-preview-mode)
+             (tabulated-list-init-header)
+             (tabulated-list-print)
+             ;; Minor mode.
+             (linum-mode 1)
+             (hl-line-mode 1))
+         ;; Single Candidate ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+         (ignore-errors
+           (kill-buffer buf-name))
+         (sos-goto-definition-from-candidates-common))))))
 
 (provide 'sos-basic-frontend)
