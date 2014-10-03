@@ -650,7 +650,9 @@ project to be loaded."
     ;; Save file names opened in current session.
     (let (file files buffers-to-kill)
       (dolist (buffer (buffer-list))
-        (when (setq file (buffer-file-name buffer))
+        (when (and (setq file (buffer-file-name buffer))
+                   ;; Skip search database.
+                   (not (string= file (prj-searchdb-path))))
           (setq files (append files `(,file))))
         (when (and close file)
           (setq buffers-to-kill (append buffers-to-kill `(,buffer)))))

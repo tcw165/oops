@@ -76,7 +76,47 @@
              (propertize "q" 'face 'tooltip))))
 
 (defun prj-kill-grep-item-at-point ()
-  (message "Yet implement..."))
+  (setq buffer-read-only nil)
+  (dolist (bound (prj-grep-mode-get-kill-regions))
+    (delete-region (car bound) (cdr bound)))
+  (and (buffer-modified-p)
+       (save-buffer))
+  (setq buffer-read-only t))
+
+(defun prj-grep-mode-get-kill-regions ()
+  (if mark-active
+      (let ((beg (region-beginning))
+            (end (region-end))
+            reg-beg reg-end regions)
+        (if (= (buffer-size) (- end beg))
+            (setq regions `((1 . ,(point-max))))
+          ;; TODO: Large region slows very much.
+          (save-excursion
+            (goto-char beg)
+            (while (<= (point) end)
+              (if (prj-is-valid-grep-item)
+                  (progn
+                    (unless reg-beg
+                      (setq reg-beg (line-beginning-position 1)))
+                    (setq reg-end (line-beginning-position 2)))
+                (when (and reg-beg reg-end)
+                  (setq regions (append regions `((,reg-beg . ,reg-end)))
+                        reg-beg nil
+                        reg-end nil)))
+              (forward-line))
+            (when (and reg-beg reg-end)
+              (setq regions (append regions `((,reg-beg . ,reg-end)))))))
+        regions)
+    (when (prj-is-valid-grep-item)
+      ;; TODO: what if there's nothing between ">>>>>" and "<<<<<"?
+      `((,(line-beginning-position 1) . ,(line-beginning-position 2))))))
+
+(defun prj-is-valid-grep-item ()
+  (save-excursion
+    (beginning-of-line)
+    (not (or (looking-at ">>>>>")
+             (looking-at "<<<<<")
+             (looking-at "$")))))
 
 (defun prj-kill-grep-buffer ()
   (when (buffer-modified-p)
@@ -87,9 +127,6 @@
 (define-derived-mode prj-grep-mode nil "prj:grep"
   "Major mode for search buffers."
   :group 'prj-group
-  ;; TODO: highlight words behind ">>>>>".
-  ;; (use-local-map prj-grep-mode-map)
-  ;; (font-lock-add-keywords nil prj-grep-mode-font-lock-keywords)
   (remove-overlays)
   (setq font-lock-defaults prj-grep-mode-font-lock-keywords
         truncate-lines t
