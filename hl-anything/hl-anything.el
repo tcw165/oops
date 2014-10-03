@@ -37,6 +37,9 @@
 ;;
 ;;; Change Log:
 ;;
+;; 2014-10-03 (0.0.6)
+;;    1. Support highlight for special faces. See `hl-highlight-special-faces'.
+;;
 ;; 2014-09-25 (0.0.5)
 ;;    1. Highlights won't be blocked behind the current line when `hl-line-mode'
 ;;       is enabled.
@@ -58,6 +61,8 @@
 (require 'thingatpt)
 (eval-when-compile (require 'cl))
 
+(require 'hl-faces)
+
 (defgroup hl-anything-group nil
   "Highlight anything."
   :tag "hl-anything"
@@ -67,45 +72,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Highlight things ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;;###autoload
-(defun hl-highlight-thingatpt-global ()
-  "Toggle highlighting globally."
-  (interactive)
-  ;; TODO:
-  )
-
-;;;###autoload
-(defun hl-highlight-thingatpt-local ()
-  "Toggle highlighting locally in the current buffer."
-  (interactive)
-  (unless hl-highlight-mode
-    (hl-highlight-mode 1))
-  (let* ((thing (hl-thingatpt))
-         (regexp (car thing)))
-    (when thing
-      (if (member regexp hl-things-local)
-          (hl-unhighlight-internal regexp t)
-        (hl-highlight-internal regexp t)))))
-
-;;;###autoload
-(defun hl-unhighlight-all-local ()
-  "Remove all the highlights in buffer."
-  (interactive)
-  (dolist (regexp hl-things-local)
-    (hl-unhighlight-internal regexp t))
-  (setq hl-index-local 0))
-
-;;;###autoload
-(define-minor-mode hl-highlight-mode
-  "Provide convenient menu items and tool-bar items for project feature."
-  :lighter " Highlight"
-  (if hl-highlight-mode
-      (progn
-        (add-hook 'pre-command-hook 'hl-highlight-pre-command t t)
-        (add-hook 'post-command-hook 'hl-highlight-post-command t t))
-    (remove-hook 'pre-command-hook 'hl-highlight-pre-command t)
-    (remove-hook 'post-command-hook 'hl-highlight-post-command t)))
 
 (defcustom hl-fg-colors '("snow"
                           "snow"
@@ -151,6 +117,15 @@ Maybe you'll need it for history and navigation feature."
   :type '(repeat function)
   :group 'hl-anything-group)
 
+(defcustom hl-highlight-special-faces '(hl-symbol-face
+                                hl-title-1-face
+                                hl-title-2-face
+                                hl-title-3-face)
+  "For the faces that will be treat as highlights, which means overlays 
+will also be created for these faces under current line."
+  :type '(repeat face)
+  :group 'hl-anything-group)
+
 (defvar hl-timer nil)
 
 (defvar hl-index 0)
@@ -170,9 +145,9 @@ Maybe you'll need it for history and navigation feature."
 `hl-line-mode'.")
 (make-variable-buffer-local 'hl-overlays-local)
 
-(defvar hl-is-always-overlays-local nil
+(defvar hl-is-highlight-special-faces nil
   "Force to create `hl-overlays-local' overlays.")
-(make-variable-buffer-local 'hl-is-always-overlays-local)
+(make-variable-buffer-local 'hl-is-highlight-special-faces)
 
 (defun hl-thingatpt ()
   "Return a list, (REGEXP_STRING BEG END), on which the point is or just string
@@ -194,34 +169,52 @@ Maybe you'll need it for history and navigation feature."
 (defun hl-bounds-of-highlight ()
   "Return the start and end locations for the highlighted things at point.
 Format: (START . END)"
-  (let* ((face (get-text-property (point) 'face))
-         org-fg org-bg
-         beg end)
-    (when (and (not (null face))
-               (not (facep face)))
-      (setq org-fg (assoc 'foreground-color face)
-            org-bg (assoc 'background-color face))
-      ;; Find beginning locations.
-      (save-excursion
-        (while (and (not (null face))
-                    (not (facep face))
-                    (equal org-fg (assoc 'foreground-color face))
-                    (equal org-bg (assoc 'background-color face)))
-          (setq beg (point))
-          (backward-char)
-          (setq face (get-text-property (point) 'face))))
-      ;; Return to original point.
-      (setq face (get-text-property (point) 'face))
-      ;; Find end locations.
-      (save-excursion
-        (while (and (not (null face))
-                    (not (facep face))
-                    (equal org-fg (assoc 'foreground-color face))
-                    (equal org-bg (assoc 'background-color face)))
-          (forward-char)
-          (setq end (point))
-          (setq face (get-text-property (point) 'face))))
-      (cons beg end))))
+  (let ((face (hl-get-text-valid-face)))
+    (when face
+      (let (beg end)
+        ;; Find beginning locations.
+        (save-excursion
+          (hl-bounds-of-valid-face face -1)
+          (setq beg (point)))
+        ;; Find end locations.
+        (save-excursion
+          (hl-bounds-of-valid-face face 1)
+          (setq end (1+ (point))))
+        (cons beg end)))))
+
+(defun hl-get-text-valid-face ()
+  (let ((face (get-text-property (point) 'face)))
+    (cond
+     ;; NULL ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+     ((null face)
+      nil)
+     ;; Normal Face ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+     ((facep face)
+      (and (memq face hl-highlight-special-faces)
+           face))
+     ;; Face List ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+     ((facep (car face))
+      (setq face (car face))
+      (and (memq face hl-highlight-special-faces)
+           face))
+     ;; Foreground-color & Background-color ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+     (t
+      (let (elm ret)
+        (when (setq elm (assoc 'foreground-color face))
+          (setq ret (append ret `(,elm))))
+        (when (setq elm (assoc 'background-color face))
+          (setq ret (append ret `(,elm))))
+        ret)))))
+
+(defun hl-bounds-of-valid-face (org-face step)
+  (when (/= step 0)
+    (let ((face (hl-get-text-valid-face)))
+      (ignore-errors
+        (if (equal org-face face)
+            (progn
+              (forward-char step)
+              (hl-bounds-of-valid-face org-face step))
+          (backward-char step))))))
 
 (defun hl-highlight-internal (regexp &optional local)
   (let* ((fg (nth hl-index-local hl-fg-colors))
@@ -270,7 +263,7 @@ Format: (START . END)"
 (defun hl-add-highlight-overlays ()
   (when (or (and (featurep 'hl-line) hl-line-mode
                  (or hl-things-global hl-things-local hl-overlays-local))
-            hl-is-always-overlays-local)
+            hl-is-highlight-special-faces)
     ;; Remove overlays.
     (mapc 'delete-overlay hl-overlays-local)
     (setq hl-overlays-local nil)
@@ -281,28 +274,64 @@ Format: (START . END)"
         (beginning-of-line)
         (while (<= (point) end)
           (if (setq bound (hl-bounds-of-highlight))
-              (let* ((overlay (make-overlay (point) (cdr bound)))
-                     (face (get-text-property (point) 'face))
-                     (fg (assoc 'foreground-color face))
-                     (bg (assoc 'background-color face)))
-                (overlay-put overlay 'face `(,fg ,bg))
+              (let ((overlay (make-overlay (point) (cdr bound)))
+                    (face (hl-get-text-valid-face)))
+                (if (facep face)
+                    (let ((fg (face-attribute face :foreground))
+                          (bg (face-attribute face :background))
+                          facespec)
+                      (when fg
+                        (setq facespec
+                              (append facespec `((foreground-color . ,fg)))))
+                      (when bg
+                        (setq facespec
+                              (append facespec `((background-color . ,bg)))))
+                      (overlay-put overlay 'face facespec))
+                  (overlay-put overlay 'face face))
                 (push overlay hl-overlays-local)
                 (goto-char (cdr bound)))
             (forward-char)))))))
 
+;;;###autoload
+(defun hl-highlight-thingatpt-global ()
+  "Toggle highlighting globally."
+  (interactive)
+  ;; TODO:
+  )
+
+;;;###autoload
+(defun hl-highlight-thingatpt-local ()
+  "Toggle highlighting locally in the current buffer."
+  (interactive)
+  (unless hl-highlight-mode
+    (hl-highlight-mode 1))
+  (let* ((thing (hl-thingatpt))
+         (regexp (car thing)))
+    (when thing
+      (if (member regexp hl-things-local)
+          (hl-unhighlight-internal regexp t)
+        (hl-highlight-internal regexp t)))))
+
+;;;###autoload
+(defun hl-unhighlight-all-local ()
+  "Remove all the highlights in buffer."
+  (interactive)
+  (dolist (regexp hl-things-local)
+    (hl-unhighlight-internal regexp t))
+  (setq hl-index-local 0))
+
+;;;###autoload
+(define-minor-mode hl-highlight-mode
+  "Provide convenient menu items and tool-bar items for project feature."
+  :lighter " Highlight"
+  (if hl-highlight-mode
+      (progn
+        (add-hook 'pre-command-hook 'hl-highlight-pre-command t t)
+        (add-hook 'post-command-hook 'hl-highlight-post-command t t))
+    (remove-hook 'pre-command-hook 'hl-highlight-pre-command t)
+    (remove-hook 'post-command-hook 'hl-highlight-post-command t)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;;###autoload
-(defun hl-find-thing-forwardly ()
-  "Find regexp forwardly and jump to it."
-  (interactive)
-  (hl-find-thing 1))
-
-;;;###autoload
-(defun hl-find-thing-backwardly ()
-  "Find regexp backwardly and jump to it."
-  (interactive)
-  (hl-find-thing -1))
 
 (defun hl-find-thing (step)
   (let* ((regexp (hl-thingatpt))
@@ -328,6 +357,18 @@ Format: (START . END)"
       (setq mark-active t)
       ;; Hook after searching.
       (run-hook-with-args hl-after-find-thing-hook regexp))))
+
+;;;###autoload
+(defun hl-find-thing-forwardly ()
+  "Find regexp forwardly and jump to it."
+  (interactive)
+  (hl-find-thing 1))
+
+;;;###autoload
+(defun hl-find-thing-backwardly ()
+  "Find regexp backwardly and jump to it."
+  (interactive)
+  (hl-find-thing -1))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Parentheses ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -383,17 +424,6 @@ Format: (START . END)"
 (defvar hl-inward-parens nil
   "This buffers currently active overlays.")
 (make-variable-buffer-local 'hl-inward-parens)
-
-;;;###autoload
-(define-minor-mode hl-paren-mode
-  "Minor mode to highlight the surrounding parentheses."
-  :lighter " hl-p"
-  (if hl-paren-mode
-      (progn
-        (add-hook 'pre-command-hook 'hl-remove-parens nil t)
-        (add-hook 'post-command-hook 'hl-paren-idle-begin nil t))
-    (remove-hook 'pre-command-hook 'hl-remove-parens t)
-    (remove-hook 'post-command-hook 'hl-paren-idle-begin t)))
 
 (defun hl-paren-idle-begin ()
   (when (hl-paren-is-begin)
@@ -476,5 +506,16 @@ Format: (START . END)"
   (mapc 'delete-overlay hl-inward-parens)
   (mapc 'kill-local-variable '(hl-outward-parens
                                hl-inward-parens)))
+
+;;;###autoload
+(define-minor-mode hl-paren-mode
+  "Minor mode to highlight the surrounding parentheses."
+  :lighter " hl-p"
+  (if hl-paren-mode
+      (progn
+        (add-hook 'pre-command-hook 'hl-remove-parens nil t)
+        (add-hook 'post-command-hook 'hl-paren-idle-begin nil t))
+    (remove-hook 'pre-command-hook 'hl-remove-parens t)
+    (remove-hook 'post-command-hook 'hl-paren-idle-begin t)))
 
 (provide 'hl-anything)

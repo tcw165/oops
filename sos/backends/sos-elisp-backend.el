@@ -79,13 +79,13 @@
         (when (re-search-forward regexp nil t)
           (setq linum (line-number-at-pos)))))
     ;; document string + line number + keywords.
-    `(,doc ,linum ((,regexp 1 ',(sos-hl-symbol-face) prepend)))))
+    `(,doc ,linum ((,regexp 1 'hl-symbol-face prepend)))))
 
 (defun sos-elisp-function-document-keywords (usage)
   (when usage
     (let ((regexp (concat "^\\(?1:" (regexp-quote usage) "\\)$"))
           keyword keywords)
-      (setq keyword `((,regexp 1 ',(sos-hl-symbol-face) prepend))
+      (setq keyword `((,regexp 1 'hl-symbol-face prepend))
             keywords (append keywords keyword))
       keywords)))
 
@@ -93,7 +93,7 @@
   (when name
     (let* ((regexp (concat "^\\(?1:" name "\\)$"))
            keyword keywords)
-      (setq keyword `((,regexp 1 ',(sos-hl-symbol-face) prepend))
+      (setq keyword `((,regexp 1 'hl-symbol-face prepend))
             keywords (append keywords keyword))
       keywords)))
 
@@ -336,7 +336,7 @@ file-local variable.\n")
     (when regexp
       `(:symbol ,thing :type "local variable" :file ,(buffer-file-name)
                 :linum ,linum
-                :keywords ((,regexp 1 ',(sos-hl-symbol-face) prepend))))))
+                :keywords ((,regexp 1 'hl-symbol-face prepend))))))
 
 (defun sos-elisp-find-function-parameter (thing)
   (let ((linum 0)
@@ -374,7 +374,7 @@ file-local variable.\n")
     (when regexp
       `(:symbol ,thing :type "function parameter" :file ,(buffer-file-name)
                 :linum ,linum
-                :keywords ((,regexp 1 ',(sos-hl-symbol-face) prepend))))))
+                :keywords ((,regexp 1 'hl-symbol-face prepend))))))
 
 (defun sos-elisp-find-face (thing symb)
   (ignore-errors

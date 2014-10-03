@@ -98,22 +98,6 @@ into the stack when user navigate to deeper definition in the definition window.
          (setq sos-is-skip-current-buffer t
                buffer-read-only t)))))
 
-(defun sos-hl-symbol-face ()
-  "Concatenate (background-color . COLOR) and (foreground-color. COLOR) in order
- to prevent to being blocked by `hl-line-mode'."
-  (let* ((fg (face-attribute 'hl-symbol-face :foreground))
-         (bg (face-attribute 'hl-symbol-face :background))
-         facespec)
-    (when fg
-      (setq facespec
-            (append facespec `((foreground-color . ,fg)))))
-    (when bg
-      (setq facespec
-            (append facespec `((background-color . ,bg)))))
-    (setq facespec
-          (append facespec (list 'hl-symbol-face)))
-    facespec))
-
 (defun sos-toggle-definition-buffer&window (toggle)
   "Display or hide the `sos-def-buf' and `sos-def-win'."
   (let ((enabled (or (and (booleanp toggle) toggle)
@@ -208,7 +192,7 @@ mouse-3: Copy the path."
             (font-lock-fontify-buffer)
             ;; Use `hl-highlight-mode' to prevent highlights to being blocked.
             (when (featurep 'hl-anything)
-              (setq-local hl-is-always-overlays-local t)
+              (setq hl-is-highlight-special-faces t)
               (hl-highlight-mode 1)))
         (when (featurep 'hl-line)
           (setq-local hl-line-sticky-flag t)

@@ -30,11 +30,12 @@
 
 (require 'font-lock)
 
-(require 'hl-faces)
+(require 'hl-anything)
 
 (defcustom prj-grep-mode-hook `(linum-mode
                                 hl-line-mode
-                                font-lock-mode)
+                                font-lock-mode
+                                hl-highlight-mode)
   "Hook run when entering `prj-grep-mode' mode."
   :type 'hook
   :group 'prj-group)
@@ -92,6 +93,8 @@
   (remove-overlays)
   (setq font-lock-defaults prj-grep-mode-font-lock-keywords
         truncate-lines t
+        ;; Highlight for specific faces.
+        hl-is-highlight-special-faces t
         ;; Header line.
         header-line-format prj-grep-mode-header-line))
 

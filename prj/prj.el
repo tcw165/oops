@@ -154,156 +154,6 @@ in the last session.")
 
 (defvar prj-process-grep nil)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;;###autoload
-(defun prj-preference ()
-  "Customize document types."
-  (interactive)
-  (prj-clean-frontends)
-  (customize-group 'prj-group))
-
-;;;###autoload
-(defun prj-create-project ()
-  "Show configuration for creating new project."
-  (interactive)
-  (unless prj-project-mode
-    (prj-project-mode 1))
-  (prj-clean-frontends)
-  (prj-call-frontends :show
-                       prj-create-project-frontends
-                       (prj-ok-delay-begin
-                        'prj-create-project-internal)))
-
-;;;###autoload
-(defun prj-delete-project ()
-  "Show configuration for deleting projects."
-  (interactive)
-  (unless prj-project-mode
-    (prj-project-mode 1))
-  (prj-clean-frontends)
-  (prj-call-frontends :show
-                       prj-delete-project-frontends
-                       (prj-ok-delay-begin
-                        'prj-delete-project-internal)))
-
-;;;###autoload
-(defun prj-edit-project ()
-  "Show configuration for editing project's setting."
-  (interactive)
-  (unless prj-project-mode
-    (prj-project-mode 1))
-  (prj-clean-frontends)
-  ;; Load project if wasn't loaded.
-  (unless (prj-project-p)
-    (prj-load-project))
-  (prj-call-frontends :show
-                       prj-edit-project-frontends
-                       (prj-ok-delay-begin
-                        'prj-edit-project-internal)))
-
-;;;###autoload
-(defun prj-load-project (&optional name)
-  "List available prjects in current workspace and let user to choose which 
-project to be loaded."
-  (interactive)
-  (unless prj-project-mode
-    (prj-project-mode 1))
-  (prj-clean-frontends)
-  (if name
-      (prj-load-project-internal name)
-    (prj-call-frontends :show
-                        prj-load-project-frontends
-                        (prj-ok-delay-begin
-                         'prj-load-project-internal))))
-
-;;;###autoload
-(defun prj-load-recent-project ()
-  "Load the project which user exits emacs last time."
-  (interactive)
-  (unless prj-project-mode
-    (prj-project-mode 1))
-  (prj-clean-frontends)
-  ;; TODO:
-  nil)
-
-;;;###autoload
-(defun prj-unload-project ()
-  "Unload current project."
-  (interactive)
-  (unless prj-project-mode
-    (prj-project-mode 1))
-  ;; Save files in the last session.
-  (prj-save-file-names t)
-  (prj-clean-frontends)
-  (let ((name (prj-project-name)))
-    (prj-clean-all)
-    (message "Unload [%s] ...done" name)))
-
-;;;###autoload
-(defun prj-build-database (&optional all)
-  "Build file list and tags."
-  (interactive '(t))
-  (prj-clean-frontends)
-  (unless (prj-project-p)
-    (prj-load-project))
-  ;; Create file list which is the data base of the project's files.
-  (when (prj-project-p)
-    (message "Build database might take a minutes, please wait ...")
-    (prj-build-filedb all)
-    (prj-build-tags all)
-    (message "Database is updated!")))
-
-;;;###autoload
-(defun prj-find-file ()
-  "Open file by the given file name."
-  (interactive)
-  (prj-clean-frontends)
-  ;; Load project if wasn't loaded.
-  (unless (prj-project-p)
-    (prj-load-project))
-  (prj-call-frontends :show
-                       prj-find-file-frontends
-                       (prj-ok-delay-begin
-                        'prj-find-file-internal)))
-
-;;;###autoload
-(defun prj-search-project ()
-  "Search string in the project. Append new search result to the old caches."
-  (interactive)
-  (prj-clean-frontends)
-  ;; Load project if no project was loaded.
-  (unless (prj-project-p)
-    (prj-load-project))
-  (if (and (processp prj-process-grep)
-           (process-live-p prj-process-grep))
-      (message "Searching is under processing, please wait...")
-    (prj-call-frontends :show
-                        prj-search-project-frontends
-                        (prj-ok-delay-begin
-                         'prj-search-project-internal-1))))
-
-;;;###autoload
-(defun prj-toggle-search-buffer ()
-  (interactive)
-  ;; TODO: bug when user is select definition window and try to toggle search buffer off.
-  (if (equal (buffer-name (current-buffer)) "*Search*")
-      ;; Back to previous buffer of current window.
-      (progn
-        (and (buffer-modified-p)
-             (save-buffer 0))
-        (kill-buffer))
-    ;; Go to search buffer.
-    (unless (prj-project-p)
-      (prj-load-project))
-    (and (featurep 'history)
-         (his-add-position-type-history))
-    (prj-with-search-buffer
-      (switch-to-buffer (current-buffer) nil t)
-      ;; (setq buffer-read-only t)
-      ;; TODO: goto last search result.
-      )))
-
 (defmacro prj-plist-put (plist prop val)
   `(setq ,plist (plist-put ,plist ,prop ,val)))
 
@@ -323,7 +173,6 @@ after `prj-idle-delay' seconds."
   `(let ((buffer (find-file-noselect (prj-searchdb-path))))
      (with-current-buffer buffer
        (rename-buffer "*Search*")
-       (setq buffer-read-only nil)
        (prj-grep-mode)
        ,@body)))
 
@@ -642,17 +491,156 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
     (prj-plist-put config :search-history '(0))
     config))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;###autoload
+(defun prj-preference ()
+  "Customize document types."
+  (interactive)
+  (prj-clean-frontends)
+  (customize-group 'prj-group))
 
 ;;;###autoload
-(define-minor-mode prj-project-mode
-  "Provide convenient menu items and tool-bar items for project feature."
-  :lighter " Project"
-  :global t
-  (if prj-project-mode
+(defun prj-create-project ()
+  "Show configuration for creating new project."
+  (interactive)
+  (unless prj-project-mode
+    (prj-project-mode 1))
+  (prj-clean-frontends)
+  (prj-call-frontends :show
+                       prj-create-project-frontends
+                       (prj-ok-delay-begin
+                        'prj-create-project-internal)))
+
+;;;###autoload
+(defun prj-delete-project ()
+  "Show configuration for deleting projects."
+  (interactive)
+  (unless prj-project-mode
+    (prj-project-mode 1))
+  (prj-clean-frontends)
+  (prj-call-frontends :show
+                       prj-delete-project-frontends
+                       (prj-ok-delay-begin
+                        'prj-delete-project-internal)))
+
+;;;###autoload
+(defun prj-edit-project ()
+  "Show configuration for editing project's setting."
+  (interactive)
+  (unless prj-project-mode
+    (prj-project-mode 1))
+  (prj-clean-frontends)
+  ;; Load project if wasn't loaded.
+  (unless (prj-project-p)
+    (prj-load-project))
+  (prj-call-frontends :show
+                       prj-edit-project-frontends
+                       (prj-ok-delay-begin
+                        'prj-edit-project-internal)))
+
+;;;###autoload
+(defun prj-load-project (&optional name)
+  "List available prjects in current workspace and let user to choose which 
+project to be loaded."
+  (interactive)
+  (unless prj-project-mode
+    (prj-project-mode 1))
+  (prj-clean-frontends)
+  (if name
+      (prj-load-project-internal name)
+    (prj-call-frontends :show
+                        prj-load-project-frontends
+                        (prj-ok-delay-begin
+                         'prj-load-project-internal))))
+
+;;;###autoload
+(defun prj-load-recent-project ()
+  "Load the project which user exits emacs last time."
+  (interactive)
+  (unless prj-project-mode
+    (prj-project-mode 1))
+  (prj-clean-frontends)
+  ;; TODO:
+  nil)
+
+;;;###autoload
+(defun prj-unload-project ()
+  "Unload current project."
+  (interactive)
+  (unless prj-project-mode
+    (prj-project-mode 1))
+  ;; Save files in the last session.
+  (prj-save-file-names t)
+  (prj-clean-frontends)
+  (let ((name (prj-project-name)))
+    (prj-clean-all)
+    (message "Unload [%s] ...done" name)))
+
+;;;###autoload
+(defun prj-build-database (&optional all)
+  "Build file list and tags."
+  (interactive '(t))
+  (prj-clean-frontends)
+  (unless (prj-project-p)
+    (prj-load-project))
+  ;; Create file list which is the data base of the project's files.
+  (when (prj-project-p)
+    (message "Build database might take a minutes, please wait ...")
+    (prj-build-filedb all)
+    (prj-build-tags all)
+    (message "Database is updated!")))
+
+;;;###autoload
+(defun prj-find-file ()
+  "Open file by the given file name."
+  (interactive)
+  (prj-clean-frontends)
+  ;; Load project if wasn't loaded.
+  (unless (prj-project-p)
+    (prj-load-project))
+  (prj-call-frontends :show
+                       prj-find-file-frontends
+                       (prj-ok-delay-begin
+                        'prj-find-file-internal)))
+
+;;;###autoload
+(defun prj-search-project ()
+  "Search string in the project. Append new search result to the old caches."
+  (interactive)
+  (prj-clean-frontends)
+  ;; Load project if no project was loaded.
+  (unless (prj-project-p)
+    (prj-load-project))
+  (if (and (processp prj-process-grep)
+           (process-live-p prj-process-grep))
+      (message "Searching is under processing, please wait...")
+    (prj-call-frontends :show
+                        prj-search-project-frontends
+                        (prj-ok-delay-begin
+                         'prj-search-project-internal-1))))
+
+;;;###autoload
+(defun prj-toggle-search-buffer ()
+  (interactive)
+  ;; TODO: bug when user is select definition window and try to toggle search buffer off.
+  ;; TODO: use front-end???
+  (if (equal (buffer-name (current-buffer)) "*Search*")
+      ;; Back to previous buffer of current window.
       (progn
-        (add-hook 'kill-emacs-hook 'prj-kill-emacs-hook t nil))
-    (remove-hook 'kill-emacs-hook 'prj-kill-emacs-hook nil)))
+        (and (buffer-modified-p)
+             (save-buffer 0))
+        (kill-buffer))
+    ;; Go to search buffer.
+    (unless (prj-project-p)
+      (prj-load-project))
+    (and (featurep 'history)
+         (his-add-position-type-history))
+    (prj-with-search-buffer
+      (switch-to-buffer (current-buffer) nil t)
+      ;; TODO: goto last search result.
+      )))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Project Mode ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun prj-kill-emacs-hook ()
   (prj-save-file-names))
@@ -672,5 +660,15 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
       ;; Export configuration.
       (prj-plist-put prj-config :recent-files files)
       (prj-export-json (prj-config-path) prj-config))))
+
+;;;###autoload
+(define-minor-mode prj-project-mode
+  "Provide convenient menu items and tool-bar items for project feature."
+  :lighter " Project"
+  :global t
+  (if prj-project-mode
+      (progn
+        (add-hook 'kill-emacs-hook 'prj-kill-emacs-hook t nil))
+    (remove-hook 'kill-emacs-hook 'prj-kill-emacs-hook nil)))
 
 (provide 'prj)

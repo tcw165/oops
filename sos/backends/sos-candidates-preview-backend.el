@@ -53,7 +53,7 @@
                                                 (goto-char 1)
                                                 (buffer-substring-no-properties
                                                  1 (line-end-position))))
-                               0 'sos-hl-symbol-face prepend)))
+                               0 'hl-symbol-face prepend)))
              `((:doc ,doc :linum ,linum :keywords ,keywords)))
            (when file
              `((:file ,file :linum ,linum))))))))
