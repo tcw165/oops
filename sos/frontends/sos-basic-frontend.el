@@ -164,20 +164,22 @@ mouse-3: Copy the path."
     (sos-with-definition-buffer
       (kill-all-local-variables)
       (remove-overlays)
-      (erase-buffer)
       ;; Insert content and set major mode.
       (or (when doc
+            (erase-buffer)
             (insert doc)
             ;; Fundamental mode.
             (fundamental-mode))
           (when (and file (file-exists-p file))
-            (insert-file-contents file)
+            (insert-file-contents file nil nil nil t)
             ;; Change major-mode refer to file name.
             (dolist (mode auto-mode-alist)
               (and (not (null (cdr mode)))
                    (string-match (car mode) file)
                    (funcall (cdr mode))))))
       ;; Minor mode.
+      (transient-mark-mode -1)
+      (hl-line-unhighlight)
       (sos-candidate-mode 1)
       ;; Move point and recenter.
       (when (integerp linum)
