@@ -265,6 +265,7 @@ mouse-3: Copy the path."
          regexp)
     (when (and (stringp file)
                (file-exists-p file))
+      (setq mark-active nil)
       (and (featurep 'history)
            (his-add-history))
       (find-file file)
@@ -272,24 +273,18 @@ mouse-3: Copy the path."
       (when (integerp linum)
         (goto-char 1)
         (forward-line (1- linum))
-        (end-of-line)
         (recenter 5))
-      (and (featurep 'history)
-           (his-add-history))
       ;; Keyword.
-      (when (and keywords (listp keywords) (car keywords))
-        (setq regexp (or (and (stringp (car keywords))
-                              (car keywords))
-                         (and (stringp (caar keywords))
-                              (caar keywords))))
-        (re-search-forward regexp nil t)
-        (let ((beg (match-beginning 1))
-              (end (match-end 1)))
-          (when end
-            (goto-char end))
-          (when beg
-            (set-marker (mark-marker) beg)
-            (setq mark-active t)))))))
+      ;; TODO: use `hl-anything' to highlight temporarily.
+      ;; (when (and keywords (listp keywords) (car keywords))
+      ;;   (setq regexp (or (and (stringp (car keywords))
+      ;;                         (car keywords))
+      ;;                    (and (stringp (caar keywords))
+      ;;                         (caar keywords))))
+      ;;   (unless (re-search-forward regexp nil t)
+      ;;     (end-of-line)))
+      (and (featurep 'history)
+           (his-add-history)))))
 
 ;;;###autoload
 (defun sos-open-definition-file ()
