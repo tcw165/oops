@@ -38,6 +38,7 @@
 (require 'tabulated-list)
 (require 'thingatpt)
 
+(require 'history)
 (require 'hl-faces)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -167,9 +168,7 @@ mouse-3: Copy the path."
       ;; Insert content and set major mode.
       (or (when doc
             (erase-buffer)
-            (insert doc)
-            ;; Fundamental mode.
-            (fundamental-mode))
+            (insert doc))
           (when (and file (file-exists-p file))
             (insert-file-contents file nil nil nil t)
             ;; Change major-mode refer to file name.
@@ -178,7 +177,6 @@ mouse-3: Copy the path."
                    (string-match (car mode) file)
                    (funcall (cdr mode))))))
       ;; Minor mode.
-      (transient-mark-mode -1)
       (hl-line-unhighlight)
       (sos-candidate-mode 1)
       ;; Move point and recenter.
@@ -186,16 +184,15 @@ mouse-3: Copy the path."
         (goto-char 1)
         (forward-line (1- linum))
         (end-of-line)
-        (recenter 5))
+        (recenter 3))
       ;; Highlight word.
       (if keywords
           (progn
             (font-lock-add-keywords nil keywords 'append)
             (font-lock-fontify-buffer)
             ;; Use `hl-highlight-mode' to prevent highlights to being blocked.
-            (when (featurep 'hl-anything)
-              (setq hl-is-highlight-special-faces t)
-              (hl-highlight-mode 1)))
+            (setq hl-is-highlight-special-faces t)
+            (hl-highlight-mode 1))
         (when (featurep 'hl-line)
           (setq-local hl-line-sticky-flag t)
           (hl-line-mode 1)))
@@ -265,26 +262,19 @@ mouse-3: Copy the path."
          regexp)
     (when (and (stringp file)
                (file-exists-p file))
-      (setq mark-active nil)
-      (and (featurep 'history)
-           (his-add-history))
-      (find-file file)
+      (his-add-history)
+      (unless (string= (buffer-file-name) file)
+        (find-file file))
       ;; Line number.
       (when (integerp linum)
         (goto-char 1)
         (forward-line (1- linum))
-        (recenter 5))
+        (recenter 3))
+      (end-of-line)
       ;; Keyword.
-      ;; TODO: use `hl-anything' to highlight temporarily.
-      ;; (when (and keywords (listp keywords) (car keywords))
-      ;;   (setq regexp (or (and (stringp (car keywords))
-      ;;                         (car keywords))
-      ;;                    (and (stringp (caar keywords))
-      ;;                         (caar keywords))))
-      ;;   (unless (re-search-forward regexp nil t)
-      ;;     (end-of-line)))
-      (and (featurep 'history)
-           (his-add-history)))))
+      ;; (when keywords
+      ;;   (hl-highlight-keywords-local&temp keywords))
+      (his-add-history))))
 
 ;;;###autoload
 (defun sos-open-definition-file ()
@@ -304,7 +294,7 @@ mouse-3: Copy the path."
         (goto-line linum)
         (and (featurep 'history)
              (his-add-position-type-history))
-        (recenter 5))
+        (recenter 3))
       (select-window sos-source-window))))
 
 ;;;###autoload
@@ -328,7 +318,7 @@ mouse-3: Copy the path."
     (when (and linum (integerp linum))
       (sos-with-definition-buffer
         (goto-line linum)
-        (recenter 5)))))
+        (recenter 3)))))
 
 ;;;###autoload
 (defun sos-jump-in-candidate ()
@@ -483,14 +473,12 @@ mouse-3: Copy the path."
 (defun sos-goto-definitions-frontend (command &optional arg)
   (case command
     (:show
-     (setq mark-active nil
-           sos-candidates arg)
+     (setq sos-candidates arg)
      (let ((buf-name "*Goto Definition*"))
        (if (sos-is-multiple-candidates)
            ;; Multiple Candidates ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
            (let ((buffer (get-buffer-create buf-name)))
-             (and (featurep 'history)
-                  (his-add-history))
+             (his-add-history)
              (switch-to-buffer buffer)
              (setq buffer-read-only nil)
              ;; Insert condidates.

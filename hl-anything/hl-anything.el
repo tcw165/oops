@@ -140,6 +140,10 @@ will also be created for these faces under current line."
   "A local things list. Format: (REGEXP1 REGEXP2 ...)")
 (make-variable-buffer-local 'hl-things-local)
 
+(defvar hl-keywords-local nil
+  "A local keywords list. See `font-lock-keywords'.")
+(make-variable-buffer-local 'hl-keywords-local)
+
 (defvar hl-overlays-local nil
   "Overlays for highlighted things. Prevent them to being hide by 
 `hl-line-mode'.")
@@ -249,6 +253,11 @@ Format: (START . END)"
                   font-lock-keywords)))
 
 (defun hl-highlight-pre-command ()
+  ;; Remove temporarily keywords.
+  (when hl-keywords-local
+    (font-lock-remove-keywords nil hl-keywords-local)
+    (font-lock-fontify-buffer)
+    (setq hl-keywords-local nil))
   (when hl-timer
     (cancel-timer hl-timer)
     (setq hl-timer nil)))
@@ -262,7 +271,8 @@ Format: (START . END)"
 
 (defun hl-add-highlight-overlays ()
   (when (or (and (featurep 'hl-line) hl-line-mode
-                 (or hl-things-global hl-things-local hl-overlays-local))
+                 (or hl-things-global hl-things-local hl-overlays-local
+                     hl-keywords-local))
             hl-is-highlight-special-faces)
     ;; Remove overlays.
     (mapc 'delete-overlay hl-overlays-local)
@@ -311,6 +321,17 @@ Format: (START . END)"
       (if (member regexp hl-things-local)
           (hl-unhighlight-internal regexp t)
         (hl-highlight-internal regexp t)))))
+
+;;;###autoload
+(defun hl-highlight-keywords-local&temp (keywords)
+  "Hhighlight keywords locally and temporarily in the current buffer. Any action
+ will remove the temporary highlight."
+  (when keywords
+    (setq hl-keywords-local keywords)
+    (font-lock-add-keywords nil keywords 'append)
+    (font-lock-fontify-buffer)
+    (unless hl-highlight-mode
+      (hl-highlight-mode 1))))
 
 ;;;###autoload
 (defun hl-unhighlight-all-local ()

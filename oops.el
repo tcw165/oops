@@ -22,7 +22,6 @@
 ;;; Commentary:
 ;;
 ;; TODO: Add comment for all the functions and variables.
-;; TODO: Add GUI buttom for `his-add-history', `his-next-history' and `his-prev-history'.
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
