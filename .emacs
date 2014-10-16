@@ -143,13 +143,12 @@ The `base' should be a directory string and the `exclude' should be a list that 
 (setq-default save-place t)
 
 (require 'semantic)
-(semantic-mode 1)
+;; (semantic-mode 1)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Company Extension ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (require 'company)
-
 (add-hook 'emacs-lisp-mode-hook 'company-mode)
 ;; (add-hook 'c-mode-hook 'company-mode)
 ;; (add-hook 'c++-mode-hook 'company-mode)
@@ -165,6 +164,9 @@ The `base' should be a directory string and the `exclude' should be a list that 
 (require 'auto-complete)
 ;; (add-hook 'emacs-lisp-mode-hook 'auto-complete-mode)
 ;; (add-hook 'python-mode-hook 'auto-complete-mode)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Oops Extension ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (require 'oops)
 (unless (prj-load-recent-project)
