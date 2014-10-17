@@ -36,8 +36,8 @@
 (defun sos-grep-backend (command &optional arg)
   (case command
     (:symbol
-     (when (eq major-mode (or (and (featurep 'prj-grep)
-                                   'prj-grep-mode)
+     (when (eq major-mode (or (and (featurep 'grep-mode)
+                                   'grep-mode)
                               (and (featurep 'compile)
                                    'compilation-mode)))
        (unless mark-active

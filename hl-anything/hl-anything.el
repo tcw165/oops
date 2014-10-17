@@ -270,7 +270,8 @@ Format: (START . END)"
   (not (or (active-minibuffer-window))))
 
 (defun hl-add-highlight-overlays ()
-  (when (or (and (featurep 'hl-line) hl-line-mode
+  (when (or (and hl-highlight-mode
+                 (featurep 'hl-line) hl-line-mode
                  (or hl-things-global hl-things-local hl-overlays-local
                      hl-keywords-local))
             hl-is-highlight-special-faces)
@@ -455,37 +456,38 @@ Format: (START . END)"
 
 (defun hl-create-parens ()
   "Highlight the parentheses around point."
-  (hl-create-parens-internal)
-  ;; Outward overlays.
-  (let ((overlays hl-outward-parens))
-    (save-excursion
-      (ignore-errors
-        (while overlays
-          (up-list -1)
-          (move-overlay (pop overlays) (point) (1+ (point)))
-          (forward-sexp)
-          (move-overlay (pop overlays) (1- (point)) (point)))))
-    ;; Hide unused overlays.
-    (dolist (overlay overlays)
-      (move-overlay overlay 1 1)))
-  ;; Inward overlays.
-  (unless (memq (get-text-property (point) 'face)
-                '(font-lock-comment-face
-                  font-lock-string-face))
-    (let ((overlays hl-inward-parens))
+  (when hl-paren-mode
+    (hl-create-parens-internal)
+    ;; Outward overlays.
+    (let ((overlays hl-outward-parens))
       (save-excursion
         (ignore-errors
-          (cond
-           ;; Open parenthesis ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-           ((eq ?\( (char-syntax (char-after)))
+          (while overlays
+            (up-list -1)
             (move-overlay (pop overlays) (point) (1+ (point)))
             (forward-sexp)
-            (move-overlay (pop overlays) (1- (point)) (point)))
-           ;; Close parenthesis ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-           ((eq ?\) (char-syntax (char-before)))
-            (move-overlay (pop overlays) (1- (point)) (point))
-            (backward-sexp)
-            (move-overlay (pop overlays) (point) (1+ (point))))))))))
+            (move-overlay (pop overlays) (1- (point)) (point)))))
+      ;; Hide unused overlays.
+      (dolist (overlay overlays)
+        (move-overlay overlay 1 1)))
+    ;; Inward overlays.
+    (unless (memq (get-text-property (point) 'face)
+                  '(font-lock-comment-face
+                    font-lock-string-face))
+      (let ((overlays hl-inward-parens))
+        (save-excursion
+          (ignore-errors
+            (cond
+             ;; Open parenthesis ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+             ((eq ?\( (char-syntax (char-after)))
+              (move-overlay (pop overlays) (point) (1+ (point)))
+              (forward-sexp)
+              (move-overlay (pop overlays) (1- (point)) (point)))
+             ;; Close parenthesis ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+             ((eq ?\) (char-syntax (char-before)))
+              (move-overlay (pop overlays) (1- (point)) (point))
+              (backward-sexp)
+              (move-overlay (pop overlays) (point) (1+ (point)))))))))))
 
 (defun hl-create-parens-internal ()
   ;; outward overlays.

@@ -39,10 +39,10 @@
 
 ;;; 3rd party library ==========================================================
 (require 'company)
+
+(require 'grep-mode)
 (require 'hl-anything)
 (require 'history)
-
-;;; Oops library ===============================================================
 (require 'sos)
 (require 'prj)
 (require 'oops-lisp-lib)
@@ -301,26 +301,30 @@ or go back to just one window (by deleting all but the selected window)."
       ((string= dir "horizontal")
        (split-window (selected-window) nil 'right)))))
 
-(defun oops-setup-default-mode-line ()
-  (setq-default mode-line-format `((:eval (format "  %s | file:%s"
-                                                  (propertize "Source"
-                                                              'face 'mode-line-buffer-id)
-                                                  (propertize (abbreviate-file-name (buffer-file-name))
-                                                              'face 'link
-                                                              'mouse-face 'highlight
-                                                              'help-echo "mouse-1: Copy file path."
-                                                              'local-map sos-default-file-info-map)))
-                                   ", line:%l col:%c"
-                                   ", function:(yet supported)")))
+(defvar oops-default-mode-line
+  `((:eval (format "  %s | file:%s, line:%s col:%s, function:(yet supported)"
+                   (propertize "Source" 'face 'mode-line-buffer-id)
+                   (propertize (abbreviate-file-name (buffer-file-name))
+                               'face 'link
+                               'mouse-face 'highlight
+                               'help-echo "mouse-1: Copy file path."
+                               'local-map sos-default-file-info-map)
+                   (propertize "%l" 'face 'link)
+                   (propertize "%c" 'face 'link)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Configuration Sets ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun oops-init-auto-mode-alist ()
+  (add-to-list 'auto-mode-alist '("\\.grep\\'" . grep-mode)))
 
 ;;;###autoload
 (defun oops-default-config ()
   (interactive)
   ;; Mode line.
-  (oops-setup-default-mode-line)
+  (setq-default mode-line-format oops-default-mode-line)
+  ;; Major mode alist.
+  (oops-init-auto-mode-alist)
   ;; Project management.
   (unless (prj-load-recent-project)
     (prj-load-project))

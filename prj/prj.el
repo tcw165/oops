@@ -40,7 +40,6 @@
 (require 'ido)
 (require 'json)
 
-(require 'prj-grep)
 (require 'prj-widget-frontend)
 
 (defgroup prj-group nil
@@ -143,7 +142,7 @@ format:
   (DOCTYPE1 (FILE1_1 FILE1_2 ...)
    DOCTYPE2 (FILE2_1 FILE2_2 ...))")
 
-(defconst prj-searchdb-name "search.db"
+(defconst prj-searchdb-name "search.grep"
   "The simple text file which caches the search result that users have done 
 in the last session.")
 
@@ -172,11 +171,8 @@ after `prj-idle-delay' seconds."
 
 (defmacro prj-with-search-buffer (&rest body)
   (declare (indent 0) (debug t))
-  `(let ((buffer (find-file-noselect (prj-searchdb-path))))
-     (with-current-buffer buffer
-       (rename-buffer "*Search*")
-       (prj-grep-mode)
-       ,@body)))
+  `(with-current-buffer (find-file-noselect (prj-searchdb-path))
+     ,@body))
 
 (defun prj-call-frontend (command frontend &optional ok)
   "Call frontends and pass ok callback functions to them. If one of them 
@@ -197,7 +193,7 @@ user loads a project or unload a project."
   ;; Clean frontends.
   (prj-clean-frontends)
   ;; Kill search buffer.
-  (let ((search (get-buffer "*Search*")))
+  (let ((search (get-buffer prj-searchdb-name)))
     (and search
          (with-current-buffer search
            (save-buffer)
@@ -622,7 +618,7 @@ project to be loaded."
   (interactive)
   ;; TODO: bug when user is select definition window and try to toggle search buffer off.
   ;; TODO: use front-end???
-  (if (equal (buffer-name (current-buffer)) "*Search*")
+  (if (string= (buffer-name (current-buffer)) prj-searchdb-name)
       ;; Back to previous buffer of current window.
       (progn
         (and (buffer-modified-p)

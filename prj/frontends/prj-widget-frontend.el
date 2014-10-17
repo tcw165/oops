@@ -273,7 +273,6 @@ remove one.\n"
        (while filedb
          (setq filelist (append filelist (cadr filedb))
                filedb (cddr filedb)))
-       ;; TOOD: use `sos-source-buffer' and new implementation.
        ;; call `prj-find-file-internal'.
        (funcall ok (ido-completing-read (format "[%s] Find file: "
                                                 (prj-project-name))

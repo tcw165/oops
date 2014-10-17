@@ -28,37 +28,36 @@
 ;; 2014-08-01 (0.0.1)
 ;;    Initial release.
 
+;; Built-in extensions
 (require 'font-lock)
-
+(require 'saveplace)
+;; 3rd party extensions.
 (require 'hl-anything)
 
-(defcustom prj-grep-mode-hook `(linum-mode
-                                hl-line-mode
-                                font-lock-mode
-                                hl-highlight-mode)
-  "Hook run when entering `prj-grep-mode' mode."
-  :type 'hook
-  :group 'prj-group)
+(defgroup grep-mode-group nil
+  "Major mode for text outputed by unix-liked grep."
+  :tag "Grep")
 
-(defvar prj-grep-mode-map
+(defcustom grep-mode-hook `(save-place-find-file-hook
+                            font-lock-mode
+                            linum-mode
+                            hl-line-mode
+                            hl-highlight-mode)
+  "Hook run when entering `grep-mode' mode."
+  :type 'hook
+  :group 'grep-mode-group)
+
+(defvar grep-mode-map
   (let ((map (make-sparse-keymap)))
     (suppress-keymap map t)
-    (if (featurep 'sos)
-        (progn
-          (define-key map [return] '(lambda ()
-                                      (interactive)
-                                      (beginning-of-line)
-                                      (sos-goto-definition))))
-      )
     ;; (define-key map [up] )
     ;; (define-key map [down] )
-    (define-key map [?q] '(lambda ()
-                            (interactive)
-                            (prj-kill-grep-buffer)))
-    (define-key map [?d] '(lambda () (interactive) (prj-kill-grep-item-at-point)))
+    (define-key map [return] 'grep-open-item)
+    (define-key map [?q] 'grep-kill-buffer)
+    (define-key map [?d] 'grep-kill-item-at-point)
     map))
 
-(defvar prj-grep-mode-font-lock-keywords
+(defvar grep-mode-font-lock-keywords
   '((("^\\([[:alnum:] $_\/.+-]+\\):\\([0-9]+\\):.*$" (1 'hl-file-face) (2 'hl-number-face))
      ("^\\(>>>>>\\s-\\)\\(.+\\)$" (1 'hl-title-3-face) (2 'hl-symbol-face))
      ("^\\(<<<<<\\)$" (1 'hl-title-3-face)))
@@ -67,7 +66,13 @@
     ;; Case insensitive.
     nil))
 
-(defvar prj-grep-mode-header-line
+(defvar grep-mode-bottom-line
+  `(,(format "  %s | line:%s, col:%s"
+             (propertize "Search Result" 'face 'mode-line-buffer-id)
+             (propertize "%l" 'face 'link)
+             (propertize "%c" 'face 'link))))
+
+(defvar grep-mode-header-line
   `(,(format "  Tips: %s and %s to navigate; %s to open item; %s to delete item; %s to quit"
              (propertize "UP" 'face 'tooltip)
              (propertize "DOWN" 'face 'tooltip)
@@ -75,15 +80,7 @@
              (propertize "d" 'face 'tooltip)
              (propertize "q" 'face 'tooltip))))
 
-(defun prj-kill-grep-item-at-point ()
-  (setq buffer-read-only nil)
-  (dolist (bound (prj-grep-mode-get-kill-regions))
-    (delete-region (car bound) (cdr bound)))
-  (and (buffer-modified-p)
-       (save-buffer))
-  (setq buffer-read-only t))
-
-(defun prj-grep-mode-get-kill-regions ()
+(defun grep-get-kill-regions ()
   (if mark-active
       (let ((beg (region-beginning))
             (end (region-end))
@@ -94,7 +91,7 @@
           (save-excursion
             (goto-char beg)
             (while (<= (point) end)
-              (if (prj-is-valid-grep-item)
+              (if (grep-is-valid-item)
                   (progn
                     (unless reg-beg
                       (setq reg-beg (line-beginning-position 1)))
@@ -107,32 +104,61 @@
             (when (and reg-beg reg-end)
               (setq regions (append regions `((,reg-beg . ,reg-end)))))))
         regions)
-    (when (prj-is-valid-grep-item)
+    (when (grep-is-valid-item)
       ;; TODO: what if there's nothing between ">>>>>" and "<<<<<"?
       `((,(line-beginning-position 1) . ,(line-beginning-position 2))))))
 
-(defun prj-is-valid-grep-item ()
+(defun grep-is-valid-item ()
   (save-excursion
     (beginning-of-line)
     (not (or (looking-at ">>>>>")
              (looking-at "<<<<<")
              (looking-at "$")))))
 
-(defun prj-kill-grep-buffer ()
+;;;###autoload
+(defun grep-kill-item-at-point ()
+  (interactive)
+  (setq buffer-read-only nil)
+  (dolist (bound (grep-get-kill-regions))
+    (delete-region (car bound) (cdr bound)))
+  (and (buffer-modified-p)
+       (save-buffer))
+  (setq buffer-read-only t))
+
+;;;###autoload
+(defun grep-kill-buffer ()
+  (interactive)
   (when (buffer-modified-p)
     (save-buffer))
   (kill-buffer))
 
 ;;;###autoload
-(define-derived-mode prj-grep-mode nil "prj:grep"
+(defun grep-open-item ()
+  (interactive)
+  (beginning-of-line)
+  (when (looking-at "^\\(.+\\):\\([0-9]+\\):")
+    (let ((file (match-string 1))
+          (linum (string-to-int (match-string 2))))
+      (message "ready to open:%s" file)
+      (when (file-exists-p file)
+        (find-file file)
+        (goto-char 1)
+        (forward-line (1- linum))
+        (end-of-line)
+        (recenter 3)))))
+
+;;;###autoload
+(define-derived-mode grep-mode nil "Grep"
   "Major mode for search buffers."
-  :group 'prj-group
+  :group 'grep-group
   (remove-overlays)
-  (setq font-lock-defaults prj-grep-mode-font-lock-keywords
+  (setq font-lock-defaults grep-mode-font-lock-keywords
         truncate-lines t
         ;; Highlight for specific faces.
         hl-is-highlight-special-faces t
         ;; Header line.
-        header-line-format prj-grep-mode-header-line))
+        header-line-format grep-mode-header-line
+        ;; Bottom line.
+        mode-line-format grep-mode-bottom-line))
 
-(provide 'prj-grep)
+(provide 'grep-mode)
