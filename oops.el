@@ -262,7 +262,31 @@ or go back to just one window (by deleting all but the selected window)."
    ((featurep 'company)
     (company-cancel))))
 
-;;; Window ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Buffer ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defvar oops-default-mode-line
+  `((:eval (format "  %s | file:%s, line:%s col:%s, function:(yet supported)"
+                   (propertize "Source" 'face 'mode-line-buffer-id)
+                   (propertize (abbreviate-file-name (buffer-file-name))
+                               'face 'link
+                               'mouse-face 'highlight
+                               'help-echo "mouse-1: Copy file path."
+                               'local-map sos-default-file-info-map)
+                   (propertize "%l" 'face 'link)
+                   (propertize "%c" 'face 'link)))))
+
+;;;###autoload
+(defun oops-kill-all-files ()
+  (interactive)
+  (dolist (buffer (buffer-list))
+    (when (and (buffer-live-p buffer)
+               (buffer-file-name buffer))
+      (kill-buffer buffer)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Window ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
 (defun oops-windmove-left ()
@@ -300,17 +324,6 @@ or go back to just one window (by deleting all but the selected window)."
        (split-window (selected-window) nil 'below))
       ((string= dir "horizontal")
        (split-window (selected-window) nil 'right)))))
-
-(defvar oops-default-mode-line
-  `((:eval (format "  %s | file:%s, line:%s col:%s, function:(yet supported)"
-                   (propertize "Source" 'face 'mode-line-buffer-id)
-                   (propertize (abbreviate-file-name (buffer-file-name))
-                               'face 'link
-                               'mouse-face 'highlight
-                               'help-echo "mouse-1: Copy file path."
-                               'local-map sos-default-file-info-map)
-                   (propertize "%l" 'face 'link)
-                   (propertize "%c" 'face 'link)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Configuration Sets ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

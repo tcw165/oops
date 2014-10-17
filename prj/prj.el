@@ -641,17 +641,17 @@ project to be loaded."
 (defun prj-save-file-names (&optional close)
   (when (prj-project-p)
     ;; Save file names opened in current session.
-    (let (file files buffers-to-kill)
+    (let ((searchdb (prj-searchdb-path))
+          file files)
       (dolist (buffer (buffer-list))
-        (when (and (setq file (buffer-file-name buffer))
+        (when (and (buffer-live-p buffer)
+                   (setq file (buffer-file-name buffer))
                    ;; Skip search database.
-                   (not (string= file (prj-searchdb-path))))
-          (setq files (append files `(,file))))
-        (when (and close file)
-          (setq buffers-to-kill (append buffers-to-kill `(,buffer)))))
-      ;; Close buffers.
-      (dolist (buffer buffers-to-kill)
-        (kill-buffer buffer))
+                   (not (string= file searchdb)))
+          (setq files (append files `(,file)))
+          ;; Close buffers.
+          (when close
+            (kill-buffer buffer))))
       ;; Export configuration.
       (prj-plist-put prj-config :recent-files files)
       (prj-export-json (prj-config-path) prj-config))))
