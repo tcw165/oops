@@ -144,36 +144,12 @@ the following back-ends.
   "Cache the return value from back-end with `:symbol' command.")
 (make-variable-buffer-local 'sos-symbol)
 
-(defvar sos-default-file-info-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map [mode-line mouse-1] (lambda ()
-                                          (interactive)
-                                          (let ((file (buffer-file-name)))
-                                            (with-temp-buffer
-                                            (insert file)
-                                            (clipboard-kill-region 1 (point-max))
-                                            (message "Path copied!")))))
-    map))
-
 (defun sos-call-backend (backend command &optional arg)
   "Call certain backend `backend' and pass `command' to it."
   (funcall backend command arg))
 
 (defun sos-init-backend (backend)
   (funcall backend :init))
-
-;;;###autoload
-(defun sos-setup-default-mode-line ()
-  (setq-default mode-line-format `((:eval (format "  %s | file:%s"
-                                                 (propertize "Source"
-                                                             'face 'mode-line-buffer-id)
-                                                 (propertize (abbreviate-file-name (buffer-file-name))
-                                                             'face 'link
-                                                             'mouse-face 'highlight
-                                                             'help-echo "mouse-1: Copy file path."
-                                                             'local-map sos-default-file-info-map)))
-                                   ", line:%l col:%c"
-                                   ", function:(yet supported)")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Definition Window ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

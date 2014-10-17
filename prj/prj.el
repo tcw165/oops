@@ -634,9 +634,7 @@ project to be loaded."
     (and (featurep 'history)
          (his-add-position-type-history))
     (prj-with-search-buffer
-      (switch-to-buffer (current-buffer) nil t)
-      ;; TODO: goto last search result.
-      )))
+      (switch-to-buffer (current-buffer) nil t))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Project Mode ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
