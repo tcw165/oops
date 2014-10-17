@@ -41,6 +41,7 @@
 (require 'json)
 
 (require 'prj-widget-frontend)
+(require 'prj-default-backend)
 
 (defgroup prj-group nil
   "A Project management utility. This utility provides you a workspace and many 
@@ -85,40 +86,37 @@ be delimit with ';'."
   :type '(string :tag "File")
   :group 'prj-group)
 
-(defcustom prj-create-project-frontend 'prj-create-project-widget-frontend
-  "The front-ends should return a struct:
-  (:name NAME
-   :doctypes DOCTYPES
-   :filepaths FILEPATHS)"
-  :type '(symbol :tag "Front-end")
+(defcustom prj-frontends '(prj-create-project-widget-frontend
+                           prj-delete-project-widget-frontend
+                           prj-edit-project-widget-frontend
+                           prj-search-project-widget-frontend
+                           prj-load-project-widget-frontend
+                           prj-find-file-frontend)
+  "The list of front-ends for the purpose of visualization. Every front-end takes
+at least one argument, command. Optional arguement callback is the function which
+ the front-end will call when some task is ready to be exectued.
+
+### Commands:
+`:create-project'  - Show GUI for creating project.
+`:delete-project'  - Show GUI for deleting project(s).
+`:edit-project'    - Show GUI for editing project.
+`:search-project'  - Show GUI for searching project (normally implemented by grep).
+`:find-file'       - Show GUI for finding files in the project.
+`:hide'            - Hide all the GUIs.
+
+### The sample of a front-end:
+  (defun some-frontend (command callback &rest args)
+    (case command
+      (:creat-project (progn ...))
+      (:hide (kill-buffer)))
+"
+  :type '(repeat (symbol :tag "Front-end"))
   :group 'prj-group)
 
-(defcustom prj-delete-project-frontend 'prj-delete-project-widget-frontend
-  "The front-ends should return "
-  :type '(symbol :tag "Front-end")
-  :group 'prj-group)
-
-(defcustom prj-load-project-frontend 'prj-load-project-widget-frontend
+(defcustom prj-backends '()
   ""
-  :type '(symbol :tag "Front-end")
+  :type '(repeat (symbol :tag "Back-end"))
   :group 'prj-group)
-
-(defcustom prj-edit-project-frontend 'prj-edit-project-widget-frontend
-  ""
-  :type '(symbol :tag "Front-end")
-  :group 'prj-group)
-
-(defcustom prj-search-project-frontend 'prj-search-project-widget-frontend
-  ""
-  :type '(symbol :tag "Front-end")
-  :group 'prj-group)
-
-(defcustom prj-find-file-frontend 'prj-find-file-basic-frontend
-  ""
-  :type '(symbol :tag "Front-end")
-  :group 'prj-group)
-
-;; (defcustom prj-find-file-backend)
 
 (defvar prj-config nil
   "A plist which represent a project's configuration, it will be exported as 
@@ -149,43 +147,28 @@ in the last session.")
 (defconst prj-search-history-max 16
   "Maximin elements count in the searh history cache.")
 
-(defconst prj-idle-delay 0.15)
-
-(defvar prj-timer nil)
-
 (defvar prj-process-grep nil)
 
 (defmacro prj-plist-put (plist prop val)
   `(setq ,plist (plist-put ,plist ,prop ,val)))
-
-(defmacro prj-ok-delay-begin (ok-impl)
-  "Create a lambda function that call OK-IMPL function with  one parameters 
-after `prj-idle-delay' seconds."
-  `(lambda (data)
-     (when prj-timer
-       (cancel-timer prj-timer)
-       (setq prj-timer nil))
-     (setq prj-timer (run-with-timer prj-idle-delay nil
-                                     ,ok-impl
-                                     data))))
 
 (defmacro prj-with-search-buffer (&rest body)
   (declare (indent 0) (debug t))
   `(with-current-buffer (find-file-noselect (prj-searchdb-path))
      ,@body))
 
-(defun prj-call-frontend (command frontend &optional ok)
-  "Call frontends and pass ok callback functions to them. If one of them 
-returns non nil, the loop will break."
-  (funcall frontend command ok))
+(defun prj-call-frontends (command &optional callback &rest args)
+  "Call frontends and pass arguments to them. If one of them returns non nil,
+ the loop will break."
+  (dolist (frontend prj-frontends)
+    (apply frontend command callback args)))
+
+(defun prj-call-backends (command &rest args)
+  (dolist (backend prj-backends)
+    (apply backend command args)))
 
 (defun prj-clean-frontends ()
-  (dolist (frontend `(,prj-create-project-frontend
-                      ,prj-delete-project-frontend
-                      ,prj-edit-project-frontend
-                      ,prj-search-project-frontend
-                      ,prj-find-file-frontend))
-    (prj-call-frontend :hide frontend)))
+  (prj-call-frontends :hide))
 
 (defun prj-clean-all ()
   "Clean search buffer or widget buffers which belongs to other project when 
@@ -204,25 +187,26 @@ user loads a project or unload a project."
 (defun prj-create-project-internal (data)
   "Internal function to create project. It is called by functions in the 
 `prj-create-project-frontend'."
-  (let* ((name (plist-get data :name))
-         (doctypes (plist-get data :doctypes))
-         (filepaths (plist-get data :filepaths))
-         (path (prj-config-path name))
-         (fullpath (expand-file-name path))
-         (dir (file-name-directory fullpath))
-         (config (prj-new-config)))
-    ;; Prepare project directory.
-    (unless (file-directory-p dir)
-      (make-directory dir))
-    ;; Export configuration.
-    (prj-plist-put config :name name)
-    (prj-plist-put config :doctypes doctypes)
-    (prj-plist-put config :filepaths filepaths)
-    (prj-export-json path config)
-    ;; Load project.
-    (prj-load-project name)
-    ;; Build database.
-    (prj-build-database t)))
+  (when data
+    (let* ((name (plist-get data :name))
+           (doctypes (plist-get data :doctypes))
+           (filepaths (plist-get data :filepaths))
+           (path (prj-config-path name))
+           (fullpath (expand-file-name path))
+           (dir (file-name-directory fullpath))
+           (config (prj-new-config)))
+      ;; Prepare project directory.
+      (unless (file-directory-p dir)
+        (make-directory dir))
+      ;; Export configuration.
+      (prj-plist-put config :name name)
+      (prj-plist-put config :doctypes doctypes)
+      (prj-plist-put config :filepaths filepaths)
+      (prj-export-json path config)
+      ;; Load project.
+      (prj-load-project name)
+      ;; Build database.
+      (prj-build-database t))))
 
 (defun prj-delete-project-internal (data)
   "Internal function to delete project. It is called by functions in the 
@@ -339,11 +323,10 @@ a file list, (FILE1 FILE2 ...). SENTINEL is the GREP's sentinel."
     (set-process-sentinel prj-process-grep sentinel)))
 
 (defun prj-find-file-internal (file)
-  (and (featurep 'history)
-       (his-add-position-type-history))
-  (find-file file)
-  (and (featurep 'history)
-       (his-add-position-type-history)))
+  (when (file-exists-p file)
+    (his-add-position-type-history)
+    (find-file file)
+    (his-add-position-type-history)))
 
 (defun prj-build-filedb (&optional all)
   "Create a list that contains all the files which should be included in the 
@@ -500,10 +483,8 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
   (unless prj-project-mode
     (prj-project-mode 1))
   (prj-clean-frontends)
-  (prj-call-frontend :show
-                     prj-create-project-frontend
-                     (prj-ok-delay-begin
-                      'prj-create-project-internal)))
+  (prj-call-frontends :create-project
+                      'prj-create-project-internal))
 
 ;;;###autoload
 (defun prj-delete-project ()
@@ -512,10 +493,8 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
   (unless prj-project-mode
     (prj-project-mode 1))
   (prj-clean-frontends)
-  (prj-call-frontend :show
-                     prj-delete-project-frontend
-                     (prj-ok-delay-begin
-                      'prj-delete-project-internal)))
+  (prj-call-frontends :delete-project
+                      'prj-delete-project-internal))
 
 ;;;###autoload
 (defun prj-edit-project ()
@@ -527,10 +506,8 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
   ;; Load project if wasn't loaded.
   (unless (prj-project-p)
     (prj-load-project))
-  (prj-call-frontend :show
-                     prj-edit-project-frontend
-                     (prj-ok-delay-begin
-                      'prj-edit-project-internal)))
+  (prj-call-frontends :edit-project
+                      'prj-edit-project-internal))
 
 ;;;###autoload
 (defun prj-load-project (&optional name)
@@ -542,10 +519,8 @@ project to be loaded."
   (prj-clean-frontends)
   (if name
       (prj-load-project-internal name)
-    (prj-call-frontend :show
-                       prj-load-project-frontend
-                       (prj-ok-delay-begin
-                        'prj-load-project-internal))))
+    (prj-call-frontends :load-project
+                        'prj-load-project-internal)))
 
 ;;;###autoload
 (defun prj-load-recent-project ()
@@ -592,10 +567,8 @@ project to be loaded."
   ;; Load project if wasn't loaded.
   (unless (prj-project-p)
     (prj-load-project))
-  (prj-call-frontend :show
-                       prj-find-file-frontend
-                       (prj-ok-delay-begin
-                        'prj-find-file-internal)))
+  (prj-call-frontends :find-file
+                      'prj-find-file-internal))
 
 ;;;###autoload
 (defun prj-search-project ()
@@ -608,10 +581,8 @@ project to be loaded."
   (if (and (processp prj-process-grep)
            (process-live-p prj-process-grep))
       (message "Searching is under processing, please wait...")
-    (prj-call-frontend :show
-                        prj-search-project-frontend
-                        (prj-ok-delay-begin
-                         'prj-search-project-internal-1))))
+    (prj-call-frontends :search-project
+                        'prj-search-project-internal-1)))
 
 ;;;###autoload
 (defun prj-toggle-search-buffer ()

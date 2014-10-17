@@ -157,26 +157,21 @@ the following back-ends.
 (defcustom sos-definition-window-frontends '(sos-definition-buffer-frontend)
   "The list of front-ends for the purpose of visualization.
 
-### The sample of a back-end:
+### Commands:
+`:init'     - When the visualization should be initialized.
+`:show'     - When the visualization should be showed.
+`:hide'     - When the visualization should be hidden.
+`:destroy'  - When the visualization should be destroied.
+`:update'   - When the data has been updated.
 
-  (defun some-front (command &optional arg)
+### The sample of a front-end:
+  (defun some-frontend (command &optional arg)
     (case command
       (:init t)
       (:show (message PROMPTY)))
       (:hide ...)
       (:destroy ...))
-
-### Commands:
-
-`:init': When the visualization should be initialized.
-
-`:show': When the visualization should be showed.
-
-`:hide': When the visualization should be hidden.
-
-`:destroy': When the visualization should be destroied.
-
-`:update': When the data has been updated."
+"
   :type '(repeat (symbol :tag "Front-end"))
   :group 'sos-group)
 

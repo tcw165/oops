@@ -338,10 +338,6 @@ or go back to just one window (by deleting all but the selected window)."
   (setq-default mode-line-format oops-default-mode-line)
   ;; Major mode alist.
   (oops-init-auto-mode-alist)
-  ;; Project management.
-  (unless (prj-load-recent-project)
-    (prj-load-project))
-  (sos-definition-window-mode 1)
   ;; Save place.
   (setq save-place-file "~/.emacs.d/.emacs-places")
   (setq-default save-place t)
@@ -354,6 +350,10 @@ or go back to just one window (by deleting all but the selected window)."
   (setq company-minimum-prefix-length 1)
   (setq company-frontends '(company-pseudo-tooltip-unless-just-one-frontend
                             company-echo-metadata-frontend
-                            company-preview-frontend)))
+                            company-preview-frontend))
+  ;; Project management.
+  (unless (prj-load-recent-project)
+    (prj-load-project))
+  (sos-definition-window-mode 1))
 
 (provide 'oops)
