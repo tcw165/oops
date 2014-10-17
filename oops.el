@@ -35,8 +35,10 @@
 (require 'imenu)
 (require 'thingatpt)
 (require 'company)
+(require 'saveplace)
 
 ;;; 3rd party library ==========================================================
+(require 'company)
 (require 'hl-anything)
 (require 'history)
 
@@ -45,7 +47,8 @@
 (require 'prj)
 (require 'oops-lisp-lib)
 
-;;; Text ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Text ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
 (defun oops-undo ()
@@ -197,7 +200,8 @@
       (indent-for-tab-command)
     (company-complete)))
 
-;;; Navigation ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Navigation ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
 (defun oops-goto-global-symbol ()
@@ -282,5 +286,31 @@ or go back to just one window (by deleting all but the selected window)."
        (split-window (selected-window) nil 'below))
       ((string= dir "horizontal")
        (split-window (selected-window) nil 'right)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Configuration Sets ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;###autoload
+(defun oops-default-config ()
+  (interactive)
+  ;; Mode line.
+  (sos-setup-default-mode-line)
+  ;; Project management.
+  (unless (prj-load-recent-project)
+    (prj-load-project))
+  (sos-definition-window-mode 1)
+  ;; Save place.
+  (setq save-place-file "~/.emacs.d/.emacs-places")
+  (setq-default save-place t)
+  ;; Company extension.
+  (add-hook 'emacs-lisp-mode-hook 'company-mode)
+  ;; (add-hook 'c-mode-hook 'company-mode)
+  ;; (add-hook 'c++-mode-hook 'company-mode)
+  (add-hook 'python-mode-hook 'company-mode)
+  (setq company-idle-delay 0)
+  (setq company-minimum-prefix-length 1)
+  (setq company-frontends '(company-pseudo-tooltip-unless-just-one-frontend
+                            company-echo-metadata-frontend
+                            company-preview-frontend)))
 
 (provide 'oops)

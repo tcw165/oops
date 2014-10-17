@@ -265,7 +265,7 @@ remove one.\n"
           (kill-buffer "*Edit Project*")))))
 
 ;;;###autoload
-(defun prj-find-file-frontend (command &optional ok)
+(defun prj-find-file-basic-frontend (command &optional ok)
   (case command
     (:show
      (let* ((filedb (prj-import-data (prj-filedb-path)))

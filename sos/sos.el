@@ -144,6 +144,17 @@ the following back-ends.
   "Cache the return value from back-end with `:symbol' command.")
 (make-variable-buffer-local 'sos-symbol)
 
+(defvar sos-default-file-info-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [mode-line mouse-1] (lambda ()
+                                          (interactive)
+                                          (let ((file (buffer-file-name)))
+                                            (with-temp-buffer
+                                            (insert file)
+                                            (clipboard-kill-region 1 (point-max))
+                                            (message "Path copied!")))))
+    map))
+
 (defun sos-call-backend (backend command &optional arg)
   "Call certain backend `backend' and pass `command' to it."
   (funcall backend command arg))
@@ -151,27 +162,21 @@ the following back-ends.
 (defun sos-init-backend (backend)
   (funcall backend :init))
 
+;;;###autoload
+(defun sos-setup-default-mode-line ()
+  (setq-default mode-line-format `((:eval (format "  %s | file:%s"
+                                                 (propertize "Source"
+                                                             'face 'mode-line-buffer-id)
+                                                 (propertize (abbreviate-file-name (buffer-file-name))
+                                                             'face 'link
+                                                             'mouse-face 'highlight
+                                                             'help-echo "mouse-1: Copy file path."
+                                                             'local-map sos-default-file-info-map)))
+                                   ", line:%l col:%c"
+                                   ", function:(yet supported)")))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Definition Window ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;;###autoload
-(define-minor-mode sos-definition-window-mode
-  "This local minor mode gethers symbol returned from backends around the point 
-and show the reference visually through frontends. Usually frontends output the 
-result to the `sos-def-buf' displayed in the `sos-def-win'."
-  :lighter " SOS:def"
-  :global t
-  :group 'sos-group
-  ;; TODO: menu-bar and tool-bar keymap.
-  (if sos-definition-window-mode
-      (progn
-        (mapc 'sos-init-backend sos-backends)
-        (sos-call-def-win-frontends :init)
-        (add-hook 'pre-command-hook 'sos-pre-command)
-        (add-hook 'post-command-hook 'sos-post-command))
-    (sos-call-def-win-frontends :destroy)
-    (remove-hook 'pre-command-hook 'sos-pre-command)
-    (remove-hook 'post-command-hook 'sos-post-command)))
 
 (defcustom sos-definition-window-frontends '(sos-definition-buffer-frontend)
   "The list of front-ends for the purpose of visualization.
@@ -299,6 +304,25 @@ If you want to skip additional commands, try example:
   (dolist (frontend sos-definition-window-frontends)
     (funcall frontend command arg)))
 
+;;;###autoload
+(define-minor-mode sos-definition-window-mode
+  "This local minor mode gethers symbol returned from backends around the point 
+and show the reference visually through frontends. Usually frontends output the 
+result to the `sos-def-buf' displayed in the `sos-def-win'."
+  :lighter " SOS:def"
+  :global t
+  :group 'sos-group
+  ;; TODO: menu-bar and tool-bar keymap.
+  (if sos-definition-window-mode
+      (progn
+        (mapc 'sos-init-backend sos-backends)
+        (sos-call-def-win-frontends :init)
+        (add-hook 'pre-command-hook 'sos-pre-command)
+        (add-hook 'post-command-hook 'sos-post-command))
+    (sos-call-def-win-frontends :destroy)
+    (remove-hook 'pre-command-hook 'sos-pre-command)
+    (remove-hook 'post-command-hook 'sos-post-command)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Outline Window ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -328,13 +352,6 @@ If you want to skip additional commands, try example:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Go to Definition ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;;###autoload
-(defun sos-goto-definition ()
-  (interactive)
-  (if (null sos-backend)
-      (sos-goto-def-1st-process)
-    (sos-goto-def-normal-process sos-backend)))
 
 (defcustom sos-goto-definition-frontend 'sos-goto-definitions-frontend
   "The list of front-ends for the purpose of visualization.
@@ -371,5 +388,12 @@ If you want to skip additional commands, try example:
 (defun sos-call-goto-def-frontends (command &optional arg)
   "Iterate all the `sos-backends' and pass `command' by order."
   (funcall sos-goto-definition-frontend command arg))
+
+;;;###autoload
+(defun sos-goto-definition ()
+  (interactive)
+  (if (null sos-backend)
+      (sos-goto-def-1st-process)
+    (sos-goto-def-normal-process sos-backend)))
 
 (provide 'sos)

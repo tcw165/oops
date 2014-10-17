@@ -27,8 +27,7 @@
  '(scroll-step 1)
  '(show-paren-mode nil)
  '(standard-indent 2)
- '(vc-handled-backends nil)
- '(which-function-mode t))
+ '(vc-handled-backends nil))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
@@ -38,23 +37,27 @@
  '(tooltip ((t (:background "cornsilk" :foreground "Black" :weight bold :family "Monaco")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;                                   load-path                                ;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Oops Extension ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun update-loadpath (base exclude)
+(defun oops-update-loadpath (base exclude)
   "Add sub-directories recursively to `load-path'.
 The `base' should be a directory string and the `exclude' should be a list that to be skipped."
   (dolist (f (directory-files base))
     (let ((name (concat base "/" f)))
       (when (and (file-directory-p name)
                  (not (member f exclude)))
-        (update-loadpath name exclude))))
+        (oops-update-loadpath name exclude))))
   (add-to-list 'load-path base))
-(update-loadpath "~/.emacs.d" '("." ".." ".svn" ".git"))
+(oops-update-loadpath "~/.emacs.d" '("." ".." ".svn" ".git"))
+
+(require 'oops)
+(oops-default-config)
+
+(require 'semantic)
+(require 'auto-complete)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;                                  Key Binding                               ;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Key Binding ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; ESC
 (global-set-key (kbd "<escape>") 'oops-common-escape)
@@ -133,42 +136,4 @@ The `base' should be a directory string and the `exclude' should be a list that 
 ;; DELETE
 (global-set-key (kbd "s-<backspace>") 'delete-forward-char)
 (global-set-key (kbd "C-s-<backspace>") 'kill-word)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;                                   3rd-party                                ;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(require 'saveplace)
-(setq save-place-file "~/.emacs.d/.emacs-places")
-(setq-default save-place t)
-
-(require 'semantic)
-;; (semantic-mode 1)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Company Extension ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(require 'company)
-(add-hook 'emacs-lisp-mode-hook 'company-mode)
-;; (add-hook 'c-mode-hook 'company-mode)
-;; (add-hook 'c++-mode-hook 'company-mode)
-(add-hook 'python-mode-hook 'company-mode)
-
-(setq company-idle-delay 0)
-(setq company-minimum-prefix-length 1)
-
-(setq company-frontends '(company-pseudo-tooltip-unless-just-one-frontend
-                          company-echo-metadata-frontend
-                          company-preview-frontend))
-
-(require 'auto-complete)
-;; (add-hook 'emacs-lisp-mode-hook 'auto-complete-mode)
-;; (add-hook 'python-mode-hook 'auto-complete-mode)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Oops Extension ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(require 'oops)
-(unless (prj-load-recent-project)
-  (prj-load-project))
 
