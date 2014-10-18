@@ -161,4 +161,7 @@
         ;; Bottom line.
         mode-line-format grep-mode-bottom-line))
 
+;; Add association when required.
+(add-to-list 'auto-mode-alist '("\\.grep\\'" . grep-mode))
+
 (provide 'grep-mode)

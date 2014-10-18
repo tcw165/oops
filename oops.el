@@ -206,6 +206,7 @@
 (defvar sos-default-file-info-map
   (let ((map (make-sparse-keymap)))
     (define-key map [mode-line mouse-1] 'oops-copy-filepath)
+    (define-key map [mode-line mouse-3] 'oops-open-filedir)
     map))
 
 ;;;###autoload
@@ -216,6 +217,22 @@
       (insert file)
       (clipboard-kill-region 1 (point-max))
       (message "Path copied!"))))
+
+;;;###autoload
+(defun oops-open-filedir ()
+  "Show current file in desktop (OS's file manager)."
+  (interactive)
+  (cond
+   ;; Windows ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+   ;; ((string= system-type "windows-nt")
+   ;;  (w32-shell-execute "explore" (replace-regexp-in-string "/" "\\" default-directory t t)))
+   ;; MacOSX ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+   ((string= system-type "darwin")
+    (shell-command "open ."))
+   ;; Linux ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+   ((string= system-type "gnu/linux")
+    (let ((process-connection-type nil))
+      (start-process "" nil "xdg-open" ".")))))
 
 ;;;###autoload
 (defun oops-goto-global-symbol ()
@@ -272,7 +289,8 @@ or go back to just one window (by deleting all but the selected window)."
                    (propertize (abbreviate-file-name (buffer-file-name))
                                'face 'link
                                'mouse-face 'highlight
-                               'help-echo "mouse-1: Copy file path."
+                               'help-echo "mouse-1: Copy file path.\n
+mouse-3: Open directory."
                                'local-map sos-default-file-info-map)
                    (propertize "%l" 'face 'link)
                    (propertize "%c" 'face 'link)))))
@@ -328,16 +346,11 @@ or go back to just one window (by deleting all but the selected window)."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Configuration Sets ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun oops-init-auto-mode-alist ()
-  (add-to-list 'auto-mode-alist '("\\.grep\\'" . grep-mode)))
-
 ;;;###autoload
 (defun oops-default-config ()
   (interactive)
   ;; Mode line.
   (setq-default mode-line-format oops-default-mode-line)
-  ;; Major mode alist.
-  (oops-init-auto-mode-alist)
   ;; Save place.
   (setq save-place-file "~/.emacs.d/.emacs-places")
   (setq-default save-place t)

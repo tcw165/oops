@@ -125,7 +125,7 @@ remove one.\n"
                             :entry-format "%i %d path: %v"
                             :value '("")
                             '(editable-field :company prj-browse-file-backend)))))
-    (:hide
+    (:destroy
      (and (get-buffer "*Create Project*")
           (kill-buffer "*Create Project*")))))
 
@@ -172,7 +172,7 @@ remove one.\n"
                                       :format (concat "%[%v%] " project "\n"))
                    prj-widget-checkboxes (append prj-widget-checkboxes
                                                   `(,wid))))))))
-    (:hide
+    (:destroy
      (and (get-buffer "*Delete Project*")
           (kill-buffer "*Delete Project*")))))
 
@@ -180,19 +180,13 @@ remove one.\n"
 (defun prj-load-project-widget-frontend (command &optional callback &rest args)
   (case command
     (:load-project
-     (let (projects)
-       ;; Find available directories which represent a project.
-       (dolist (name (directory-files prj-workspace-path))
-         (unless (member name '("." ".."))
-           (let ((config-file (prj-config-path name)))
-             (when (and (file-exists-p config-file)
-                        (not (string= name (prj-project-name))))
-               (setq projects (append projects `(,name)))))))
-       ;; Prompt user to create project if no projects is in workspace.
+     (let ((projects (car args)))
        (if projects
            ;; Prompt user to load project and return project name.
            (funcall callback (ido-completing-read "Load project: " projects nil t))
-         (message "No project in the workspace. Please create new project!"))))))
+         (if (prj-project-p)
+             (message "[%s] No other project in the workspace!" (prj-project-name))
+           (message "No project in the workspace. Please create new project!")))))))
 
 ;;;###autoload
 (defun prj-edit-project-widget-frontend (command &optional callback &rest args)
@@ -247,7 +241,7 @@ remove one.\n"
                             :entry-format "%i %d path: %v"
                             :value (copy-list (prj-project-filepaths))
                             '(editable-field :company prj-browse-file-backend)))))
-    (:hide
+    (:destroy
      (and (get-buffer "*Edit Project*")
           (kill-buffer "*Edit Project*")))))
 
@@ -255,22 +249,19 @@ remove one.\n"
 (defun prj-find-file-frontend (command &optional callback &rest args)
   (case command
     (:find-file
-     (let* ((callback callback)
-            (filedb (prj-import-data (prj-filedb-path)))
-            filelist)
-       (while filedb
-         (setq filelist (append filelist (cadr filedb))
-               filedb (cddr filedb)))
-       (funcall callback (ido-completing-read (format "[%s] Find file: "
-                                                      (prj-project-name))
-                                              filelist))))))
+     (let ((callback callback)
+           (files (nth 0 args))
+           (prompt (format "[%s] Find file: " (prj-project-name))))
+       (funcall callback (ido-completing-read
+                          prompt
+                          files))))))
 
 ;;;###autoload
 (defun prj-search-project-widget-frontend (command &optional callback &rest args)
   (case command
     (:search-project
      (let ((thing (prj-thingatpt))
-           (history (cadr (prj-project-search-history))))
+           (history (car (prj-project-search-history))))
        (prj-with-widget "*Search Project*"
          ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
          (lambda (&rest ignore)
@@ -355,7 +346,7 @@ remove one.\n"
                                           :company prj-browse-file-backend))
                      prj-widget-filepaths (append prj-widget-filepaths
                                                   `(,wid)))))))))
-    (:hide
+    (:destroy
      (and (get-buffer "*Search Project*")
           (kill-buffer "*Search Project*")))))
 
