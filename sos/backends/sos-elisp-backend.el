@@ -39,7 +39,7 @@
 (defconst sos-elisp-find-face-regexp "^\\s-*(defface\\(?:\\s-\\|\n\\|;.*\n\\)+\\(?1:%s\\)\\(?:\\s-\\|$\\)"
   "Refer to `find-face-regexp'.")
 
-(defconst sos-elisp-find-feature-regexp "^\\s-*(provide '\\(?1:%s\\))")
+(defconst sos-elisp-find-feature-regexp "^\\s-*(provide '\\(?1:%s\\)")
 
 (defun sos-elisp-thingatpt ()
   "Find symbol string around the point or text selection."
