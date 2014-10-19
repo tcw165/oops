@@ -96,39 +96,32 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
   ;; TODO:
   t)
 
-(defun prj-process-grep (match files complete-func)
-  "Use `start-process' to call GREP. MATCH is a string to search. FILEPATHS is 
-a file list, (FILE1 FILE2 ...). SENTINEL is the GREP's sentinel."
-  ;; (shell-command "find ~/.emacs.d -regex '\\.el'|xargs grep -nH \"garbage-collect\"" (find-file-noselect (prj-searchdb-path)) nil)
-  ;; (start-process-shell-command)
-  
-  ;; (with-temp-file (prj-temp-path)
-  ;;   (dolist (file files)))
-  ;; (delete-file (prj-temp-path))
-  
-  (let ((stream (with-output-to-string
-                  (princ "(start-process \"grep\" (current-buffer) \"grep\" ")
-                  (prin1 "-snH")(princ " ")
-                  (prin1 match)(princ " ")
-                  (dolist (file (prj-project-files))
-                    (prin1 file)(princ " "))
-                  (princ ")"))))
-    (setq prj-process-grep (eval (read stream)))
-    (set-process-sentinel prj-process-grep complete-func)))
-
 (defmacro prj-with-search-buffer (&rest body)
   (declare (indent 0) (debug t))
   `(with-current-buffer (find-file-noselect (prj-searchdb-path))
      ,@body))
 
+(defun prj-process-grep (match input-file)
+  (find-file (prj-searchdb-path))
+  (setq prj-process-grep (start-process-shell-command
+                          "prj-process-grep"
+                          (current-buffer)
+                          (format "xargs grep -snH \"%s\" < \"%s\" 2>/dev/null"
+                                  match
+                                  input-file)))
+  (and (processp prj-process-grep)
+       (set-process-sentinel prj-process-grep 'prj-async-grep-complete)))
+
 (defun prj-async-grep-complete (process message)
-  "A sentinel for asynchronous process GREP."
   (when (memq (process-status process) '(stop exit signal))
     (prj-with-search-buffer
       (goto-char (point-max))
+      (unless (looking-back "\n")
+        (insert "\n"))
       (insert "<<<<<\n\n")
       (save-buffer 0)
-      (setq buffer-read-only t)
+      (setq buffer-read-only t
+            prj-process-grep nil)
       (message "Search project...done"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -192,6 +185,6 @@ a file list, (FILE1 FILE2 ...). SENTINEL is the GREP's sentinel."
            (goto-char (point-max))
            (insert (format ">>>>> %s\n" match))
            ;; TODO: support filepaths and doctypes
-           (prj-process-grep match nil 'prj-async-grep-complete)))))))
+           (prj-process-grep match (prj-filedb-path "all"))))))))
 
 (provide 'prj-default-backend)
