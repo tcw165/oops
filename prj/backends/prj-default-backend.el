@@ -110,7 +110,7 @@ a file list, (FILE1 FILE2 ...). SENTINEL is the GREP's sentinel."
                   (princ "(start-process \"grep\" (current-buffer) \"grep\" ")
                   (prin1 "-snH")(princ " ")
                   (prin1 match)(princ " ")
-                  (dolist (file files)
+                  (dolist (file (prj-project-files))
                     (prin1 file)(princ " "))
                   (princ ")"))))
     (setq prj-process-grep (eval (read stream)))
@@ -143,17 +143,14 @@ a file list, (FILE1 FILE2 ...). SENTINEL is the GREP's sentinel."
      (garbage-collect))
     (:index-files
      (let ((is-rebuild (car args))
-           (doctypes (prj-project-doctypes))
            all-files)
        ;; Collect files in respect of document types.
-       (while doctypes
+       (dolist (doctype (prj-project-doctypes))
          (setq all-files (concat all-files (prj-process-find
-                                            (prj-filedb-path (car doctypes))
+                                            (prj-filedb-path doctype)
                                             (prj-convert-filepaths (prj-project-filepaths))
-                                            (prj-convert-matches (cadr doctypes))
-                                            (prj-convert-excludes prj-exclude-types)))
-               ;; Next.
-               doctypes (cddr doctypes)))
+                                            (prj-convert-matches (cdr (assoc doctype prj-document-types)))
+                                            (prj-convert-excludes prj-exclude-types)))))
        ;; Export all database.
        (when all-files
          (setq prj-total-files-cache (split-string all-files "\n" t))
@@ -194,7 +191,7 @@ a file list, (FILE1 FILE2 ...). SENTINEL is the GREP's sentinel."
            (switch-to-buffer (current-buffer) nil t)
            (goto-char (point-max))
            (insert (format ">>>>> %s\n" match))
-           (prj-process-grep match (prj-project-files)
-                             'prj-async-grep-complete)))))))
+           ;; TODO: support filepaths and doctypes
+           (prj-process-grep match nil 'prj-async-grep-complete)))))))
 
 (provide 'prj-default-backend)

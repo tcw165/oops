@@ -65,7 +65,7 @@ project; Powerful selective grep string or regular expression in a project, etc.
   :group 'prj-group)
 
 ;; TODO: use mode and extensions `auto-mode-alist'.
-(defcustom prj-document-types '(("Text" . "*.txt;*.md;*.xml")
+(defcustom prj-document-types '(("Text" . "*.txt;*.md")
                                 ("Emacs Lisp" . ".emacs;*.el")
                                 ("Python" . "*.py")
                                 ("C/C++ Header" . "*.h;*.hxx;*.hpp")
@@ -354,7 +354,7 @@ user loads a project or unload a project."
   (plist-get prj-config :name))
 
 ;;;###autoload
-(defun prj-project-doctypes ()
+(defun prj-project-doctypes (&optional key)
   (plist-get prj-config :doctypes))
 
 ;;;###autoload

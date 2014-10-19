@@ -105,13 +105,13 @@
        ;; Widget for doctypes.
        (let (wid)
          (dolist (doctype prj-document-types)
-           (setq wid (widget-create 'checkbox
-                                    :data doctype
-                                    :format (concat "%[%v%] "
-                                                    (prj-format-doctype doctype)
-                                                    "\n"))
-                 prj-widget-doctypes (append prj-widget-doctypes
-                                             `(,wid)))))
+           (let ((doctype (car doctype)))
+             (setq wid (widget-create 'checkbox
+                                      :data doctype
+                                      :format (concat "%[%v%] "
+                                                      (prj-format-doctype doctype)
+                                                      "\n"))
+                   prj-widget-doctypes (append prj-widget-doctypes `(,wid))))))
        (widget-insert "\n")
        (widget-insert "Include Path:\n")
        (widget-insert (propertize "- Button INS to add a path; Button DEL to \
@@ -223,16 +223,14 @@ remove one.\n"
        ;; Widget for doctypes.
        (let (wid)
          (dolist (doctype prj-document-types)
-           (setq wid (widget-create 'checkbox
-                                    :data doctype
-                                    :format (concat "%[%v%] "
-                                                    (prj-format-doctype doctype)
-                                                    "\n")
-                                    :value (and (lax-plist-get (prj-project-doctypes)
-                                                               (car doctype))
-                                                t))
-                 prj-widget-doctypes (append prj-widget-doctypes
-                                             `(,wid)))))
+           (let ((doctype (car doctype)))
+             (setq wid (widget-create 'checkbox
+                                      :data doctype
+                                      :format (concat "%[%v%] "
+                                                      (prj-format-doctype doctype)
+                                                      "\n")
+                                      :value (member doctype (prj-project-doctypes)))
+                   prj-widget-doctypes (append prj-widget-doctypes `(,wid))))))
        (widget-insert "\n")
        (widget-insert "Include Path:\n")
        ;; Widget for filepaths.
@@ -317,18 +315,15 @@ remove one.\n"
                         "Deselect All")
          (widget-insert " :\n")
          ;; Widget for doctypes.
-         (let ((doctype (prj-project-doctypes))
-               wid)
-           (while doctype
+         (let (wid)
+           (dolist (doctype (prj-project-doctypes))
              (setq wid (widget-create 'checkbox
                                       :data doctype
                                       :format (concat "%[%v%] "
                                                       (prj-format-doctype doctype)
                                                       "\n")
                                       :value t)
-                   prj-widget-doctypes (append prj-widget-doctypes
-                                               `(,wid))
-                   doctype (cddr doctype))))
+                   prj-widget-doctypes (append prj-widget-doctypes `(,wid)))))
          (widget-insert "\n")
          (widget-insert "Search Path:\n")
          ;; Widget for filepaths.
@@ -411,13 +406,9 @@ remove one.\n"
        (widget-value-set box nil))))
 
 (defun prj-format-doctype (doctype)
-  (cond
-   ;; alist ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-   ((stringp (cdr doctype))
-    (format "%s (%s)" (car doctype) (cdr doctype)))
-   ;; plist ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-   (t
-    (format "%s (%s)" (car doctype) (cadr doctype)))))
+  (format "%s (%s)"
+          doctype
+          (cdr (assoc doctype prj-document-types))))
 
 (defun prj-widget-doctypes ()
   "Return a plist of selected document types."
@@ -426,8 +417,7 @@ remove one.\n"
       (let ((doctype (and (widget-value checkbox)
                           (widget-get checkbox :data))))
         (when doctype
-          (setq doctypes (append doctypes
-                                 `(,(car doctype) ,(cdr doctype)))))))
+          (setq doctypes (append doctypes `(,doctype))))))
     doctypes))
 
 (defun prj-widget-filepaths ()
