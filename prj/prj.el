@@ -64,7 +64,6 @@ project; Powerful selective grep string or regular expression in a project, etc.
   :set 'prj-cus-set-workspace
   :group 'prj-group)
 
-;; TODO: use mode and extensions `auto-mode-alist'.
 (defcustom prj-document-types '(("Text" . "*.txt;*.md")
                                 ("Emacs Lisp" . ".emacs;*.el")
                                 ("Python" . "*.py")

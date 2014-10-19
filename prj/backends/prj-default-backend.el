@@ -28,6 +28,8 @@
 ;; 2014-08-01 (0.0.1)
 ;;    Initial release.
 
+(require 'ido)
+
 (defvar prj-total-files-cache nil)
 
 (defvar prj-process-grep nil)
@@ -102,18 +104,22 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
      ,@body))
 
 (defun prj-process-grep (match input-file)
-  (find-file (prj-searchdb-path))
-  (setq prj-process-grep (start-process-shell-command
-                          "prj-process-grep"
-                          (current-buffer)
-                          (format "xargs grep -snH \"%s\" < \"%s\" 2>/dev/null"
-                                  match
-                                  input-file)))
-  (and (processp prj-process-grep)
-       (set-process-sentinel prj-process-grep 'prj-async-grep-complete)))
+  (prj-with-search-buffer
+    (goto-char (point-max))
+    (insert (format ">>>>> %s\n" match))
+    (setq prj-process-grep (start-process-shell-command
+                            "prj-process-grep"
+                            (current-buffer)
+                            (format "xargs grep -snH \"%s\" < \"%s\" 2>/dev/null"
+                                    match
+                                    input-file)))
+    (message (format "[%s] Searching is processing..." (prj-project-name)))
+    (set-process-sentinel prj-process-grep 'prj-async-grep-complete)))
 
 (defun prj-async-grep-complete (process message)
-  (when (memq (process-status process) '(stop exit signal))
+  (cond
+   ((eq (process-status process) 'run))
+   ((memq (process-status process) '(stop exit signal))
     (prj-with-search-buffer
       (goto-char (point-max))
       (unless (looking-back "\n")
@@ -121,8 +127,14 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
       (insert "<<<<<\n\n")
       (save-buffer 0)
       (setq buffer-read-only t
-            prj-process-grep nil)
-      (message "Search project...done"))))
+            prj-process-grep nil))
+    (let ((buffer (get-buffer prj-searchdb-name)))
+      (unless (eq (current-buffer) buffer)
+        (when (string= "yes" (ido-completing-read
+                              (format "[%s] Searching is done, display? "
+                                      (prj-project-name))
+                              '("yes" "no") nil t))
+          (switch-to-buffer buffer)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Back-ends ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -179,12 +191,8 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
                 (setcdr (nthcdr (1- prj-search-history-max) history) nil))
            (prj-plist-put prj-config :search-history history)
            (prj-export-json (prj-config-path) prj-config))
+         ;; TODO: support filepaths and doctypes
          ;; Start to search.
-         (prj-with-search-buffer
-           (switch-to-buffer (current-buffer) nil t)
-           (goto-char (point-max))
-           (insert (format ">>>>> %s\n" match))
-           ;; TODO: support filepaths and doctypes
-           (prj-process-grep match (prj-filedb-path "all"))))))))
+         (prj-process-grep match (prj-filedb-path "all")))))))
 
 (provide 'prj-default-backend)
