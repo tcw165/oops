@@ -203,7 +203,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Navigation ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defvar sos-default-file-info-map
+(defvar oops-default-file-info-map
   (let ((map (make-sparse-keymap)))
     (define-key map [mode-line mouse-1] 'oops-copy-filepath)
     (define-key map [mode-line mouse-3] 'oops-open-filedir)
@@ -286,12 +286,11 @@ or go back to just one window (by deleting all but the selected window)."
 (defvar oops-default-mode-line
   `((:eval (format "  %s | file:%s, line:%s col:%s, function:(yet supported)"
                    (propertize "Source" 'face 'mode-line-buffer-id)
-                   (propertize (abbreviate-file-name (buffer-file-name))
+                   (propertize (abbreviate-file-name (or (buffer-file-name) ""))
                                'face 'link
                                'mouse-face 'highlight
-                               'help-echo "mouse-1: Copy file path.\n
-mouse-3: Open directory."
-                               'local-map sos-default-file-info-map)
+                               'help-echo "mouse-1: Copy file path.\nmouse-3: Open directory."
+                               'local-map oops-default-file-info-map)
                    (propertize "%l" 'face 'link)
                    (propertize "%c" 'face 'link)))))
 

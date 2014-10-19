@@ -28,34 +28,18 @@
 ;; 2014-08-01 (0.0.1)
 ;;    Initial release.
 
-(defconst prj-filedb-name "files.db"
-  "The file name of project file-list database. The database is a plist which 
-contains files should be concerned.
-format:
-  (DOCTYPE1 (FILE1_1 FILE1_2 ...)
-   DOCTYPE2 (FILE2_1 FILE2_2 ...))")
-
-(defconst prj-searchdb-name "search.grep"
-  "The simple text file which caches the search result that users have done 
-in the last session.")
-
-(defvar prj-files-cache nil)
-
-(defvar prj-filedb-cache nil)
+(defvar prj-total-files-cache nil)
 
 (defvar prj-process-grep nil)
 
-(defun prj-filedb-path ()
-  (expand-file-name (format "%s/%s/%s"
-                            prj-workspace-path
-                            (prj-project-name)
-                            prj-filedb-name)))
-
-(defun prj-searchdb-path ()
-  (expand-file-name (format "%s/%s/%s"
-                            prj-workspace-path
-                            (prj-project-name)
-                            prj-searchdb-name)))
+(defun prj-filedb-path (&optional name)
+  (let ((dir (expand-file-name (format "%s/%s/files"
+                                       prj-workspace-path
+                                       (prj-project-name)))))
+    (if name
+        (format "%s/%s.files" dir (or (and (string= name "all") name)
+                                      (secure-hash 'sha1 name)))
+      dir)))
 
 (defun prj-export-data (filename data)
   "Export `data' to `filename' file. The saved data can be imported with `prj-import-data'."
@@ -71,6 +55,16 @@ in the last session.")
       (insert-file-contents filename)
       (read (buffer-string)))))
 
+(defun prj-convert-filepaths (filepaths)
+  (let ((filepath filepaths)
+        ret)
+    (while filepath
+      (setq ret (concat ret (car filepath))
+            filepath (cdr filepath))
+      (and filepath
+           (setq ret (concat ret " "))))
+    ret))
+
 (defun prj-convert-matches (doctype)
   "Convert DOCTYPE to string as include-path parameter for FIND.
 e.g. *.md;*.el;*.txt => -name *.md -o -name *.el -o -name *.txt"
@@ -85,39 +79,42 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
        (let ((matches (concat "\"!\" \"-name\" \"" doctype "\"")))
          (replace-regexp-in-string ";" "\" \"!\" \"-name\" \"" matches))))
 
-(defun prj-process-find (filepaths matches excludes)
+(defun prj-process-find (output filepaths &optional matches excludes)
   "Use `call-process' to call FIND. FILEPATHS is a file list, (FILE1 FILE2 ...).
  MATCHES and EXCLUDES is strings in format of \"-name pattern\"."
-  (let* ((matches (prj-convert-matches matches))
-         (excludes (prj-convert-excludes excludes))
-         (stream (with-output-to-string
-                   (princ "(call-process \"find\" nil (list (current-buffer) nil) nil ")
-                   (dolist (filepath filepaths)
-                     (prin1 filepath)(princ " "))
-                   (princ matches)(princ " ")
-                   (princ excludes)(princ ")")))
-         (output (with-temp-buffer
-                   (eval (read stream))
-                   (buffer-string))))
-    (and output (split-string output "\n" t))))
+  (let ((dir (file-name-directory output))
+        (stream (shell-command-to-string (format "find %s %s %s"
+                                                 filepaths
+                                                 (or matches "")
+                                                 (or excludes "")))))
+    (and dir (make-directory dir t))
+    (with-temp-file output
+      (insert stream)
+      stream)))
 
 (defun prj-process-find-change ()
   ;; TODO:
   t)
 
-(defun prj-process-grep (match filepaths sentinel)
+(defun prj-process-grep (match files complete-func)
   "Use `start-process' to call GREP. MATCH is a string to search. FILEPATHS is 
 a file list, (FILE1 FILE2 ...). SENTINEL is the GREP's sentinel."
-  ;; (shell-command "find ~/.emacs.d -name \"*.el\"|xargs grep -nH \"garbage-collect\"" (find-file-noselect (prj-searchdb-path)) nil)
+  ;; (shell-command "find ~/.emacs.d -regex '\\.el'|xargs grep -nH \"garbage-collect\"" (find-file-noselect (prj-searchdb-path)) nil)
+  ;; (start-process-shell-command)
+  
+  ;; (with-temp-file (prj-temp-path)
+  ;;   (dolist (file files)))
+  ;; (delete-file (prj-temp-path))
+  
   (let ((stream (with-output-to-string
                   (princ "(start-process \"grep\" (current-buffer) \"grep\" ")
                   (prin1 "-snH")(princ " ")
                   (prin1 match)(princ " ")
-                  (dolist (filepath filepaths)
-                    (prin1 filepath)(princ " "))
+                  (dolist (file files)
+                    (prin1 file)(princ " "))
                   (princ ")"))))
     (setq prj-process-grep (eval (read stream)))
-    (set-process-sentinel prj-process-grep sentinel)))
+    (set-process-sentinel prj-process-grep complete-func)))
 
 (defmacro prj-with-search-buffer (&rest body)
   (declare (indent 0) (debug t))
@@ -140,41 +137,31 @@ a file list, (FILE1 FILE2 ...). SENTINEL is the GREP's sentinel."
 ;;;###autoload
 (defun prj-filedb-backend (command &rest args)
   (case command
-    (:init
-     (unless prj-filedb-cache
-       (setq prj-filedb-cache (prj-import-data (prj-filedb-path))))
-     (unless prj-files-cache
-       (let ((filedb prj-filedb-cache))
-         (while filedb
-           (setq prj-files-cache (append prj-files-cache (cadr filedb))
-                 filedb (cddr filedb))))))
+    (:init)
+    (:destroy
+     (setq prj-total-files-cache nil)
+     (garbage-collect))
     (:index-files
      (let ((is-rebuild (car args))
            (doctypes (prj-project-doctypes))
-           files
-           filedb)
-       (and is-rebuild (file-exists-p (prj-filedb-path))
-            (delete-file (prj-filedb-path)))
+           all-files)
+       ;; Collect files in respect of document types.
        (while doctypes
-         (prj-plist-put filedb
-                        (car doctypes)
-                        (setq files (prj-process-find
-                                     (prj-project-filepaths)
-                                     (cadr doctypes)
-                                     prj-exclude-types)))
-         (setq prj-files-cache (append prj-files-cache files)
+         (setq all-files (concat all-files (prj-process-find
+                                            (prj-filedb-path (car doctypes))
+                                            (prj-convert-filepaths (prj-project-filepaths))
+                                            (prj-convert-matches (cadr doctypes))
+                                            (prj-convert-excludes prj-exclude-types)))
                ;; Next.
                doctypes (cddr doctypes)))
-       ;; Export database.
-       (setq prj-filedb-cache filedb)
-       (prj-export-data (prj-filedb-path) filedb)))
+       ;; Export all database.
+       (when all-files
+         (setq prj-total-files-cache (split-string all-files "\n" t))
+         (with-temp-file (prj-filedb-path "all")
+           (insert all-files)))))
     (:files
      ;; TODO: Files for specific document type?
-     prj-files-cache)
-    (:destroy
-     (setq prj-filedb-cache nil
-           prj-filedb-cache nil)
-     (garbage-collect))))
+     prj-total-files-cache)))
 
 ;;;###autoload
 (defun prj-async-grep-backend (command &rest args)

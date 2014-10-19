@@ -68,10 +68,8 @@ project; Powerful selective grep string or regular expression in a project, etc.
 (defcustom prj-document-types '(("Text" . "*.txt;*.md;*.xml")
                                 ("Emacs Lisp" . ".emacs;*.el")
                                 ("Python" . "*.py")
-                                ("Java" . "*.java")
                                 ("C/C++ Header" . "*.h;*.hxx;*.hpp")
-                                ("C/C++ Source" . "*.c;*.cpp")
-                                ("Makfile" . "Makefile;makefile;Configure.ac;configure.ac;*.mk"))
+                                ("C/C++ Source" . "*.c;*.cxx;*.cpp"))
   "Categorize file names refer to specific matches and give them type names. 
 It is a alist of (DOC_NAME MATCHES). Each matches in MATCHES should be delimit 
 with ';'."
@@ -328,6 +326,9 @@ user loads a project or unload a project."
 ;; Public API ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
+(defconst prj-searchdb-name "search.grep")
+
+;;;###autoload
 (defun prj-project-p ()
   "Return t if any project was loaded (current project)."
   (and prj-config
@@ -340,6 +341,13 @@ user loads a project or unload a project."
                             (or name
                                 (prj-project-name))
                             prj-config-name)))
+
+;;;###autoload
+(defun prj-searchdb-path ()
+  (expand-file-name (format "%s/%s/%s"
+                            prj-workspace-path
+                            (prj-project-name)
+                            prj-searchdb-name)))
 
 ;;;###autoload
 (defun prj-project-name ()
