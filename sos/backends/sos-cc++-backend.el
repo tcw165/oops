@@ -28,8 +28,16 @@
 ;; 2014-10-01 (0.0.1)
 ;;    Initial release.
 
-;;;###autoload
-(defun sos-semantic-backend (command &optional arg)
+(require 'prj)
+
+(defun sos-cc++-init-tag ()
   )
 
-(provide 'sos-semantic-backend)
+;;;###autoload
+(defun sos-cc++-backend (command &rest arg)
+  (case command
+    (:init
+     (add-hook 'prj-after-build-database-hook 'sos-cc++-init-tag)
+     (sos-cc++-init-tag))))
+
+(provide 'sos-cc++-backend)

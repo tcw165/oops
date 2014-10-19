@@ -30,16 +30,17 @@
 ;; 2014-11-01 (0.0.1)
 ;;    Initial release.
 
+(require 'history)
+(require 'prj)
+
 ;; Front-ends.
-(require 'sos-basic-frontend)
+(require 'sos-default-frontend)
 
 ;; Back-ends.
 (require 'sos-grep-backend)
 (require 'sos-candidates-preview-backend)
 (require 'sos-elisp-backend)
-(require 'sos-semantic-backend)
-
-(require 'history)
+(require 'sos-cc++-backend)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Common ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -49,9 +50,10 @@
 meaningful information around the point."
   :tag "Sos")
 
-(defcustom sos-backends '(sos-grep-backend
-                          sos-candidates-preview-backend
-                          sos-elisp-backend)
+(defcustom sos-backends '(sos-candidates-preview-backend
+                          sos-grep-backend
+                          sos-elisp-backend
+                          sos-cc++-backend)
   "The list of back-ends for the purpose of collecting candidates. The sos 
 engine will dispatch all the back-ends and pass specific commands in order. 
 Every command has its purpose, paremeter rule and return rule (get meaningful 
@@ -144,12 +146,12 @@ the following back-ends.
   "Cache the return value from back-end with `:symbol' command.")
 (make-variable-buffer-local 'sos-symbol)
 
-(defun sos-call-backend (backend command &optional arg)
+(defun sos-call-backend (backend command &rest args)
   "Call certain backend `backend' and pass `command' to it."
-  (funcall backend command arg))
+  (apply backend command args))
 
 (defun sos-init-backend (backend)
-  (funcall backend :init))
+  (sos-call-backend backend :init))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Definition Window ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -159,13 +161,13 @@ the following back-ends.
 
 ### Commands:
 `:init'     - When the visualization should be initialized.
+`:destroy'  - When the visualization should be destroied.
 `:show'     - When the visualization should be showed.
 `:hide'     - When the visualization should be hidden.
-`:destroy'  - When the visualization should be destroied.
 `:update'   - When the data has been updated.
 
 ### The sample of a front-end:
-  (defun some-frontend (command &optional arg)
+  (defun some-frontend (command &rest args)
     (case command
       (:init t)
       (:show (message PROMPTY)))
@@ -175,7 +177,7 @@ the following back-ends.
   :type '(repeat (symbol :tag "Front-end"))
   :group 'sos-group)
 
-(defcustom sos-idle-delay 0.2
+(defcustom sos-idle-delay 0.3
   "The idle delay in seconds until sos starts automatically."
   :type '(number :tag "Seconds"))
 
@@ -185,61 +187,16 @@ the following back-ends.
 (defvar sos-source-buffer nil
   "The current source code buffer.")
 
-(defvar sos-source-buffer-tick 0
-  "The current source buffer's tick counter.")
-
 (defvar sos-source-window nil
   "The current window where the source code buffer is at.")
 
-(defvar sos-is-skip-current-buffer nil
+(defvar sos-is-skip nil
   "t to skip `sos-idle-begin'.")
-(make-variable-buffer-local 'sos-is-skip-current-buffer)
+(make-variable-buffer-local 'sos-is-skip)
 
-(defun sos-pre-command ()
-  (when sos-timer
-    (cancel-timer sos-timer)
-    (setq sos-timer nil)))
-
-(defun sos-post-command ()
-  (when (sos-is-idle-begin)
-    (setq sos-source-buffer (current-buffer)
-          sos-source-window (selected-window)
-          sos-timer (run-with-idle-timer sos-idle-delay nil
-                                         'sos-idle-begin))))
-
-(defun sos-is-idle-begin ()
-  (not (or (active-minibuffer-window)
-           sos-is-skip-current-buffer
-           (sos-is-skip-command))))
-
-(defun sos-is-skip-command (&rest commands)
-  "Return t if `this-command' should be skipped.
-If you want to skip additional commands, try example:
-
-  (sos-is-skip-command 'self-insert-command 'previous-line 'next-line
-                       'left-char right-char)"
-  (memq this-command `(mwheel-scroll
-                       save-buffer
-                       eval-buffer
-                       eval-last-sexp
-                       ;; Additional commands.
-                       ,@commands)))
-
-(defun sos-idle-begin ()
-  (condition-case err
-      (progn
-        (if (null sos-backend)
-            (sos-def-win-1st-process)
-          (sos-def-win-normal-process sos-backend))
-        (setq sos-source-buffer-tick (buffer-modified-tick)))
-    (error err)))
-
-(defun sos-def-win-1st-process ()
-  (dolist (backend sos-backends)
-    (sos-def-win-normal-process backend)
-    (if sos-backend
-        (return t)
-      (sos-call-def-win-frontends :hide))))
+(defun sos-call-def-win-frontends (command &rest args)
+  (dolist (frontend sos-definition-window-frontends)
+    (apply frontend command args)))
 
 (defun sos-def-win-normal-process (backend)
   (let ((symb (sos-call-backend backend :symbol)))
@@ -257,42 +214,67 @@ If you want to skip additional commands, try example:
 
      ;; Something ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
      (t
-      (if (and (equal symb sos-symbol)
-               (equal (buffer-modified-tick) sos-source-buffer-tick))
-          (progn
-            ;; If return symbol is equal to `sos-symbol', ask front-ends to do
-            ;; `:update' task.
-            ;; TODO: ask backends for more information and pass them to frontends.
-            (sos-call-def-win-frontends :update))
+      (if (equal symb sos-symbol)
+          (sos-call-def-win-frontends :update)
         (setq sos-backend backend
               sos-symbol symb)
-        (let ((candidates (sos-call-backend backend :candidates symb)))
-          (if (and candidates (listp candidates))
+        (let ((candidates (sos-call-backend sos-backend :candidates symb)))
+          (if candidates
               (sos-call-def-win-frontends :show candidates)
             (sos-call-def-win-frontends :hide))))))))
 
-(defun sos-call-def-win-frontends (command &optional arg)
-  (dolist (frontend sos-definition-window-frontends)
-    (funcall frontend command arg)))
+(defun sos-def-win-1st-process ()
+  (dolist (backend sos-backends)
+    (sos-def-win-normal-process backend)
+    (if sos-backend
+        (return t)
+      (sos-call-def-win-frontends :hide))))
+
+(defun sos-is-skip-command (&rest commands)
+  "Return t if `this-command' should be skipped.
+If you want to skip additional commands, try example:
+  (sos-is-skip-command 'self-insert-command 'previous-line ...)"
+  (memq this-command `(mwheel-scroll
+                       save-buffer
+                       eval-buffer
+                       eval-last-sexp
+                       ;; Additional commands.
+                       ,@commands)))
+
+(defun sos-is-idle-begin ()
+  (not (or (active-minibuffer-window)
+           (sos-is-skip-command)
+           sos-is-skip)))
+
+(defun sos-idle-begin ()
+  (when (sos-is-idle-begin)
+    (setq sos-source-buffer (current-buffer)
+          sos-source-window (selected-window))
+    (condition-case err
+        (if (null sos-backend)
+            (sos-def-win-1st-process)
+          (sos-def-win-normal-process sos-backend))
+      (error err))))
 
 ;;;###autoload
 (define-minor-mode sos-definition-window-mode
   "This local minor mode gethers symbol returned from backends around the point 
 and show the reference visually through frontends. Usually frontends output the 
 result to the `sos-def-buf' displayed in the `sos-def-win'."
-  :lighter " SOS:def"
   :global t
   :group 'sos-group
   ;; TODO: menu-bar and tool-bar keymap.
   (if sos-definition-window-mode
       (progn
-        (mapc 'sos-init-backend sos-backends)
+        ;; Initialize front-ends & back-ends.
         (sos-call-def-win-frontends :init)
-        (add-hook 'pre-command-hook 'sos-pre-command)
-        (add-hook 'post-command-hook 'sos-post-command))
+        (mapc 'sos-init-backend sos-backends)
+        (setq sos-timer (run-with-idle-timer sos-idle-delay t 'sos-idle-begin)))
+    ;; Destroy front-ends & back-ends.
     (sos-call-def-win-frontends :destroy)
-    (remove-hook 'pre-command-hook 'sos-pre-command)
-    (remove-hook 'post-command-hook 'sos-post-command)))
+    (when sos-timer
+      (cancel-timer sos-timer)
+      (setq sos-timer nil))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Outline Window ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -300,7 +282,6 @@ result to the `sos-def-buf' displayed in the `sos-def-win'."
 ;;;###autoload
 (define-minor-mode sos-outline-window-mode
   ""
-  :lighter " SOS:outline"
   :global t
   :group 'sos-group
   ;; TODO: menu-bar and tool-bar keymap.
@@ -330,14 +311,12 @@ result to the `sos-def-buf' displayed in the `sos-def-win'."
 ### Commands:
 `:show': When the visualization should be showed. The 1st argument is the 
          candidates."
-  :type '(repeat (symbol :tag "Front-end"))
+  :type '(symbol :tag "Front-end")
   :group 'sos-group)
 
-(defun sos-goto-def-1st-process ()
-  (dolist (backend sos-backends)
-    (sos-goto-def-normal-process backend)
-    (if sos-backend
-        (return t))))
+(defun sos-call-goto-def-frontends (command &rest arg)
+  "Iterate all the `sos-backends' and pass `command' by order."
+  (apply sos-goto-definition-frontend command arg))
 
 (defun sos-goto-def-normal-process (backend)
   (let ((symb (sos-call-backend backend :symbol)))
@@ -352,13 +331,15 @@ result to the `sos-def-buf' displayed in the `sos-def-win'."
      ;; Something ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
      (t
       (setq sos-backend backend)
-      (let ((candidates (sos-call-backend backend :candidates symb)))
+      (let ((candidates (sos-call-backend sos-backend :candidates symb)))
         (when (and candidates (listp candidates))
           (sos-call-goto-def-frontends :show candidates)))))))
 
-(defun sos-call-goto-def-frontends (command &optional arg)
-  "Iterate all the `sos-backends' and pass `command' by order."
-  (funcall sos-goto-definition-frontend command arg))
+(defun sos-goto-def-1st-process ()
+  (dolist (backend sos-backends)
+    (sos-goto-def-normal-process backend)
+    (if sos-backend
+        (return t))))
 
 ;;;###autoload
 (defun sos-goto-definition ()

@@ -372,7 +372,7 @@ file-local variable.\n")
                               "$"))
                 (throw 'break)))))))
     (when regexp
-      `(:symbol ,thing :type "function parameter" :file ,(buffer-file-name)
+      `(:symbol ,thing :type "function param" :file ,(buffer-file-name)
                 :linum ,linum
                 :keywords ((,regexp 1 'hl-symbol-face prepend))))))
 
@@ -388,18 +388,17 @@ file-local variable.\n")
                   :keywords ,keywords)))))
 
 ;;;###autoload
-(defun sos-elisp-backend (command &optional arg)
+(defun sos-elisp-backend (command &rest args)
   (case command
     (:symbol
      (when (member major-mode '(emacs-lisp-mode
                                 lisp-interaction-mode))
        (let ((symb (sos-elisp-thingatpt)))
          ;; Return the thing in string or `:stop'.
-         (or symb
-             :stop))))
+         (or symb :stop))))
     (:candidates
-     (when arg
-       (let* ((thing arg)
+     (when args
+       (let* ((thing (car args))
               (symb (intern-soft thing))
               candidates)
          ;; TODO: use tag system.
@@ -412,9 +411,6 @@ file-local variable.\n")
                              (sos-elisp-find-let-variable thing)))
            (and cand
                 (push cand candidates)))
-         candidates)))
-    (:tips
-     (when arg
-       (list (format "%s" arg))))))
+         candidates)))))
 
 (provide 'sos-elisp-backend)

@@ -33,7 +33,7 @@
 (defconst sos-grep-prefix ">>>>> ")
 
 ;;;###autoload
-(defun sos-grep-backend (command &optional arg)
+(defun sos-grep-backend (command &rest args)
   (case command
     (:symbol
      (when (eq major-mode (or (and (featurep 'grep-mode)
@@ -54,7 +54,7 @@
              :stop)))))
     (:candidates
      ;; 1st argument is (FILEPATH . NUM) struct.
-     (let* ((symb arg)
+     (let* ((symb (car args))
             (file (car symb))
             (linum (cdr symb))
             (match (save-excursion

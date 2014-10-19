@@ -43,8 +43,9 @@
 (require 'grep-mode)
 (require 'hl-anything)
 (require 'history)
-(require 'sos)
 (require 'prj)
+(require 'sos)
+;; TODO: deprecated
 (require 'oops-lisp-lib)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

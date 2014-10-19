@@ -114,7 +114,7 @@ at least one argument, command. Optional arguement callback is the function whic
 
 (defcustom prj-backends '(prj-filedb-backend
                           prj-async-grep-backend)
-  "The list of back-ends for the purpose of indexing files or tagging files which
+  "The list of back-ends for the purpose of indexing files or tagging files which 
 should be included in current project. Every back-end takes at least one argument, 
 command.
 
@@ -487,7 +487,7 @@ project to be loaded."
   (when (prj-project-p)
     (message "Building database might take a while, please wait ...")
     (prj-call-backends :index-files is-rebuil)
-    (run-hook-with-args prj-after-build-database-hook)
+    (run-hooks 'prj-after-build-database-hook)
     (message "Database is updated!")))
 
 ;;;###autoload

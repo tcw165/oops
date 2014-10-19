@@ -30,11 +30,13 @@
 
 (require 'tabulated-list)
 
+(require 'hl-anything)
+
 ;;;###autoload
-(defun sos-candidates-preview-backend (command &optional arg)
+(defun sos-candidates-preview-backend (command &rest args)
   (case command
     (:symbol
-     (when (memq major-mode '(sos-candidates-preview-mode))
+     (when (string= (buffer-name) "*Goto Definition*")
        (let ((entry (tabulated-list-get-entry)))
          (if (and entry (not mark-active))
              ;; Return the entry of `tabulated-list-entries'.
@@ -42,20 +44,23 @@
            :stop))))
     (:candidates
      ;; 1st argument is an entry of `tabulated-list-entries'.
-     (let* ((entry arg)
+     (let* ((entry (car args))
+            (symb (aref entry 0))
             (linum (string-to-int (aref entry 2)))
             (file (aref entry 3))
             (doc (aref entry 4))
             keywords)
-       (or (when doc
-             (setq keywords `((,(regexp-quote (with-temp-buffer
-                                                (insert doc)
-                                                (goto-char 1)
-                                                (buffer-substring-no-properties
-                                                 1 (line-end-position))))
-                               0 'hl-symbol-face prepend)))
-             `((:doc ,doc :linum ,linum :keywords ,keywords)))
-           (when file
-             `((:file ,file :linum ,linum))))))))
+       (cond
+        (doc
+         (setq keywords `((,(regexp-quote (with-temp-buffer
+                                            (insert doc)
+                                            (goto-char 1)
+                                            (buffer-substring-no-properties
+                                             1 (line-end-position))))
+                           0 'hl-symbol-face prepend)))
+         `((:doc ,doc :linum ,linum :keywords ,keywords)))
+        (file
+         (setq keywords `((,(regexp-quote symb) 0 'hl-symbol-face prepend)))
+         `((:file ,file :linum ,linum :keywords ,keywords))))))))
 
 (provide 'sos-candidates-preview-backend)
