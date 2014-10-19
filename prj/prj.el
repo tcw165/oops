@@ -64,6 +64,7 @@ project; Powerful selective grep string or regular expression in a project, etc.
   :set 'prj-cus-set-workspace
   :group 'prj-group)
 
+;; TODO: use mode and extensions `auto-mode-alist'.
 (defcustom prj-document-types '(("Text" . "*.txt;*.md;*.xml")
                                 ("Emacs Lisp" . ".emacs;*.el")
                                 ("Python" . "*.py")
@@ -74,7 +75,6 @@ project; Powerful selective grep string or regular expression in a project, etc.
   "Categorize file names refer to specific matches and give them type names. 
 It is a alist of (DOC_NAME MATCHES). Each matches in MATCHES should be delimit 
 with ';'."
-  ;; TODO: give GUI a pretty appearance.
   :type '(repeat (cons (string :tag "Type")
                        (string :tag "File")))
   :group 'prj-group)
@@ -97,13 +97,14 @@ at least one argument, command. Optional arguement callback is the function whic
  the front-end will call when command task is ready to be exectued.
 
 ### Commands:
+`:init'             - Initialize frontends.
+`:destroy'          - Ask frontends to destroy their GUIs.
 `:create-project'   - Show GUI for creating project.
 `:delete-project'   - Show GUI for deleting project(s).
 `:edit-project'     - Show GUI for editing project.
 `:search-project'   - Show GUI for searching project (normally implemented by grep).
 `:find-file'        - Show GUI for finding files in the project. The 3rd argument is 
                       a files list of current project.
-`:destroy'          - Destroy all the GUIs.
 
 ### The sample of a front-end:
   (defun some-frontend (command callback &rest args)
@@ -115,28 +116,36 @@ at least one argument, command. Optional arguement callback is the function whic
   :group 'prj-group)
 
 (defcustom prj-backends '(prj-filedb-backend
-                          prj-tagdb-backend)
+                          prj-async-grep-backend)
   "The list of back-ends for the purpose of indexing files or tagging files which
 should be included in current project. Every back-end takes at least one argument, 
 command.
 
 ### Basic Commands:
+`:init'             - Initialize back-ends .
+`:destroy'          - Ask back-ends to destroy something or free memory.
+
 `:index-files'      - Collect files recursively under directories given by project
                       file-path setting.
-`:files'            - Return a files list of current project.
+`:files'            - Return a files list of current project. Optional arguemnt is
+                      a list of document types when you want specific files.
 
-`:tag-files'        - 
-`:tags'             - 
-
-`:destroy'          - Ask back-ends to destroy something or free memory.
+`:search'           - Search string in the current project.
 
 ### The sample of a front-end:
   (defun some-backend (command &rest args)
     (case command
       (:index-files
-       (progn ...)))
+       (progn ...))
+      (:files
+       (progn ...))))
 "
   :type '(repeat (symbol :tag "Back-end"))
+  :group 'prj-group)
+
+(defcustom prj-after-build-database-hook nil
+  "Hook run when entering `grep-mode' mode."
+  :type 'hook
   :group 'prj-group)
 
 (defvar prj-config nil
@@ -155,29 +164,21 @@ format of JSON file.
 (defconst prj-config-name "config.db"
   "The file name of project configuration. see `prj-config' for detail.")
 
-(defconst prj-filedb-name "files.db"
-  "The file name of project file-list database. The database is a plist which 
-contains files should be concerned.
-format:
-  (DOCTYPE1 (FILE1_1 FILE1_2 ...)
-   DOCTYPE2 (FILE2_1 FILE2_2 ...))")
-
-(defconst prj-searchdb-name "search.grep"
-  "The simple text file which caches the search result that users have done 
-in the last session.")
-
 (defconst prj-search-history-max 8
   "Maximin elements count in the searh history cache.")
-
-(defvar prj-process-grep nil)
 
 (defmacro prj-plist-put (plist prop val)
   `(setq ,plist (plist-put ,plist ,prop ,val)))
 
-(defmacro prj-with-search-buffer (&rest body)
-  (declare (indent 0) (debug t))
-  `(with-current-buffer (find-file-noselect (prj-searchdb-path))
-     ,@body))
+(defun prj-new-config ()
+  "Return a config template. Check `prj-config' for detail."
+  (let (config)
+    (prj-plist-put config :name "")
+    (prj-plist-put config :filepaths '())
+    (prj-plist-put config :doctypes '())
+    (prj-plist-put config :recent-files '())
+    (prj-plist-put config :search-history '())
+    config))
 
 (defun prj-call-frontends (command &optional callback &rest args)
   "Call frontends and pass command and callback to them."
@@ -185,12 +186,19 @@ in the last session.")
     (apply frontend command callback args)))
 
 (defun prj-call-backends (command &rest args)
-  "Call backends and pass command to them."
-  (catch 'break
-    (let (ret)
+  "Call backends and pass command to them. If any backend return non-nil will 
+terminate the iteration and return its result unless commands is `:init' or 
+`:destroy'."
+  (let (ret)
+    (catch 'break
       (dolist (backend prj-backends)
-        (and (setq ret (apply backend command args))
-             (throw 'break ret))))))
+        (let ((ret (apply backend command args)))
+          (and ret
+               (not (member command '(:init :destroy)))
+               (throw 'break ret)))))))
+
+(defun prj-init-frontends ()
+  (prj-call-frontends :init))
 
 (defun prj-destroy-frontends ()
   (prj-call-frontends :destroy))
@@ -200,6 +208,20 @@ in the last session.")
 
 (defun prj-destroy-backends ()
   (prj-call-backends :destroy))
+
+(defun prj-import-json (filename)
+  "Read data exported by `prj-export-json' from file `filename'."
+  (when (file-exists-p filename)
+    (let ((json-object-type 'plist)
+          (json-key-type 'keyword)
+          (json-array-type 'list))
+      (json-read-file filename))))
+
+(defun prj-export-json (filename data)
+  "Export `data' to `filename' file.."
+  (when (file-writable-p filename)
+    (with-temp-file filename
+      (insert (json-encode-plist data)))))
 
 (defun prj-destroy-all ()
   "Clean search buffer or widget buffers which belongs to other project when 
@@ -270,6 +292,7 @@ user loads a project or unload a project."
     ;; Update database
     (prj-build-database)
     (prj-init-backends)
+    (prj-init-frontends)
     (message "Load [%s] ...done" (prj-project-name))))
 
 (defun prj-edit-project-internal (data)
@@ -290,57 +313,10 @@ user loads a project or unload a project."
           (prj-build-database t)
         (prj-build-database)))))
 
-(defun prj-search-project-internal-1 (data)
+(defun prj-search-project-internal (data)
   "Internal function to edit project. It is called by functions in the 
 `prj-search-project-frontend'."
-  (let ((match (plist-get data :match))
-        (doctypes (plist-get data :doctypes))
-        (filepaths (plist-get data :filepaths))
-        (casefold (plist-get data :casefold))
-        (word-only (plist-get data :word-only))
-        (skip-comment (plist-get data :skip-comment)))
-    ;; Update search history.
-    (let ((history (prj-project-search-history)))
-      (if (member match history)
-          ;; Reorder the match.
-          (setq history (delete match history)
-                history (push match history))
-        (setq history (push match history)))
-      ;; Keep maximum history.
-      (and (> (length history) prj-search-history-max)
-           (setcdr (nthcdr (1- prj-search-history-max) history) nil))
-      (prj-plist-put prj-config :search-history history)
-      (prj-export-json (prj-config-path) prj-config))
-    ;; Start to search.
-    (prj-with-search-buffer
-      (switch-to-buffer (current-buffer) nil t)
-      (goto-char (point-max))
-      (insert (format ">>>>> %s\n" match))
-      (prj-process-grep match (prj-project-files)
-                        'prj-search-project-internal-2))))
-
-(defun prj-search-project-internal-2 (process message)
-  "A sentinel for asynchronous process GREP."
-  (when (memq (process-status process) '(stop exit signal))
-    (prj-with-search-buffer
-      (goto-char (point-max))
-      (insert "<<<<<\n\n")
-      (save-buffer 0)
-      (setq buffer-read-only t)
-      (message "Search project...done"))))
-
-(defun prj-process-grep (match filepaths sentinel)
-  "Use `start-process' to call GREP. MATCH is a string to search. FILEPATHS is 
-a file list, (FILE1 FILE2 ...). SENTINEL is the GREP's sentinel."
-  (let ((stream (with-output-to-string
-                  (princ "(start-process \"grep\" (current-buffer) \"grep\" ")
-                  (prin1 "-snH")(princ " ")
-                  (prin1 match)(princ " ")
-                  (dolist (filepath filepaths)
-                    (prin1 filepath)(princ " "))
-                  (princ ")"))))
-    (setq prj-process-grep (eval (read stream)))
-    (set-process-sentinel prj-process-grep sentinel)))
+  (prj-call-backends :search data))
 
 (defun prj-find-file-internal (file)
   (when (file-exists-p file)
@@ -348,32 +324,8 @@ a file list, (FILE1 FILE2 ...). SENTINEL is the GREP's sentinel."
     (find-file file)
     (his-add-position-type-history)))
 
-(defun prj-new-config ()
-  "Return a config template. Check `prj-config' for detail."
-  (let (config)
-    (prj-plist-put config :name "")
-    (prj-plist-put config :filepaths '())
-    (prj-plist-put config :doctypes '())
-    (prj-plist-put config :recent-files '())
-    (prj-plist-put config :search-history '())
-    config))
-
-(defun prj-import-json (filename)
-  "Read data exported by `prj-export-json' from file `filename'."
-  (when (file-exists-p filename)
-    (let ((json-object-type 'plist)
-          (json-key-type 'keyword)
-          (json-array-type 'list))
-      (json-read-file filename))))
-
-(defun prj-export-json (filename data)
-  "Export `data' to `filename' file.."
-  (when (file-writable-p filename)
-    (with-temp-file filename
-      (insert (json-encode-plist data)))))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Public API for Front-ends & Back-ends ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Public API ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
 (defun prj-project-p ()
@@ -388,20 +340,6 @@ a file list, (FILE1 FILE2 ...). SENTINEL is the GREP's sentinel."
                             (or name
                                 (prj-project-name))
                             prj-config-name)))
-
-;;;###autoload
-(defun prj-filedb-path ()
-  (expand-file-name (format "%s/%s/%s"
-                            prj-workspace-path
-                            (prj-project-name)
-                            prj-filedb-name)))
-
-;;;###autoload
-(defun prj-searchdb-path ()
-  (expand-file-name (format "%s/%s/%s"
-                            prj-workspace-path
-                            (prj-project-name)
-                            prj-searchdb-name)))
 
 ;;;###autoload
 (defun prj-project-name ()
@@ -426,7 +364,7 @@ a file list, (FILE1 FILE2 ...). SENTINEL is the GREP's sentinel."
 ;;;###autoload
 (defun prj-project-files (&optional doctypes)
   "Return a list containing files in current project."
-  (prj-call-backends :files))
+  (prj-call-backends :files doctypes))
 
 ;;;###autoload
 (defun prj-workspace-projects ()
@@ -542,7 +480,7 @@ project to be loaded."
   (when (prj-project-p)
     (message "Building database might take a while, please wait ...")
     (prj-call-backends :index-files is-rebuil)
-    (prj-call-backends :tag-files is-rebuil)
+    (run-hook-with-args prj-after-build-database-hook)
     (message "Database is updated!")))
 
 ;;;###autoload
@@ -565,30 +503,27 @@ project to be loaded."
   ;; Load project if no project was loaded.
   (unless (prj-project-p)
     (prj-load-project))
-  (if (and (processp prj-process-grep)
-           (process-live-p prj-process-grep))
-      (message "Searching is under processing, please wait...")
-    (prj-call-frontends :search-project
-                        'prj-search-project-internal-1)))
+  (prj-call-frontends :search-project
+                      'prj-search-project-internal))
 
 ;;;###autoload
 (defun prj-toggle-search-buffer ()
   (interactive)
   ;; TODO: bug when user is select definition window and try to toggle search buffer off.
   ;; TODO: use front-end???
-  (if (string= (buffer-name (current-buffer)) prj-searchdb-name)
-      ;; Back to previous buffer of current window.
-      (progn
-        (and (buffer-modified-p)
-             (save-buffer 0))
-        (kill-buffer))
-    ;; Go to search buffer.
-    (unless (prj-project-p)
-      (prj-load-project))
-    (and (featurep 'history)
-         (his-add-position-type-history))
-    (prj-with-search-buffer
-      (switch-to-buffer (current-buffer) nil t))))
+  (unless (prj-project-p)
+    (prj-load-project))
+  (let ((buffer (get-buffer prj-searchdb-name)))
+    (if buffer
+        ;; Back to previous buffer of current window.
+        (with-current-buffer buffer
+          (and (buffer-modified-p)
+               (save-buffer 0))
+          (kill-buffer))
+      ;; Go to search buffer.
+      (his-add-position-type-history)
+      (find-file (prj-searchdb-path))
+      (his-add-position-type-history))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Project Mode ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

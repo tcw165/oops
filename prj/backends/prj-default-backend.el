@@ -28,9 +28,34 @@
 ;; 2014-08-01 (0.0.1)
 ;;    Initial release.
 
+(defconst prj-filedb-name "files.db"
+  "The file name of project file-list database. The database is a plist which 
+contains files should be concerned.
+format:
+  (DOCTYPE1 (FILE1_1 FILE1_2 ...)
+   DOCTYPE2 (FILE2_1 FILE2_2 ...))")
+
+(defconst prj-searchdb-name "search.grep"
+  "The simple text file which caches the search result that users have done 
+in the last session.")
+
 (defvar prj-files-cache nil)
 
 (defvar prj-filedb-cache nil)
+
+(defvar prj-process-grep nil)
+
+(defun prj-filedb-path ()
+  (expand-file-name (format "%s/%s/%s"
+                            prj-workspace-path
+                            (prj-project-name)
+                            prj-filedb-name)))
+
+(defun prj-searchdb-path ()
+  (expand-file-name (format "%s/%s/%s"
+                            prj-workspace-path
+                            (prj-project-name)
+                            prj-searchdb-name)))
 
 (defun prj-export-data (filename data)
   "Export `data' to `filename' file. The saved data can be imported with `prj-import-data'."
@@ -80,6 +105,35 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
   ;; TODO:
   t)
 
+(defun prj-process-grep (match filepaths sentinel)
+  "Use `start-process' to call GREP. MATCH is a string to search. FILEPATHS is 
+a file list, (FILE1 FILE2 ...). SENTINEL is the GREP's sentinel."
+  ;; (shell-command "find ~/.emacs.d -name \"*.el\"|xargs grep -nH \"garbage-collect\"" (find-file-noselect (prj-searchdb-path)) nil)
+  (let ((stream (with-output-to-string
+                  (princ "(start-process \"grep\" (current-buffer) \"grep\" ")
+                  (prin1 "-snH")(princ " ")
+                  (prin1 match)(princ " ")
+                  (dolist (filepath filepaths)
+                    (prin1 filepath)(princ " "))
+                  (princ ")"))))
+    (setq prj-process-grep (eval (read stream)))
+    (set-process-sentinel prj-process-grep sentinel)))
+
+(defmacro prj-with-search-buffer (&rest body)
+  (declare (indent 0) (debug t))
+  `(with-current-buffer (find-file-noselect (prj-searchdb-path))
+     ,@body))
+
+(defun prj-async-grep-complete (process message)
+  "A sentinel for asynchronous process GREP."
+  (when (memq (process-status process) '(stop exit signal))
+    (prj-with-search-buffer
+      (goto-char (point-max))
+      (insert "<<<<<\n\n")
+      (save-buffer 0)
+      (setq buffer-read-only t)
+      (message "Search project...done"))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Back-ends ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -123,8 +177,37 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
      (garbage-collect))))
 
 ;;;###autoload
-(defun prj-tagdb-backend (command &rest args)
+(defun prj-async-grep-backend (command &rest args)
   (case command
-    (:tag-files)))
+    (:search
+     (if (and (processp prj-process-grep)
+              (process-live-p prj-process-grep))
+         (message "Searching is under processing, please wait...")
+       (let* ((data (car args))
+              (match (plist-get data :match))
+              (doctypes (plist-get data :doctypes))
+              (filepaths (plist-get data :filepaths))
+              (casefold (plist-get data :casefold))
+              (word-only (plist-get data :word-only))
+              (skip-comment (plist-get data :skip-comment)))
+         ;; Update search history.
+         (let ((history (prj-project-search-history)))
+           (if (member match history)
+               ;; Reorder the match.
+               (setq history (delete match history)
+                     history (push match history))
+             (setq history (push match history)))
+           ;; Keep maximum history.
+           (and (> (length history) prj-search-history-max)
+                (setcdr (nthcdr (1- prj-search-history-max) history) nil))
+           (prj-plist-put prj-config :search-history history)
+           (prj-export-json (prj-config-path) prj-config))
+         ;; Start to search.
+         (prj-with-search-buffer
+           (switch-to-buffer (current-buffer) nil t)
+           (goto-char (point-max))
+           (insert (format ">>>>> %s\n" match))
+           (prj-process-grep match (prj-project-files)
+                             'prj-async-grep-complete)))))))
 
 (provide 'prj-default-backend)
