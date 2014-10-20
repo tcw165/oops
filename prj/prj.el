@@ -25,8 +25,6 @@
 ;;           `prj-create-project', `prj-delete-project',
 ;;           `prj-load-project', `prj-unload-project',
 ;;           `prj-build-database', `prj-find-file'.
-;; - Divide complex computation into piece, let user can interrupt it and save
-;;   the result before the cancellation.
 ;; - Support project's local variable.
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -50,18 +48,11 @@ its full path; Add different directories with specific document types in a
 project; Powerful selective grep string or regular expression in a project, etc."
   :tag "Prj")
 
-(defun prj-cus-set-workspace (symbol value)
-  "Make sure the directory is present."
-  (when (stringp value)
-    (unless (file-exists-p value)
-      (make-directory value))
-    (when (file-exists-p value)
-      (set symbol (expand-file-name value)))))
-
 (defcustom prj-workspace-path "~/.emacs.d/.workspace"
   "The place storing all the projects' configurations."
-  :type '(string)
+  :type 'directory
   :set 'prj-cus-set-workspace
+  :initialize 'custom-initialize-default
   :group 'prj-group)
 
 (defcustom prj-document-types '(("Text" . "*.txt;*.md")
@@ -80,7 +71,7 @@ with ';'."
   "Those kinds of file should be excluded in the project. Each matches should 
 be delimit with ';'."
   ;; TODO: give GUI a pretty appearance.
-  :type '(string :tag "File")
+  :type 'string
   :group 'prj-group)
 
 (defcustom prj-frontends '(prj-create-project-widget-frontend
@@ -90,24 +81,46 @@ be delimit with ';'."
                            prj-load-project-widget-frontend
                            prj-find-file-frontend)
   "The list of front-ends for the purpose of visualization. Every front-end takes
-at least one argument, command. Optional arguement callback is the function which
- the front-end will call when command task is ready to be exectued.
+at least one argument, command. Optional arguement, callback, is the implementation 
+provided by engine to complete task in respect of the given command.
 
 ### Commands:
 `:init'             - Initialize frontends.
 `:destroy'          - Ask frontends to destroy their GUIs.
-`:create-project'   - Show GUI for creating project.
-`:delete-project'   - Show GUI for deleting project(s).
-`:edit-project'     - Show GUI for editing project.
-`:search-project'   - Show GUI for searching project (normally implemented by grep).
-`:find-file'        - Show GUI for finding files in the project. The 3rd argument is 
-                      a files list of current project.
+
+`:create-project'   - Show GUI for creating project. 2nd argument, callback, is 
+                      necessary.
+`:delete-project'   - Show GUI for deleting project(s). 2nd argument, callback, is 
+                      necessary.
+`:edit-project'     - Show GUI for editing project. 2nd argument, callback, is 
+                      necessary.
+
+`:search-project'   - Show GUI for searching project. 2nd argument, callback, is 
+                      necessary.
+`:find-file'        - Show GUI for finding files in the project. 2nd argument, 
+                      callback, is necessary and  3rd argument is a files list 
+                      of current project.
 
 ### The sample of a front-end:
-  (defun some-frontend (command callback &rest args)
+  (defun some-frontend (command &optional callback &rest args)
     (case command
-      (:creat-project (progn ...))
-      (:destroy (kill-buffer)))
+      (:init (start-process ...))
+      (:destroy (kill-buffer))
+      (:creat-project
+       (progn ...
+        (funcall callback ...)))
+      (:delete-project
+       (progn ...
+        (funcall callback ...)))
+      (:edit-project
+       (progn ...
+        (funcall callback ...)))
+      (:search-project
+       (progn ...
+        (funcall callback ...)))
+      (:find-file
+       (progn ...
+        (funcall callback ...))))
 "
   :type '(repeat (symbol :tag "Front-end"))
   :group 'prj-group)
@@ -118,16 +131,17 @@ at least one argument, command. Optional arguement callback is the function whic
 should be included in current project. Every back-end takes at least one argument, 
 command.
 
-### Basic Commands:
+### Commands:
 `:init'             - Initialize back-ends .
 `:destroy'          - Ask back-ends to destroy something or free memory.
 
 `:index-files'      - Collect files recursively under directories given by project
                       file-path setting.
 `:files'            - Return a files list of current project. Optional arguemnt is
-                      a list of document types when you want specific files.
+                      a list of keys of `prj-document-types' when you want specific 
+                      files.
 
-`:search'           - Search string in the current project.
+`:search'           - Search string in the current project. Optional argument ...
 
 ### The sample of a front-end:
   (defun some-backend (command &rest args)
@@ -140,6 +154,11 @@ command.
   :type '(repeat (symbol :tag "Back-end"))
   :group 'prj-group)
 
+(defcustom prj-search-history-max 8
+  "Maximum history amount."
+  :type 'integer
+  :group 'prj-group)
+
 (defcustom prj-after-build-database-hook nil
   "Hook run when entering `grep-mode' mode."
   :type 'hook
@@ -147,7 +166,7 @@ command.
 
 (defvar prj-config nil
   "A plist which represent a project's configuration, it will be exported as 
-format of JSON file.
+format of JSON file. see `prj-new-config'.
 
 ### Plist Format:
 `:name'             - Project's name. A string.
@@ -155,17 +174,24 @@ format of JSON file.
 `:doctypes'         - A plist containing pairs of document type and document 
                       extensions. see `prj-document-types'.
 `:recent-files'     - A list containing recent file-path(s) string(s).
-`:search-history'   - A list containing recent searching string(s).
-")
-
-(defconst prj-config-name "config.db"
-  "The file name of project configuration. see `prj-config' for detail.")
-
-(defconst prj-search-history-max 8
-  "Maximin elements count in the searh history cache.")
+`:search-history'   - A list containing recent searching string(s).")
 
 (defmacro prj-plist-put (plist prop val)
   `(setq ,plist (plist-put ,plist ,prop ,val)))
+
+(defun prj-cus-set-workspace (symbol value)
+  "Make sure the directory is present."
+  (when (stringp value)
+    (let ((project (prj-project-name))
+          (old-path prj-workspace-path)
+          (new-path (expand-file-name (or (and (string-match "\\(.*\\)/$" value)
+                                              (match-string 1 value))
+                                         value))))
+      (make-directory (file-name-directory new-path) t)
+      (rename-file old-path new-path)
+      (set symbol new-path)
+      (prj-unload-project)
+      (prj-load-project project))))
 
 (defun prj-new-config ()
   "Return a config template. Check `prj-config' for detail."
@@ -179,20 +205,21 @@ format of JSON file.
 
 (defun prj-call-frontends (command &optional callback &rest args)
   "Call frontends and pass command and callback to them."
-  (dolist (frontend prj-frontends)
-    (apply frontend command callback args)))
+  (catch 'break
+    (dolist (frontend prj-frontends)
+      (let ((ret (apply frontend command callback args)))
+        (and ret (not (memq command '(:init :destroy)))
+             (throw 'break ret))))))
 
 (defun prj-call-backends (command &rest args)
   "Call backends and pass command to them. If any backend return non-nil will 
-terminate the iteration and return its result unless commands is `:init' or 
-`:destroy'."
-  (let (ret)
-    (catch 'break
-      (dolist (backend prj-backends)
-        (let ((ret (apply backend command args)))
-          (and ret
-               (not (member command '(:init :destroy)))
-               (throw 'break ret)))))))
+discard remaining back-ends and return its result unless commands is `:init' or 
+`:destroy'. see `prj-backends'."
+  (catch 'break
+    (dolist (backend prj-backends)
+      (let ((ret (apply backend command args)))
+        (and ret (not (memq command '(:init :destroy)))
+             (throw 'break ret))))))
 
 (defun prj-init-frontends ()
   (prj-call-frontends :init))
@@ -335,11 +362,10 @@ user loads a project or unload a project."
 
 ;;;###autoload
 (defun prj-config-path (&optional name)
-  (expand-file-name (format "%s/%s/%s"
+  (expand-file-name (format "%s/%s/config.db"
                             prj-workspace-path
                             (or name
-                                (prj-project-name))
-                            prj-config-name)))
+                                (prj-project-name)))))
 
 ;;;###autoload
 (defun prj-searchdb-path ()

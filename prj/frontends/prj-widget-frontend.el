@@ -486,8 +486,6 @@ remove one.\n"
                         (cdr prj-browse-file-cache))))
     (ignore-case t)))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 (defvar prj-browse-file-cache nil
   "Storing (DIR . (CANDIDATES...)) for completion.")
 (make-variable-buffer-local 'prj-browse-file-cache)
