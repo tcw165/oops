@@ -134,15 +134,14 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
 ;; Back-ends ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
-(defun prj-filedb-backend (command &rest args)
+(defun prj-index-files-backend (command &optional is-rebuild)
   (case command
     (:init)
     (:destroy
      (setq prj-total-files-cache nil)
      (garbage-collect))
     (:index-files
-     (let ((is-rebuild (car args))
-           all-files)
+     (let (all-files)
        ;; Collect files in respect of document types.
        (dolist (doctype (prj-project-doctypes))
          (setq all-files (concat all-files (prj-process-find
@@ -154,40 +153,26 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
        (when all-files
          (setq prj-total-files-cache (split-string all-files "\n" t))
          (with-temp-file (prj-filedb-path "all")
-           (insert all-files)))))
-    (:files
+           (insert all-files)))))))
+
+;;;###autoload
+(defun prj-find-files-backend (command &optional doctypes filepaths)
+  (case command
+    (:init)
+    (:destroy)
+    (:find-files
      ;; TODO: Files for specific document type?
      prj-total-files-cache)))
 
 ;;;###autoload
-(defun prj-async-grep-backend (command &rest args)
+(defun prj-async-grep-backend (command &optional match input-file output-file)
   (case command
+    (:init)
+    (:destroy)
     (:search
      (if (and (processp prj-process-grep)
               (process-live-p prj-process-grep))
          (message "Searching is under processing, please wait...")
-       (let* ((data (nth 0 args))
-              (output-file (nth 1 args))
-              (match (plist-get data :match))
-              (doctypes (plist-get data :doctypes))
-              (filepaths (plist-get data :filepaths))
-              (casefold (plist-get data :casefold))
-              (word-only (plist-get data :word-only))
-              (skip-comment (plist-get data :skip-comment)))
-         ;; Update search history.
-         (let ((history (prj-project-search-history)))
-           (if (member match history)
-               ;; Reorder the match.
-               (setq history (delete match history)
-                     history (push match history))
-             (setq history (push match history)))
-           ;; Keep maximum history.
-           (and (> (length history) prj-search-history-max)
-                (setcdr (nthcdr (1- prj-search-history-max) history) nil))
-           (prj-plist-put prj-config :search-history history)
-           (prj-export-config))
-         ;; TODO: support filepaths and doctypes
-         ;; Start to search.
-         (prj-process-grep match (prj-filedb-path "all") output-file))))))
+       (prj-process-grep match input-file output-file)))))
 
 (provide 'prj-default-backend)

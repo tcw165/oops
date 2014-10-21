@@ -170,7 +170,7 @@
 ;; Front-Ends ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
-(defun prj-create-project-widget-frontend (command &rest args)
+(defun prj-create-project-frontend (command &rest args)
   (case command
     (:create-project
      (prj-with-widget "*Create Project*"
@@ -231,7 +231,7 @@ remove one.\n"
           (kill-buffer "*Create Project*")))))
 
 ;;;###autoload
-(defun prj-delete-project-widget-frontend (command &rest args)
+(defun prj-delete-project-frontend (command &rest args)
   (case command
     (:delete-project
      (prj-with-widget "*Delete Project*"
@@ -276,20 +276,19 @@ remove one.\n"
           (kill-buffer "*Delete Project*")))))
 
 ;;;###autoload
-(defun prj-load-project-widget-frontend (command &rest args)
+(defun prj-load-project-frontend (command &optional projects)
   (case command
     (:load-project
-     (let ((projects (car args)))
-       (if projects
-           ;; Prompt user to load project and return project name.
-           (funcall 'prj-load-project-impl
-                    (ido-completing-read "Load project: " projects nil t))
-         (if (prj-project-p)
-             (message "[%s] No other project in the workspace!" (prj-project-name))
-           (message "No project in the workspace. Please create new project!")))))))
+     (if projects
+         ;; Prompt user to load project and return project name.
+         (funcall 'prj-load-project-impl
+                  (ido-completing-read "Load project: " projects nil t))
+       (if (prj-project-p)
+           (message "[%s] No other project in the workspace!" (prj-project-name))
+         (message "No project in the workspace. Please create new project!"))))))
 
 ;;;###autoload
-(defun prj-edit-project-widget-frontend (command &rest args)
+(defun prj-edit-project-frontend (command &rest args)
   (case command
     (:edit-project
      (prj-with-widget "*Edit Project*"
@@ -342,15 +341,16 @@ remove one.\n"
           (kill-buffer "*Edit Project*")))))
 
 ;;;###autoload
-(defun prj-find-file-frontend (command &rest args)
+(defun prj-find-file-frontend (command &optional files)
   (case command
-    (:find-file
-     (let ((files (nth 0 args))
-           (prompt (format "[%s] Find file: " (prj-project-name))))
-       (funcall 'prj-find-file-impl (ido-completing-read prompt files))))))
+    (:find-files
+     (let ((file (ido-completing-read
+                  (format "[%s] Find file: " (prj-project-name))
+                  files)))
+       (funcall 'prj-find-file-impl file)))))
 
 ;;;###autoload
-(defun prj-search-project-widget-frontend (command &rest args)
+(defun prj-search-project-frontend (command &rest args)
   (case command
     (:search-project
      (let ((thing (prj-thingatpt))
@@ -535,4 +535,4 @@ remove one.\n"
           prefix)
       nil)))
 
-(provide 'prj-widget-frontend)
+(provide 'prj-default-frontend)

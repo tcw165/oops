@@ -70,7 +70,7 @@
 (require 'ido)
 
 (require 'json)
-(require 'prj-widget-frontend)
+(require 'prj-default-frontend)
 (require 'prj-default-backend)
 
 (defgroup prj-group nil
@@ -106,12 +106,12 @@ be delimit with ';'."
   :type 'string
   :group 'prj-group)
 
-(defcustom prj-frontends '(prj-create-project-widget-frontend
-                           prj-delete-project-widget-frontend
-                           prj-edit-project-widget-frontend
-                           prj-search-project-widget-frontend
-                           prj-load-project-widget-frontend
-                           prj-find-file-frontend)
+(defcustom prj-frontends '(prj-create-project-frontend
+                           prj-delete-project-frontend
+                           prj-edit-project-frontend
+                           prj-load-project-frontend
+                           prj-find-file-frontend
+                           prj-search-project-frontend)
   "The list of front-ends for the purpose of visualization. Every front-end takes
 at least one argument, command. Optional arguement, callback, is the implementation 
 provided by engine to complete task in respect of the given command. The engine 
@@ -122,44 +122,30 @@ is neither `:init' nor `:destroy' will make engine discard remaining iteration.
 `:init'             - Initialize frontends.
 `:destroy'          - Ask frontends to destroy their GUIs.
 
-`:create-project'   - Show GUI for creating project. 2nd argument, callback, is 
-                      necessary.
-`:delete-project'   - Show GUI for deleting project(s). 2nd argument, callback, is 
-                      necessary.
-`:edit-project'     - Show GUI for editing project. 2nd argument, callback, is 
-                      necessary.
-
-`:search-project'   - Show GUI for searching project. 2nd argument, callback, is 
-                      necessary.
-`:find-file'        - Show GUI for finding files in the project. 2nd argument, 
-                      callback, is necessary and  3rd argument is a files list 
-                      of current project.
-
-### The sample of a front-end:
-  (defun some-frontend (command &optional callback &rest args)
-    (case command
-      (:init (start-process ...))
-      (:destroy (kill-buffer))
-      (:creat-project
-       (progn ...
-        (funcall callback ...)))
-      (:delete-project
-       (progn ...
-        (funcall callback ...)))
-      (:edit-project
-       (progn ...
-        (funcall callback ...)))
-      (:search-project
-       (progn ...
-        (funcall callback ...)))
-      (:find-file
-       (progn ...
-        (funcall callback ...))))
-"
-  :type '(repeat (symbol :tag "Front-end"))
+`:create-project'   - Show GUI for creating project.
+                      Default is `prj-create-project-frontend'.
+`:delete-project'   - Show GUI for deleting project(s).
+                      Default is `prj-delete-project-frontend'.
+`:edit-project'     - Show GUI for editing project.
+                      Default is `prj-edit-project-frontend'.
+`:load-project'     - Show GUI for loading project. 2nd argument is project's file 
+                      list.
+                      Default is `prj-load-project-frontend'.
+`:find-files'       - Show GUI for finding files in the project. 2nd argument is a 
+                      files list of current project.
+                      Default is `prj-find-file-frontend'.
+`:search-project'   - Show GUI for searching project.
+                      Default is `prj-search-project-frontend'."
+  :type '(list (symbol :tag "Create Project Frontend")
+               (symbol :tag "Delete Project Frontend")
+               (symbol :tag "  Edit Project Frontend")
+               (symbol :tag "  Load Project Frontend")
+               (symbol :tag "     Find File Frontend")
+               (symbol :tag "Search Project Frontend"))
   :group 'prj-group)
 
-(defcustom prj-backends '(prj-filedb-backend
+(defcustom prj-backends '(prj-index-files-backend
+                          prj-find-files-backend
                           prj-async-grep-backend)
   "The list of back-ends for the purpose of indexing files or tagging files which 
 should be included in current project. Every back-end takes at least one argument, 
@@ -171,21 +157,14 @@ command.
 
 `:index-files'      - Collect files recursively under directories given by project
                       file-path setting.
-`:files'            - Return a files list of current project. Optional arguemnt is
+`:find-files'       - Return a files list of current project. Optional arguemnt is
                       a list of keys of `prj-document-types' when you want specific 
                       files.
 
-`:search'           - Search string in the current project. Optional argument ...
-
-### The sample of a front-end:
-  (defun some-backend (command &rest args)
-    (case command
-      (:index-files
-       (progn ...))
-      (:files
-       (progn ...))))
-"
-  :type '(repeat (symbol :tag "Back-end"))
+`:search'           - Search string in the current project. Optional argument ..."
+  :type '(list (symbol :tag "Index Files Backend")
+               (symbol :tag " Find Files Backend")
+               (symbol :tag "     Search Backend"))
   :group 'prj-group)
 
 (defcustom prj-search-history-max 8
@@ -267,34 +246,49 @@ format of JSON file. see `prj-new-config'.
       (insert (json-encode-plist data)))))
 
 (defun prj-call-frontends (command &rest args)
-  "Call frontends and pass command and remaining optional arguments to them."
-  (catch 'break
-    (dolist (frontend prj-frontends)
-      (let ((ret (apply frontend command args)))
-        (and ret (not (memq command '(:init :destroy)))
-             (throw 'break ret))))))
-
-(defun prj-call-backends (command &rest args)
-  "Call backends and pass command to them. If any backend return non-nil will 
-discard remaining back-ends and return its result unless commands is `:init' or 
-`:destroy'. see `prj-backends'."
-  (catch 'break
-    (dolist (backend prj-backends)
-      (let ((ret (apply backend command args)))
-        (and ret (not (memq command '(:init :destroy)))
-             (throw 'break ret))))))
+  (let ((commands '(:create-project
+                    :delete-project
+                    :edit-project
+                    :load-project
+                    :find-files
+                    :search-project))
+        (funcs prj-frontends))
+    (catch 'break
+      (while commands
+        (when (eq command (car commands))
+          (let ((ret (apply (car funcs) command args)))
+            (and ret (throw 'break ret))))
+        (setq commands (cdr commands)
+              funcs (cdr funcs))))))
 
 (defun prj-init-frontends ()
-  (prj-call-frontends :init))
+  (dolist (backend prj-frontends)
+    (funcall backend :init)))
 
 (defun prj-destroy-frontends ()
-  (prj-call-frontends :destroy))
+  (dolist (backend prj-frontends)
+    (funcall backend :destroy)))
+
+(defun prj-call-backends (command &rest args)
+  (let ((commands '(:index-files
+                    :find-files
+                    :search))
+        (funcs prj-backends))
+    (catch 'break
+      (while commands
+        (when (eq command (car commands))
+          (let ((ret (apply (car funcs) command args)))
+            (and ret (throw 'break ret))))
+        (setq commands (cdr commands)
+              funcs (cdr funcs))))))
 
 (defun prj-init-backends ()
-  (prj-call-backends :init))
+  (dolist (backend prj-backends)
+    (funcall backend :init)))
 
 (defun prj-destroy-backends ()
-  (prj-call-backends :destroy))
+  (dolist (backend prj-backends)
+    (funcall backend :destroy)))
 
 (defun prj-destroy-all ()
   "Clean search buffer or widget buffers which belongs to other project when 
@@ -349,9 +343,9 @@ user loads a project or unload a project."
   (plist-get prj-config :search-history))
 
 ;;;###autoload
-(defun prj-project-files (&optional doctypes)
+(defun prj-project-files (&optional doctypes filepaths)
   "Return a list containing files in current project."
-  (prj-call-backends :files doctypes))
+  (prj-call-backends :find-files doctypes filepaths))
 
 ;;;###autoload
 (defun prj-export-config ()
@@ -447,7 +441,28 @@ user loads a project or unload a project."
 (defun prj-search-project-impl (data)
   "Internal function to edit project. It is called by functions in the 
 `prj-search-project-frontend'."
-  (prj-call-backends :search data (prj-searchdb-path)))
+  (let* ((match (plist-get data :match))
+         (doctypes (plist-get data :doctypes))
+         (filepaths (plist-get data :filepaths))
+         (casefold (plist-get data :casefold))
+         (word-only (plist-get data :word-only)))
+    ;; Update search history.
+    (let ((history (prj-project-search-history)))
+      (if (member match history)
+          ;; Reorder the match.
+          (setq history (delete match history)
+                history (push match history))
+        (setq history (push match history)))
+      ;; Keep maximum history.
+      (and (> (length history) prj-search-history-max)
+           (setcdr (nthcdr (1- prj-search-history-max) history) nil))
+      (prj-plist-put prj-config :search-history history)
+      (prj-export-config))
+    ;; TODO: support filepaths and doctypes
+    ;; TODO: discard using back-end's function `prj-filedb-path'.
+    ;; TODO: (prj-project-files ...) to get input file.
+    ;; Start to search.
+    (prj-call-backends :search match (prj-filedb-path "all") (prj-searchdb-path))))
 
 ;;;###autoload
 (defun prj-find-file-impl (file)
@@ -537,7 +552,7 @@ project to be loaded."
     (message "Unload [%s] ...done" name)))
 
 ;;;###autoload
-(defun prj-build-database (&optional is-rebuil)
+(defun prj-build-database (&optional is-rebuild)
   "Index file and tags."
   (interactive
    (when (string= "yes" (ido-completing-read
@@ -552,7 +567,7 @@ project to be loaded."
   ;; Create file list which is the data base of the project's files.
   (when (prj-project-p)
     (message "Building database might take a while, please wait ...")
-    (prj-call-backends :index-files is-rebuil)
+    (prj-call-backends :index-files is-rebuild)
     (run-hooks 'prj-after-build-database-hook)
     (message "Database is updated!")))
 
@@ -564,7 +579,7 @@ project to be loaded."
   ;; Load project if wasn't loaded.
   (unless (prj-project-p)
     (prj-load-project))
-  (prj-call-frontends :find-file (prj-project-files)))
+  (prj-call-frontends :find-files (prj-project-files)))
 
 ;;;###autoload
 (defun prj-search-project ()
