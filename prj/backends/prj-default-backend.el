@@ -34,6 +34,8 @@
 
 (defvar prj-process-grep nil)
 
+(defvar prj-grep-output-file nil)
+
 (defun prj-filedb-path (&optional name)
   (let ((dir (expand-file-name (format "%s/%s/files"
                                        prj-workspace-path
@@ -98,43 +100,35 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
   ;; TODO:
   t)
 
-(defmacro prj-with-search-buffer (&rest body)
-  (declare (indent 0) (debug t))
-  `(with-current-buffer (find-file-noselect (prj-searchdb-path))
-     ,@body))
-
-(defun prj-process-grep (match input-file)
-  (prj-with-search-buffer
-    (goto-char (point-max))
-    (insert (format ">>>>> %s\n" match))
-    (setq prj-process-grep (start-process-shell-command
-                            "prj-process-grep"
-                            (current-buffer)
-                            (format "xargs grep -snH \"%s\" < \"%s\" 2>/dev/null"
-                                    match
-                                    input-file)))
-    (message (format "[%s] Searching is processing..." (prj-project-name)))
-    (set-process-sentinel prj-process-grep 'prj-async-grep-complete)))
+(defun prj-process-grep (match input-file output-file)
+  (message (format "[%s] Searching is processing..." (prj-project-name)))
+  (call-process-shell-command (format "echo \">>>>> %s\" 1>>\"%s\""
+                                      match
+                                      output-file))
+  (setq prj-process-grep (start-process-shell-command
+                          "prj-process-grep"
+                          nil
+                          (format "xargs grep -snH \"%s\" < \"%s\" 1>>\"%s\" 2>/dev/null"
+                                  match
+                                  input-file
+                                  output-file))
+        ;; Remember filename of output file.
+        prj-grep-output-file output-file)
+  ;; add process sentinel.
+  (set-process-sentinel prj-process-grep 'prj-async-grep-complete))
 
 (defun prj-async-grep-complete (process message)
   (cond
    ((eq (process-status process) 'run))
    ((memq (process-status process) '(stop exit signal))
-    (prj-with-search-buffer
-      (goto-char (point-max))
-      (unless (looking-back "\n")
-        (insert "\n"))
-      (insert "<<<<<\n\n")
-      (save-buffer 0)
-      (setq buffer-read-only t
-            prj-process-grep nil))
-    (let ((buffer (get-buffer prj-searchdb-name)))
-      (unless (eq (current-buffer) buffer)
-        (when (string= "yes" (ido-completing-read
-                              (format "[%s] Searching is done, display? "
-                                      (prj-project-name))
-                              '("yes" "no") nil t))
-          (switch-to-buffer buffer)))))))
+    (setq prj-process-grep nil)
+    (find-file prj-grep-output-file)
+    (goto-char (point-max))
+    (unless (looking-back "\n")
+      (insert "\n"))
+    (insert "<<<<<\n\n")
+    (save-buffer 0)
+    (switch-to-buffer (current-buffer)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Back-ends ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -172,7 +166,8 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
      (if (and (processp prj-process-grep)
               (process-live-p prj-process-grep))
          (message "Searching is under processing, please wait...")
-       (let* ((data (car args))
+       (let* ((data (nth 0 args))
+              (output-file (nth 1 args))
               (match (plist-get data :match))
               (doctypes (plist-get data :doctypes))
               (filepaths (plist-get data :filepaths))
@@ -190,9 +185,9 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
            (and (> (length history) prj-search-history-max)
                 (setcdr (nthcdr (1- prj-search-history-max) history) nil))
            (prj-plist-put prj-config :search-history history)
-           (prj-export-json (prj-config-path) prj-config))
+           (prj-export-config))
          ;; TODO: support filepaths and doctypes
          ;; Start to search.
-         (prj-process-grep match (prj-filedb-path "all")))))))
+         (prj-process-grep match (prj-filedb-path "all") output-file))))))
 
 (provide 'prj-default-backend)

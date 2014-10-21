@@ -37,26 +37,6 @@
  '(tooltip ((t (:background "cornsilk" :foreground "Black" :weight bold :family "Monaco")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Oops Extension ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defun oops-update-loadpath (base exclude)
-  "Add sub-directories recursively to `load-path'.
-The `base' should be a directory string and the `exclude' should be a list that to be skipped."
-  (dolist (f (directory-files base))
-    (let ((name (concat base "/" f)))
-      (when (and (file-directory-p name)
-                 (not (member f exclude)))
-        (oops-update-loadpath name exclude))))
-  (add-to-list 'load-path base))
-(oops-update-loadpath "~/.emacs.d" '("." ".." ".svn" ".git"))
-
-(require 'oops)
-(oops-default-config)
-
-(require 'semantic)
-(require 'auto-complete)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Key Binding ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; ESC
@@ -137,3 +117,22 @@ The `base' should be a directory string and the `exclude' should be a list that 
 (global-set-key (kbd "s-<backspace>") 'delete-forward-char)
 (global-set-key (kbd "C-s-<backspace>") 'kill-word)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Oops Extension ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun oops-update-loadpath (base exclude)
+  "Add sub-directories recursively to `load-path'.
+The `base' should be a directory string and the `exclude' should be a list that to be skipped."
+  (dolist (f (directory-files base))
+    (let ((name (concat base "/" f)))
+      (when (and (file-directory-p name)
+                 (not (member f exclude)))
+        (oops-update-loadpath name exclude))))
+  (add-to-list 'load-path base))
+(oops-update-loadpath "~/.emacs.d" '("." ".." ".svn" ".git"))
+
+(require 'oops)
+(oops-default-config)
+
+(require 'semantic)
+(require 'auto-complete)

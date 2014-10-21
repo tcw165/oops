@@ -31,6 +31,7 @@
 ;; Built-in extensions
 (require 'font-lock)
 (require 'saveplace)
+
 ;; 3rd party extensions.
 (require 'hl-anything)
 
@@ -80,34 +81,6 @@
              (propertize "d" 'face 'tooltip)
              (propertize "q" 'face 'tooltip))))
 
-(defun grep-get-kill-regions ()
-  (if mark-active
-      (let ((beg (region-beginning))
-            (end (region-end))
-            reg-beg reg-end regions)
-        (if (= (buffer-size) (- end beg))
-            (setq regions `((1 . ,(point-max))))
-          ;; TODO: Large region slows very much.
-          (save-excursion
-            (goto-char beg)
-            (while (<= (point) end)
-              (if (grep-is-valid-item)
-                  (progn
-                    (unless reg-beg
-                      (setq reg-beg (line-beginning-position 1)))
-                    (setq reg-end (line-beginning-position 2)))
-                (when (and reg-beg reg-end)
-                  (setq regions (append regions `((,reg-beg . ,reg-end)))
-                        reg-beg nil
-                        reg-end nil)))
-              (forward-line))
-            (when (and reg-beg reg-end)
-              (setq regions (append regions `((,reg-beg . ,reg-end)))))))
-        regions)
-    (when (grep-is-valid-item)
-      ;; TODO: what if there's nothing between ">>>>>" and "<<<<<"?
-      `((,(line-beginning-position 1) . ,(line-beginning-position 2))))))
-
 (defun grep-is-valid-item ()
   (save-excursion
     (beginning-of-line)
@@ -115,21 +88,39 @@
              (looking-at "<<<<<")
              (looking-at "$")))))
 
+(defun grep-clean-empty-item ()
+  (save-excursion
+    (goto-char 1)
+    (while (re-search-forward "^>>>>>.*\n<<<<<" nil t)
+      (goto-char (match-beginning 0))
+      (delete-region (line-beginning-position 1)
+                     (line-beginning-position 4)))))
+
 ;;;###autoload
 (defun grep-kill-item-at-point ()
   (interactive)
-  (setq buffer-read-only nil)
-  (dolist (bound (grep-get-kill-regions))
-    (delete-region (car bound) (cdr bound)))
-  (and (buffer-modified-p)
-       (save-buffer))
-  (setq buffer-read-only t))
+  (if mark-active
+      (let ((end-mark (set-marker (copy-marker (mark-marker) t) (region-end))))
+        ;; TODO: Large region slows very much.
+        (goto-char (region-beginning))
+        (beginning-of-line)
+        (setq mark-active nil)
+        (while (< (point) (marker-position end-mark))
+          (if (grep-is-valid-item)
+              (delete-region (line-beginning-position 1)
+                             (line-beginning-position 2))
+            (forward-line)))
+        (set-marker end-mark nil))
+    (and (grep-is-valid-item)
+         (delete-region (line-beginning-position 1)
+                        (line-beginning-position 2))))
+  (save-buffer))
 
 ;;;###autoload
 (defun grep-kill-buffer ()
   (interactive)
-  (when (buffer-modified-p)
-    (save-buffer))
+  (and (buffer-modified-p)
+       (save-buffer))
   (kill-buffer))
 
 ;;;###autoload
@@ -159,7 +150,8 @@
         ;; Header line.
         header-line-format grep-mode-header-line
         ;; Bottom line.
-        mode-line-format grep-mode-bottom-line))
+        mode-line-format grep-mode-bottom-line)
+  (add-hook 'before-save-hook 'grep-clean-empty-item nil t))
 
 ;; Add association when required.
 (add-to-list 'auto-mode-alist '("\\.grep\\'" . grep-mode))

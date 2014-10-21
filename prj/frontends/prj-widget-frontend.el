@@ -40,9 +40,6 @@
   "Face for pressed button."
   :group 'prj-group)
 
-(defvar prj-widget-callback nil)
-(make-variable-buffer-local 'prj-widget-callback)
-
 (defvar prj-widget-textfield nil)
 (make-variable-buffer-local 'prj-widget-textfield)
 
@@ -64,17 +61,122 @@
 (defvar prj-widget-skip-comment nil)
 (make-variable-buffer-local 'prj-widget-skip-comment)
 
+(defmacro prj-with-widget (name ok-notify &rest body)
+  (declare (indent 1) (debug t))
+  `(progn
+     (switch-to-buffer (get-buffer-create ,name))
+     ;; TODO: fix compatibility with `company'.
+     ;; Face
+     (setq-local widget-image-enable nil)
+     (setq-local widget-button-face 'prj-button-face)
+     (setq-local widget-button-pressed-face 'prj-button-pressed-face)
+     (setq-local widget-mouse-face 'prj-button-mouse-face)
+     (setq-local widget-push-button-prefix " ")
+     (setq-local widget-push-button-suffix " ")
+     (setq header-line-format '((:eval (format "  %s"
+                                               (propertize ,name
+                                                           'face 'bold)))
+                                " | "
+                                (:eval (format "%s or %s to jump among widgets."
+                                               (propertize " TAB "
+                                                           'face 'tooltip)
+                                               (propertize " Shift-TAB "
+                                                           'face 'tooltip)))))
+     (widget-insert "\n")
+     ;; ==> body
+     ,@body
+     ;; <=======
+     (widget-insert "\n")
+     (widget-create 'push-button
+                    :notify ,ok-notify
+                    "ok")
+     (widget-insert " ")
+     (widget-create 'push-button
+                    :notify (lambda (&rest ignore)
+                              (kill-buffer))
+                    "cancel")
+     ;; Make some TAB do something before its original task.
+     (add-hook 'widget-forward-hook 'prj-widget-forward-or-company t t)
+     (use-local-map widget-keymap)
+     (widget-setup)
+     ;; Move point to 1st editable-field.
+     (let ((field (car widget-field-list)))
+       (when field
+         (goto-char (widget-field-end field))))
+     ;; Enable specific feature.
+     (when (featurep 'company)
+       (company-mode)
+       (make-local-variable 'company-backends)
+       (add-to-list 'company-backends 'prj-browse-file-backend))))
+
+(defmacro prj-widget-checkbox-select-all (checkboxes)
+  `(lambda (&rest ignore)
+     (dolist (box ,checkboxes)
+       (widget-value-set box t))))
+
+(defmacro prj-widget-checkbox-deselect-all (checkboxes)
+  `(lambda (&rest ignore)
+     (dolist (box ,checkboxes)
+       (widget-value-set box nil))))
+
+(defun prj-thingatpt ()
+  "Return a list, (REGEXP_STRING BEG END), on which the point is or just string of selection."
+  (if mark-active
+      (buffer-substring-no-properties (region-beginning) (region-end))
+    (let ((bound (bounds-of-thing-at-point 'symbol)))
+      (and bound
+           (buffer-substring-no-properties (car bound) (cdr bound))))))
+
+(defun prj-format-doctype (doctype)
+  (format "%s (%s)"
+          doctype
+          (cdr (assoc doctype prj-document-types))))
+
+(defun prj-widget-doctypes ()
+  "Return a plist of selected document types."
+  (let (doctypes)
+    (dolist (checkbox prj-widget-doctypes)
+      (let ((doctype (and (widget-value checkbox)
+                          (widget-get checkbox :data))))
+        (when doctype
+          (setq doctypes (append doctypes `(,doctype))))))
+    doctypes))
+
+(defun prj-widget-filepaths ()
+  "Return a list of file paths."
+  (let (filepaths)
+    (dolist (file (widget-value prj-widget-filepaths))
+      (when (and (> (length file) 2)
+                 (file-exists-p file))
+        (setq file (expand-file-name file)
+              ;; Add '/' postfix if it is a directory.
+              file (if (and (file-directory-p file)
+                            (not (string-match "\/$" file)))
+                       (concat file "/")
+                     file)
+              filepaths (append filepaths `(,file)))))
+    filepaths))
+
+(defun prj-widget-checkboxes ()
+  (let (ret)
+    (dolist (checkbox prj-widget-checkboxes)
+      (let ((data (and (widget-value checkbox)
+                       (widget-get checkbox :data))))
+        (when data
+          (setq ret (append ret `(,data))))))
+    ret))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Front-Ends ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
-(defun prj-create-project-widget-frontend (command &optional callback &rest args)
+(defun prj-create-project-widget-frontend (command &rest args)
   (case command
     (:create-project
      (prj-with-widget "*Create Project*"
        ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        (lambda (&rest ignore)
-         (let ((callback prj-widget-callback)
-               (name (widget-value prj-widget-textfield))
+         (let ((name (widget-value prj-widget-textfield))
                (doctypes (prj-widget-doctypes))
                (filepaths (prj-widget-filepaths)))
            (unless (> (length name) 0)
@@ -84,13 +186,12 @@
            (unless (> (length filepaths) 0)
              (error "No valid file path!"))
            (kill-buffer)
-           (funcall callback `(:name ,name :doctypes ,doctypes
+           (funcall 'prj-create-project-impl `(:name ,name :doctypes ,doctypes
                                      :filepaths ,filepaths))))
 
        ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        ;; Widget for project name.
-       (setq prj-widget-callback callback
-             prj-widget-textfield (widget-create 'editable-field
+       (setq prj-widget-textfield (widget-create 'editable-field
                                                  :format "Project Name: %v"))
        (widget-insert "\n")
        (widget-insert "Document Types (Edit) ") ;; TODO: add customizable link
@@ -130,21 +231,19 @@ remove one.\n"
           (kill-buffer "*Create Project*")))))
 
 ;;;###autoload
-(defun prj-delete-project-widget-frontend (command &optional callback &rest args)
+(defun prj-delete-project-widget-frontend (command &rest args)
   (case command
     (:delete-project
      (prj-with-widget "*Delete Project*"
        ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        (lambda (&rest ignore)
-         (let ((callback prj-widget-callback)
-               (projects (prj-widget-checkboxes)))
+         (let ((projects (prj-widget-checkboxes)))
            (unless (> (length projects) 0)
              (error "No project is selected!"))
            (kill-buffer)
-           (funcall callback projects)))
+           (funcall 'prj-delete-project-impl projects)))
 
        ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-       (setq prj-widget-callback callback)
        (widget-insert "Delete project ")
        (widget-create 'push-button
                       :notify (prj-widget-checkbox-select-all prj-widget-checkboxes)
@@ -177,37 +276,36 @@ remove one.\n"
           (kill-buffer "*Delete Project*")))))
 
 ;;;###autoload
-(defun prj-load-project-widget-frontend (command &optional callback &rest args)
+(defun prj-load-project-widget-frontend (command &rest args)
   (case command
     (:load-project
      (let ((projects (car args)))
        (if projects
            ;; Prompt user to load project and return project name.
-           (funcall callback (ido-completing-read "Load project: " projects nil t))
+           (funcall 'prj-load-project-impl
+                    (ido-completing-read "Load project: " projects nil t))
          (if (prj-project-p)
              (message "[%s] No other project in the workspace!" (prj-project-name))
            (message "No project in the workspace. Please create new project!")))))))
 
 ;;;###autoload
-(defun prj-edit-project-widget-frontend (command &optional callback &rest args)
+(defun prj-edit-project-widget-frontend (command &rest args)
   (case command
     (:edit-project
      (prj-with-widget "*Edit Project*"
        ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        (lambda (&rest ignore)
-         (let ((callback prj-widget-callback)
-               (doctypes (prj-widget-doctypes))
+         (let ((doctypes (prj-widget-doctypes))
                (filepaths (prj-widget-filepaths)))
            (unless (> (length doctypes) 0)
              (error "No document types is selected!"))
            (unless (> (length filepaths) 0)
              (error "No valid file path!"))
            (kill-buffer)
-           (funcall callback
+           (funcall 'prj-edit-project-impl
                     `(:doctypes ,doctypes :filepaths ,filepaths))))
 
        ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-       (setq prj-widget-callback callback)
        (widget-insert (format "Project Name: %s\n\n"
                               (propertize (prj-project-name)
                                           'face 'widget-field)))
@@ -244,18 +342,15 @@ remove one.\n"
           (kill-buffer "*Edit Project*")))))
 
 ;;;###autoload
-(defun prj-find-file-frontend (command &optional callback &rest args)
+(defun prj-find-file-frontend (command &rest args)
   (case command
     (:find-file
-     (let ((callback callback)
-           (files (nth 0 args))
+     (let ((files (nth 0 args))
            (prompt (format "[%s] Find file: " (prj-project-name))))
-       (funcall callback (ido-completing-read
-                          prompt
-                          files))))))
+       (funcall 'prj-find-file-impl (ido-completing-read prompt files))))))
 
 ;;;###autoload
-(defun prj-search-project-widget-frontend (command &optional callback &rest args)
+(defun prj-search-project-widget-frontend (command &rest args)
   (case command
     (:search-project
      (let ((thing (prj-thingatpt))
@@ -263,8 +358,7 @@ remove one.\n"
        (prj-with-widget "*Search Project*"
          ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
          (lambda (&rest ignore)
-           (let ((callback prj-widget-callback)
-                 (match (widget-value prj-widget-textfield))
+           (let ((match (widget-value prj-widget-textfield))
                  (doctypes (prj-widget-doctypes))
                  (filepaths nil)
                  (casefold (widget-value prj-widget-case-sensitive))
@@ -275,7 +369,7 @@ remove one.\n"
              (unless (> (length doctypes) 0)
                (error "No document types is selected!"))
              (kill-buffer)
-             (funcall callback
+             (funcall 'prj-search-project-impl
                       `(:match ,match :doctypes ,doctypes
                                :filepaths ,filepaths
                                :casefold ,casefold
@@ -283,7 +377,6 @@ remove one.\n"
                                :skip-comment ,skip-comment))))
 
          ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-         (setq prj-widget-callback callback)
          ;; Widget for search.
          (setq prj-widget-textfield
                (widget-create 'editable-field
@@ -346,115 +439,7 @@ remove one.\n"
           (kill-buffer "*Search Project*")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defmacro prj-with-widget (name ok-notify &rest body)
-  (declare (indent 1) (debug t))
-  `(progn
-     (switch-to-buffer (get-buffer-create ,name))
-     ;; TODO: fix compatibility with `company'.
-     ;; Face
-     (setq-local widget-image-enable nil)
-     (setq-local widget-button-face 'prj-button-face)
-     (setq-local widget-button-pressed-face 'prj-button-pressed-face)
-     (setq-local widget-mouse-face 'prj-button-mouse-face)
-     (setq-local widget-push-button-prefix " ")
-     (setq-local widget-push-button-suffix " ")
-     (setq header-line-format '((:eval (format "  %s"
-                                               (propertize ,name
-                                                           'face 'bold)))
-                                " | "
-                                (:eval (format "%s or %s to jump among widgets."
-                                               (propertize " TAB "
-                                                           'face 'tooltip)
-                                               (propertize " Shift-TAB "
-                                                           'face 'tooltip)))))
-     (widget-insert "\n")
-     ;; ==> body
-     ,@body
-     ;; <=======
-     (widget-insert "\n")
-     (widget-create 'push-button
-                    :notify ,ok-notify
-                    "ok")
-     (widget-insert " ")
-     (widget-create 'push-button
-                    :notify (lambda (&rest ignore)
-                              (kill-buffer))
-                    "cancel")
-     ;; Make some TAB do something before its original task.
-     (add-hook 'widget-forward-hook 'prj-widget-forward-or-company t t)
-     (use-local-map widget-keymap)
-     (widget-setup)
-     ;; Move point to 1st editable-field.
-     (let ((field (car widget-field-list)))
-       (when field
-         (goto-char (widget-field-end field))))
-     ;; Enable specific feature.
-     (when (featurep 'company)
-       (company-mode)
-       (make-local-variable 'company-backends)
-       (add-to-list 'company-backends 'prj-browse-file-backend))))
-
-(defmacro prj-widget-checkbox-select-all (checkboxes)
-  `(lambda (&rest ignore)
-     (dolist (box ,checkboxes)
-       (widget-value-set box t))))
-
-(defmacro prj-widget-checkbox-deselect-all (checkboxes)
-  `(lambda (&rest ignore)
-     (dolist (box ,checkboxes)
-       (widget-value-set box nil))))
-
-(defun prj-format-doctype (doctype)
-  (format "%s (%s)"
-          doctype
-          (cdr (assoc doctype prj-document-types))))
-
-(defun prj-widget-doctypes ()
-  "Return a plist of selected document types."
-  (let (doctypes)
-    (dolist (checkbox prj-widget-doctypes)
-      (let ((doctype (and (widget-value checkbox)
-                          (widget-get checkbox :data))))
-        (when doctype
-          (setq doctypes (append doctypes `(,doctype))))))
-    doctypes))
-
-(defun prj-widget-filepaths ()
-  "Return a list of file paths."
-  (let (filepaths)
-    (dolist (file (widget-value prj-widget-filepaths))
-      (when (and (> (length file) 2)
-                 (file-exists-p file))
-        (setq file (expand-file-name file)
-              ;; Add '/' postfix if it is a directory.
-              file (if (and (file-directory-p file)
-                            (not (string-match "\/$" file)))
-                       (concat file "/")
-                     file)
-              filepaths (append filepaths `(,file)))))
-    filepaths))
-
-(defun prj-widget-checkboxes ()
-  (let (ret)
-    (dolist (checkbox prj-widget-checkboxes)
-      (let ((data (and (widget-value checkbox)
-                       (widget-get checkbox :data))))
-        (when data
-          (setq ret (append ret `(,data))))))
-    ret))
-
-(defun prj-thingatpt ()
-  "Return a list, (REGEXP_STRING BEG END), on which the point is or just string of selection."
-  (if mark-active
-      (buffer-substring-no-properties (region-beginning) (region-end))
-    (let ((bound (bounds-of-thing-at-point 'symbol)))
-      (and bound
-           (buffer-substring-no-properties (car bound) (cdr bound))))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; back-ends for `company' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
 (defun prj-browse-file-backend (command &optional arg &rest ign)
