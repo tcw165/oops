@@ -343,9 +343,9 @@ user loads a project or unload a project."
   (plist-get prj-config :search-history))
 
 ;;;###autoload
-(defun prj-project-files (&optional doctypes filepaths)
+(defun prj-project-files (&optional doctypes filepaths return-list)
   "Return a list containing files in current project."
-  (prj-call-backends :find-files doctypes filepaths))
+  (prj-call-backends :find-files doctypes filepaths return-list))
 
 ;;;###autoload
 (defun prj-export-config ()

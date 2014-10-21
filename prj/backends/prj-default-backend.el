@@ -156,7 +156,7 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
            (insert all-files)))))))
 
 ;;;###autoload
-(defun prj-find-files-backend (command &optional doctypes filepaths)
+(defun prj-find-files-backend (command &optional doctypes filepaths return-list)
   (case command
     (:init)
     (:destroy)
