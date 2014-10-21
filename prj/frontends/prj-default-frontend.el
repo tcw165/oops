@@ -186,8 +186,7 @@
            (unless (> (length filepaths) 0)
              (error "No valid file path!"))
            (kill-buffer)
-           (funcall 'prj-create-project-impl `(:name ,name :doctypes ,doctypes
-                                     :filepaths ,filepaths))))
+           (funcall 'prj-create-project-impl name doctypes filepaths)))
 
        ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        ;; Widget for project name.
@@ -301,8 +300,7 @@ remove one.\n"
            (unless (> (length filepaths) 0)
              (error "No valid file path!"))
            (kill-buffer)
-           (funcall 'prj-edit-project-impl
-                    `(:doctypes ,doctypes :filepaths ,filepaths))))
+           (funcall 'prj-edit-project-impl doctypes filepaths)))
 
        ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        (widget-insert (format "Project Name: %s\n\n"
@@ -369,12 +367,8 @@ remove one.\n"
              (unless (> (length doctypes) 0)
                (error "No document types is selected!"))
              (kill-buffer)
-             (funcall 'prj-search-project-impl
-                      `(:match ,match :doctypes ,doctypes
-                               :filepaths ,filepaths
-                               :casefold ,casefold
-                               :word-only ,word-only
-                               :skip-comment ,skip-comment))))
+             ;; TODO:
+             (funcall 'prj-search-project-impl mathc)))
 
          ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
          ;; Widget for search.
