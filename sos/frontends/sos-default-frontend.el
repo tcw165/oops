@@ -445,6 +445,7 @@ into the stack when user navigate to deeper definition in the definition window.
     (suppress-keymap map t)
     (define-key map [?e] '(lambda () (interactive) (sos-goto-definition-from-candidates)))
     (define-key map [?q] '(lambda () (interactive) (kill-buffer (current-buffer))))
+    (define-key map [escape] '(lambda () (interactive) (kill-buffer (current-buffer))))
     (define-key map [left] '(lambda () (interactive) (sos-left-char)))
     (define-key map [right] '(lambda () (interactive) (sos-right-char)))
     (define-key map [up] '(lambda () (interactive) (sos-previous-line)))

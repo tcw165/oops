@@ -42,6 +42,7 @@
                                        (prj-project-name)))))
     (if name
         (format "%s/%s.files" dir (or (and (string= name "all") name)
+                                      (and (string= name "temp") name)
                                       (secure-hash 'sha1 name)))
       dir)))
 
@@ -59,7 +60,7 @@
       (insert-file-contents filename)
       (read (buffer-string)))))
 
-(defun prj-convert-filepaths (filepaths)
+(defun prj-list-to-cmd-form (filepaths)
   (let ((filepath filepaths)
         ret)
     (while filepath
@@ -69,19 +70,17 @@
            (setq ret (concat ret " "))))
     ret))
 
-(defun prj-convert-matches (doctype)
+(defun prj-matches-to-find-form (doctype &optional is-exclude)
   "Convert DOCTYPE to string as include-path parameter for FIND.
-e.g. *.md;*.el;*.txt => -name *.md -o -name *.el -o -name *.txt"
-  (and (stringp doctype)
-       (let ((matches (concat "\"-name\" \"" doctype "\"")))
-         (replace-regexp-in-string ";" "\" \"-o\" \"-name\" \"" matches))))
-
-(defun prj-convert-excludes (doctype)
-  "Convert DOCTYPE to string as exclude-path parameter for FIND.
-e.g. .git;.svn => ! -name .git ! -name .svn"
-  (and (stringp doctype)
-       (let ((matches (concat "\"!\" \"-name\" \"" doctype "\"")))
-         (replace-regexp-in-string ";" "\" \"!\" \"-name\" \"" matches))))
+Example:
+  *.md;*.el;*.txt   =>   -name *.md -o -name *.el -o -name *.txt
+If `is-exclude' is t:
+  *.git;*.svn       =>   ! -name .git ! -name .svn"
+  (if is-exclude
+      (let ((matches (concat "! -name \"" doctype "\"")))
+        (replace-regexp-in-string ";" "\" ! -name \"" matches))
+    (let ((matches (concat "-name \"" doctype "\"")))
+      (replace-regexp-in-string ";" "\" -o -name \"" matches))))
 
 (defun prj-process-find (output filepaths &optional matches excludes)
   "Use `call-process' to call FIND. FILEPATHS is a file list, (FILE1 FILE2 ...).
@@ -99,6 +98,13 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
 (defun prj-process-find-change ()
   ;; TODO:
   t)
+
+(defun prj-matches-to-grep-form (doctype)
+  "Convert DOCTYPE to string as include-path parameter for FIND.
+Example:
+  *.md;*.el;*.txt   =>   -name *.md -o -name *.el -o -name *.txt"
+  (let ((matches (concat "-name \"" doctype "\"")))
+    (replace-regexp-in-string ";" "\" -o -name \"" matches)))
 
 (defun prj-process-grep (match input-file output-file)
   (message (format "[%s] Searching is processing..." (prj-project-name)))
@@ -144,11 +150,13 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
      (let (all-files)
        ;; Collect files in respect of document types.
        (dolist (doctype (prj-project-doctypes))
-         (setq all-files (concat all-files (prj-process-find
-                                            (prj-filedb-path doctype)
-                                            (prj-convert-filepaths (prj-project-filepaths))
-                                            (prj-convert-matches (cdr (assoc doctype prj-document-types)))
-                                            (prj-convert-excludes prj-exclude-types)))))
+         (setq all-files (concat
+                          all-files
+                          (prj-process-find
+                           (prj-filedb-path doctype)
+                           (prj-list-to-cmd-form (prj-project-filepaths))
+                           (prj-matches-to-find-form (cdr (assoc doctype prj-document-types)))
+                           (prj-matches-to-find-form prj-exclude-types t)))))
        ;; Export all database.
        (when all-files
          (setq prj-total-files-cache (split-string all-files "\n" t))
@@ -162,7 +170,13 @@ e.g. .git;.svn => ! -name .git ! -name .svn"
     (:destroy)
     (:find-files
      ;; TODO: Files for specific document type?
-     prj-total-files-cache)))
+     (if return-list
+         prj-total-files-cache
+       ;; (prj-process-grep)
+       (progn
+         ;; (prj-filedb-path "temp")
+         ;; (prj-matches-to-grep-form)
+         )))))
 
 ;;;###autoload
 (defun prj-async-grep-backend (command &optional match input-file output-file)

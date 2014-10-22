@@ -470,7 +470,9 @@ user loads a project or unload a project."
 ;;;###autoload
 (defun prj-count-files ()
   (interactive)
-  (message "[%s] %s total files." (prj-project-name) (length (prj-project-files))))
+  (message "[%s] %s total files."
+           (prj-project-name)
+           (length (prj-project-files nil nil t))))
 
 ;;;###autoload
 (defun prj-create-project ()
@@ -565,7 +567,7 @@ project to be loaded."
   ;; Load project if wasn't loaded.
   (unless (prj-project-p)
     (prj-load-project))
-  (prj-call-frontends :find-files (prj-project-files)))
+  (prj-call-frontends :find-files (prj-project-files nil nil t)))
 
 ;;;###autoload
 (defun prj-search-project ()
