@@ -136,6 +136,9 @@ Example:
     (save-buffer 0)
     (switch-to-buffer (current-buffer)))))
 
+(defun prj-process-cat ()
+  )
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Back-ends ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -170,13 +173,21 @@ Example:
     (:destroy)
     (:find-files
      ;; TODO: Files for specific document type?
-     (if return-list
-         prj-total-files-cache
-       ;; (prj-process-grep)
-       (progn
-         ;; (prj-filedb-path "temp")
-         ;; (prj-matches-to-grep-form)
-         )))))
+     (cond
+      ;; Return "all" file ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+      ((and (null doctypes) (null filepaths) (null return-list))
+       (prj-filedb-path "all"))
+      ;; Return list of all files ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+      ((and (null doctypes) (null filepaths) return-list)
+       prj-total-files-cache)
+      ;; Others ... ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+      (t
+       (let ((file (prj-filedb-path "temp")))
+         ;; Filter document types
+         ;; Filter file paths
+         (if return-list
+             ()
+           file)))))))
 
 ;;;###autoload
 (defun prj-async-grep-backend (command &optional match input-file output-file)

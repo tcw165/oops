@@ -368,7 +368,7 @@ remove one.\n"
                (error "No document types is selected!"))
              (kill-buffer)
              ;; TODO:
-             (funcall 'prj-search-project-impl mathc)))
+             (funcall 'prj-search-project-impl match)))
 
          ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
          ;; Widget for search.
