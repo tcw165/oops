@@ -277,7 +277,7 @@ or go back to just one window (by deleting all but the selected window)."
     (funcall buffer-quit-function))
    ((string-match "^ \\*" (buffer-name (current-buffer)))
     (bury-buffer))
-   ((featurep 'company)
+   (t
     (company-cancel))))
 
 

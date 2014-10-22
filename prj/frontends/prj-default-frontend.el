@@ -105,10 +105,9 @@
                          (widget-field-end (car widget-field-list)))
                     (point)))
      ;; Enable specific feature.
-     (when (featurep 'company)
-       (setq-local company-frontends '(company-preview-frontend))
-       (setq-local company-backends '(company-browse-file-backend))
-       (company-mode 1))))
+     (setq-local company-frontends '(company-preview-frontend))
+     (setq-local company-backends '(company-browse-file-backend))
+     (company-mode 1)))
 
 (defmacro prj-widget-checkbox-select-all (checkboxes)
   `(lambda (&rest ignore)
