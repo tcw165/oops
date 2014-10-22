@@ -18,7 +18,6 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-(require 'cus-edit)
 (require 'widget)
 (require 'wid-edit)
 (require 'tooltip)
@@ -40,6 +39,12 @@
   "Face for pressed button."
   :group 'prj-group)
 
+(defvar prj-widget-keymap
+  (let ((map (copy-keymap (default-value 'widget-keymap))))
+    (define-key map "\t" '(lambda () (interactive) (prj-widget-forward-or-company)))
+    (define-key map [escape] '(lambda () (interactive) (kill-buffer)))
+    map))
+
 (defvar prj-widget-textfield nil)
 (make-variable-buffer-local 'prj-widget-textfield)
 
@@ -57,9 +62,6 @@
 
 (defvar prj-widget-word-only nil)
 (make-variable-buffer-local 'prj-widget-word-only)
-
-(defvar prj-widget-skip-comment nil)
-(make-variable-buffer-local 'prj-widget-skip-comment)
 
 (defmacro prj-with-widget (name ok-notify &rest body)
   (declare (indent 1) (debug t))
@@ -95,19 +97,17 @@
                     :notify (lambda (&rest ignore)
                               (kill-buffer))
                     "cancel")
-     ;; Make some TAB do something before its original task.
-     (add-hook 'widget-forward-hook 'prj-widget-forward-or-company t t)
-     (use-local-map widget-keymap)
+     (use-local-map prj-widget-keymap)
      (widget-setup)
      ;; Move point to 1st editable-field.
-     (let ((field (car widget-field-list)))
-       (when field
-         (goto-char (widget-field-end field))))
+     (goto-char (or (and (car widget-field-list)
+                         (widget-field-end (car widget-field-list)))
+                    (point)))
      ;; Enable specific feature.
      (when (featurep 'company)
-       (company-mode)
-       (make-local-variable 'company-backends)
-       (add-to-list 'company-backends 'prj-browse-file-backend))))
+       (setq-local company-frontends '(company-preview-frontend))
+       (setq-local company-backends '(company-browse-file-backend))
+       (company-mode 1))))
 
 (defmacro prj-widget-checkbox-select-all (checkboxes)
   `(lambda (&rest ignore)
@@ -149,11 +149,15 @@
       (when (and (> (length file) 2)
                  (file-exists-p file))
         (setq file (expand-file-name file)
+              ;; Remove '/' postfix if any.
+              file (or (and (string-match "\\(.*\\)\/$" file)
+                            (match-string 1 file))
+                       file)
               ;; Add '/' postfix if it is a directory.
-              file (if (and (file-directory-p file)
-                            (not (string-match "\/$" file)))
-                       (concat file "/")
-                     file)
+              ;; file (if (and (file-directory-p file)
+              ;;               (not (string-match "\/$" file)))
+              ;;          (concat file "/")
+              ;;        file)
               filepaths (append filepaths `(,file)))))
     filepaths))
 
@@ -224,7 +228,7 @@ remove one.\n"
              (widget-create 'editable-list
                             :entry-format "%i %d path: %v"
                             :value '("")
-                            '(editable-field :company prj-browse-file-backend)))))
+                            '(editable-field :company company-browse-file-backend)))))
     (:destroy
      (and (get-buffer "*Create Project*")
           (kill-buffer "*Create Project*")))))
@@ -333,7 +337,7 @@ remove one.\n"
              (widget-create 'editable-list
                             :entry-format "%i %d path: %v"
                             :value (copy-list (prj-project-filepaths))
-                            '(editable-field :company prj-browse-file-backend)))))
+                            '(editable-field :company company-browse-file-backend)))))
     (:destroy
      (and (get-buffer "*Edit Project*")
           (kill-buffer "*Edit Project*")))))
@@ -358,17 +362,16 @@ remove one.\n"
          (lambda (&rest ignore)
            (let ((match (widget-value prj-widget-textfield))
                  (doctypes (prj-widget-doctypes))
-                 (filepaths nil)
-                 (casefold (widget-value prj-widget-case-sensitive))
-                 (word-only (widget-value prj-widget-word-only))
-                 (skip-comment (widget-value prj-widget-skip-comment)))
+                 (filepaths (prj-widget-filepaths))
+                 (case-sensitive (widget-value prj-widget-case-sensitive))
+                 (word-only (widget-value prj-widget-word-only)))
              (unless (> (length match) 0)
                (error "Empty search!"))
              (unless (> (length doctypes) 0)
                (error "No document types is selected!"))
              (kill-buffer)
-             ;; TODO:
-             (funcall 'prj-search-project-impl match)))
+             (funcall 'prj-search-project-impl
+                      match doctypes filepaths case-sensitive word-only)))
 
          ;; Body ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
          ;; Widget for search.
@@ -383,14 +386,10 @@ remove one.\n"
          (setq prj-widget-case-sensitive
                (widget-create 'checkbox
                               :format "%[%v%] Case Sensitive  "
-                              :value t))
+                              :value nil))
          (setq prj-widget-word-only
                (widget-create 'checkbox
                               :format "%[%v%] Match Whole Word  "))
-         (setq prj-widget-skip-comment
-               (widget-create 'checkbox
-                              :format "%[%v%] Skip Comments\n"
-                              :value t))
          (widget-insert "\n")
          (widget-insert "Document Types ")
          (widget-create 'push-button
@@ -411,23 +410,19 @@ remove one.\n"
                                                       "\n")
                                       :value t)
                    prj-widget-doctypes (append prj-widget-doctypes `(,wid)))))
+         ;; Widget for filepaths.
          (widget-insert "\n")
          (widget-insert "Search Path:\n")
-         ;; Widget for filepaths.
          (dolist (path-root (prj-project-filepaths))
-           (let ((path-root (propertize path-root
-                                        'face 'font-lock-string-face))
-                 wid)
-             (when (file-directory-p path-root)
-               (setq wid (widget-create 'editable-list
-                                        :entry-format (concat "%i %d "
-                                                              path-root
-                                                              "%v")
-                                        :value '("")
-                                        '(editable-field
-                                          :company prj-browse-file-backend))
-                     prj-widget-filepaths (append prj-widget-filepaths
-                                                  `(,wid)))))))))
+           (let ((path-root (abbreviate-file-name path-root)))
+             (when (file-exists-p path-root)
+               (setq company-file-prefix (append company-file-prefix
+                                                 `(,path-root))))))
+         (setq prj-widget-filepaths
+               (widget-create 'editable-list
+                              :entry-format "%i %d path: %v"
+                              :value '("")
+                              '(editable-field :company company-browse-file-backend))))))
     (:destroy
      (and (get-buffer "*Search Project*")
           (kill-buffer "*Search Project*")))))
@@ -435,42 +430,17 @@ remove one.\n"
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; back-ends for `company' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;;;###autoload
-(defun prj-browse-file-backend (command &optional arg &rest ign)
-  "The backend based on `company' to provide convenience when browsing files."
-  (case command
-    (prefix
-     (prj-common-prefix 'prj-browse-file-backend))
-    (candidates
-     (let* ((prefix arg)
-            (dir (or (and (file-directory-p prefix)
-                          prefix)
-                     (file-name-directory prefix)))
-            path candidates directories)
-       (and dir
-            (unless (equal dir (car prj-browse-file-cache))
-              (dolist (file (prj-directory-files dir (prj-to-regexp prj-exclude-types)))
-                (setq path (prj-concat-filepath dir file))
-                (push path candidates)
-                ;; Add one level of children.
-                (when (file-directory-p path)
-                  (push path directories)))
-              (dolist (directory (reverse directories))
-                (ignore-errors
-                  (dolist (child (prj-directory-files directory (prj-to-regexp prj-exclude-types)))
-                    (setq path (prj-concat-filepath directory child))
-                    (push path candidates))))
-              (setq prj-browse-file-cache (cons dir (nreverse candidates)))))
-       (all-completions prefix
-                        (cdr prj-browse-file-cache))))
-    (ignore-case t)))
-
 (defvar prj-browse-file-cache nil
   "Storing (DIR . (CANDIDATES...)) for completion.")
 (make-variable-buffer-local 'prj-browse-file-cache)
 
+(defvar company-file-prefix nil
+  "Storing (DIR . (CANDIDATES...)) for completion.")
+(make-variable-buffer-local 'company-file-prefix)
+
 (defun prj-concat-filepath (dir file)
-  "Return a full path combined with `dir' and `file'. It saves you the worry of whether to append '/' or not."
+  "Return a full path combined with `dir' and `file'. It saves you the worry of 
+whether to append '/' or not."
   (concat dir
           (unless (eq (aref dir (1- (length dir))) ?/) "/")
           file))
@@ -509,24 +479,51 @@ remove one.\n"
     (setq regexp (replace-regexp-in-string "\\\\|$" "" regexp)
           regexp (concat "\\(" regexp "\\)"))))
 
+(defun company-widget-p ()
+  (let* ((field (widget-field-at (point)))
+         (field-backend (and field (widget-get field :company))))
+    (and field field-backend
+         (eq field-backend 'company-browse-file-backend))))
+
 (defun prj-widget-forward-or-company ()
   "It is for `widget-forward-hook' to continue forward to next widget or show company prompt."
-  (interactive)
-  (and (or (prj-common-prefix 'prj-browse-file-backend))
-       (company-complete)
-       (top-level)))
+  (if (company-widget-p)
+      (company-complete)
+    (widget-forward 1)))
 
-(defun prj-common-prefix (backend)
-  "The function responds 'prefix for `prj-browse-file-backend'. Return nil means skip this backend function; Any string means there're candidates should be prompt. Only the editable-field with :file-browse property is allowed."
-  (let* ((field (widget-field-at (point)))
-         (field-backend (and field
-                             (widget-get field :company))))
-    (if (and field field-backend
-             (eq field-backend backend))
-        (let* ((start (widget-field-start field))
-               (end (widget-field-end field))
-               (prefix (buffer-substring-no-properties start end)))
-          prefix)
-      nil)))
+;;;###autoload
+(defun company-browse-file-backend (command &optional arg &rest ign)
+  "The backend based on `company' to provide convenience when browsing files."
+  (case command
+    (prefix
+     (let* ((field (widget-field-at (point)))
+            (start (widget-field-start field))
+            (end (widget-field-end field)))
+       (if (= start end)
+           "~/"
+         (buffer-substring-no-properties start end))))
+    (candidates
+     (let* ((prefix arg)
+            (dir (or (and (file-directory-p prefix)
+                          prefix)
+                     (file-name-directory prefix)))
+            path candidates directories)
+       (and dir
+            (unless (equal dir (car prj-browse-file-cache))
+              (dolist (file (prj-directory-files dir (prj-to-regexp prj-exclude-types)))
+                (setq path (prj-concat-filepath dir file))
+                (push path candidates)
+                ;; Add one level of children.
+                (when (file-directory-p path)
+                  (push path directories)))
+              (dolist (directory (reverse directories))
+                (ignore-errors
+                  (dolist (child (prj-directory-files directory (prj-to-regexp prj-exclude-types)))
+                    (setq path (prj-concat-filepath directory child))
+                    (push path candidates))))
+              (setq prj-browse-file-cache (cons dir (nreverse candidates)))))
+       (all-completions prefix
+                        (cdr prj-browse-file-cache))))
+    (ignore-case t)))
 
 (provide 'prj-default-frontend)

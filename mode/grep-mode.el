@@ -55,6 +55,7 @@
     ;; (define-key map [down] )
     (define-key map [return] 'grep-open-item)
     (define-key map [?q] 'grep-kill-buffer)
+    (define-key map [escape] 'grep-kill-buffer)
     (define-key map [?d] 'grep-kill-item-at-point)
     map))
 

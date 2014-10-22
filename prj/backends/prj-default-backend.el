@@ -42,7 +42,7 @@
                                        (prj-project-name)))))
     (if name
         (format "%s/%s.files" dir (or (and (string= name "all") name)
-                                      (and (string= name "temp") name)
+                                      (and (string-match "^temp.*" name) name)
                                       (secure-hash 'sha1 name)))
       dir)))
 
@@ -106,7 +106,7 @@ Example:
   (let ((matches (concat "-name \"" doctype "\"")))
     (replace-regexp-in-string ";" "\" -o -name \"" matches)))
 
-(defun prj-process-grep (match input-file output-file)
+(defun prj-process-async-grep (match input-file output-file case-sensitive)
   (message (format "[%s] Searching is processing..." (prj-project-name)))
   (call-process-shell-command (format "echo \">>>>> %s\" 1>>\"%s\""
                                       match
@@ -114,7 +114,8 @@ Example:
   (setq prj-process-grep (start-process-shell-command
                           "prj-process-grep"
                           nil
-                          (format "xargs grep -snH \"%s\" < \"%s\" 1>>\"%s\" 2>/dev/null"
+                          (format "xargs grep -nH %s \"%s\" < \"%s\" 1>>\"%s\" 2>/dev/null"
+                                  (if (null case-sensitive) "-i" "")
                                   match
                                   input-file
                                   output-file))
@@ -136,8 +137,17 @@ Example:
     (save-buffer 0)
     (switch-to-buffer (current-buffer)))))
 
-(defun prj-process-cat ()
-  )
+(defun prj-process-sync-grep (match input-file output-file case-sensitive)
+  (call-process-shell-command (format "grep %s \"%s\" \"%s\" 1>>\"%s\" 2>/dev/null"
+                                      (if (null case-sensitive) "-i" "")
+                                      match
+                                      input-file
+                                      output-file)))
+
+(defun prj-process-cat (input-file output-file)
+  (call-process-shell-command (format "cat \"%s\" 1>>\"%s\" 2>/dev/null"
+                                      input-file
+                                      output-file)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Back-ends ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -172,7 +182,10 @@ Example:
     (:init)
     (:destroy)
     (:find-files
-     ;; TODO: Files for specific document type?
+     (unless (listp doctypes)
+       (error "The parameter, doctypes, must be a list!"))
+     (unless (listp filepaths)
+       (error "The parameter, filepaths, must be a list!"))
      (cond
       ;; Return "all" file ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
       ((and (null doctypes) (null filepaths) (null return-list))
@@ -182,15 +195,29 @@ Example:
        prj-total-files-cache)
       ;; Others ... ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
       (t
-       (let ((file (prj-filedb-path "temp")))
+       (let ((temp1 (prj-filedb-path "temp1"))
+             (temp2 (prj-filedb-path "temp2"))
+             file)
          ;; Filter document types
+         (and (file-exists-p temp1)
+              (delete-file temp1))
+         (dolist (doctype doctypes)
+           (when (and (setq file (prj-filedb-path doctype))
+                      (file-exists-p file))
+             (prj-process-cat file temp1)))
          ;; Filter file paths
+         (and (file-exists-p temp2)
+              (delete-file temp2))
+         (dolist (filepath filepaths)
+           (prj-process-sync-grep filepath temp1 temp2))
          (if return-list
-             ()
-           file)))))))
+             (with-temp-buffer
+               (insert-file-contents-literally temp2)
+               (split-string (buffer-string) "\n" t))
+           temp2)))))))
 
 ;;;###autoload
-(defun prj-async-grep-backend (command &optional match input-file output-file)
+(defun prj-async-grep-backend (command &optional match input-file output-file case-sensitive)
   (case command
     (:init)
     (:destroy)
@@ -198,6 +225,6 @@ Example:
      (if (and (processp prj-process-grep)
               (process-live-p prj-process-grep))
          (message "Searching is under processing, please wait...")
-       (prj-process-grep match input-file output-file)))))
+       (prj-process-async-grep match input-file output-file case-sensitive)))))
 
 (provide 'prj-default-backend)

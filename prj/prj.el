@@ -42,6 +42,7 @@
 ;;; Developer API ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;  `prj-project-p'
 ;;  `prj-workspace-projects'
+;;  `prj-project-config-dir'
 ;;  `prj-project-name'
 ;;  `prj-project-doctypes'
 ;;  `prj-project-filepaths'
@@ -323,6 +324,10 @@ user loads a project or unload a project."
     projects))
 
 ;;;###autoload
+(defun prj-project-config-dir ()
+  (expand-file-name (format "%s/%s" prj-workspace-path)))
+
+;;;###autoload
 (defun prj-project-name ()
   (plist-get prj-config :name))
 
@@ -451,11 +456,18 @@ user loads a project or unload a project."
          (setcdr (nthcdr (1- prj-search-history-max) history) nil))
     (prj-plist-put prj-config :search-history history)
     (prj-export-config))
-  ;; TODO: support filepaths and doctypes
-  ;; TODO: discard using back-end's function `prj-filedb-path'.
-  ;; TODO: (prj-project-files ...) to get input file.
+  ;; Filter document types for acceleration.
+  (and (equal doctypes (prj-project-doctypes))
+       (setq doctypes nil))
+  ;; Filter file paths for acceleration.
+  (and (equal filepaths '(""))
+       (setq filepaths nil))
   ;; Start to search.
-  (prj-call-backends :search match (prj-filedb-path "all") (prj-searchdb-path)))
+  (prj-call-backends :search
+                     match
+                     (prj-project-files doctypes filepaths)
+                     (prj-searchdb-path)
+                     case-sensitive))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Interactive API ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
