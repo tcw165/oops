@@ -42,6 +42,7 @@
 (defvar prj-widget-keymap
   (let ((map (copy-keymap (default-value 'widget-keymap))))
     (define-key map "\t" '(lambda () (interactive) (prj-widget-forward-or-company)))
+    (define-key map [tab] '(lambda () (interactive) (prj-widget-forward-or-company)))
     (define-key map [escape] '(lambda () (interactive) (kill-buffer)))
     map))
 
@@ -146,7 +147,7 @@
   "Return a list of file paths."
   (let (filepaths)
     (dolist (file (widget-value prj-widget-filepaths))
-      (when (and (> (length file) 2)
+      (when (and (not (string= file ""))
                  (file-exists-p file))
         (setq file (expand-file-name file)
               ;; Remove '/' postfix if any.
@@ -430,54 +431,22 @@ remove one.\n"
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; back-ends for `company' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defvar prj-browse-file-cache nil
-  "Storing (DIR . (CANDIDATES...)) for completion.")
-(make-variable-buffer-local 'prj-browse-file-cache)
-
 (defvar company-file-prefix nil
   "Storing (DIR . (CANDIDATES...)) for completion.")
 (make-variable-buffer-local 'company-file-prefix)
 
-(defun prj-concat-filepath (dir file)
-  "Return a full path combined with `dir' and `file'. It saves you the worry of 
-whether to append '/' or not."
-  (concat dir
-          (unless (eq (aref dir (1- (length dir))) ?/) "/")
-          file))
-
-(defun prj-directory-files (dir &optional exclude)
+(defun company-directory-files (dir)
   "Return a list containing file names under `dir' but exlcudes files that match `exclude'."
   (let (files)
-    (dolist (file (directory-files dir))
-      (and (not (member file '("." "..")))
-           (not (string-match exclude file))
-           (setq files (cons file files))))
-    (setq files (reverse files))))
-
-(defun prj-to-regexp (wildcardexp)
-  "Translate wildcard expression to Emacs regular expression."
-  (let (regexp)
-    (dolist (el (split-string wildcardexp ";"))
-      (cond
-       ;; ex: *.el
-       ((string-match "^\\*\\..+" el)
-        (setq el (replace-regexp-in-string "^\\*\\." ".*\\\\." el)
-              el (concat el "$")))
-       ;; ex: cache-*
-       ((string-match ".+\\*$" el)
-        (setq el (concat "^" el)
-              el (replace-regexp-in-string "\\*" ".*" el)))
-       ;; ex: ABC*DEF
-       ((string-match ".+\\*.+" el)
-        (setq el (concat "^" el)
-              el (replace-regexp-in-string "\\*" ".*" el)
-              el (concat el "$")))
-       ;; ex: .git or .svn
-       ((string-match "\\." el)
-        (setq el (replace-regexp-in-string "\\." "\\\\." el))))
-      (setq regexp (concat regexp el "\\|")))
-    (setq regexp (replace-regexp-in-string "\\\\|$" "" regexp)
-          regexp (concat "\\(" regexp "\\)"))))
+    (ignore-errors
+      (dolist (file (directory-files dir))
+        (and (not (member file '("." "..")))
+             (not (string-match "\\(\.git\\|\.svn\\)" file))
+             (setq file (concat dir
+                                (unless (eq (aref dir (1- (length dir))) ?/) "/")
+                                file)
+                   files (append files `(,file))))))
+    files))
 
 (defun company-widget-p ()
   (let* ((field (widget-field-at (point)))
@@ -492,38 +461,37 @@ whether to append '/' or not."
     (widget-forward 1)))
 
 ;;;###autoload
-(defun company-browse-file-backend (command &optional arg &rest ign)
+(defun company-browse-file-backend (command &rest args)
   "The backend based on `company' to provide convenience when browsing files."
   (case command
     (prefix
-     (let* ((field (widget-field-at (point)))
-            (start (widget-field-start field))
-            (end (widget-field-end field)))
-       (if (= start end)
-           "~/"
+     (when (company-widget-p)
+       (let* ((field (widget-field-at (point)))
+              (start (widget-field-start field))
+              (end (widget-field-end field)))
          (buffer-substring-no-properties start end))))
     (candidates
-     (let* ((prefix arg)
-            (dir (or (and (file-directory-p prefix)
-                          prefix)
-                     (file-name-directory prefix)))
-            path candidates directories)
-       (and dir
-            (unless (equal dir (car prj-browse-file-cache))
-              (dolist (file (prj-directory-files dir (prj-to-regexp prj-exclude-types)))
-                (setq path (prj-concat-filepath dir file))
-                (push path candidates)
-                ;; Add one level of children.
-                (when (file-directory-p path)
-                  (push path directories)))
-              (dolist (directory (reverse directories))
-                (ignore-errors
-                  (dolist (child (prj-directory-files directory (prj-to-regexp prj-exclude-types)))
-                    (setq path (prj-concat-filepath directory child))
-                    (push path candidates))))
-              (setq prj-browse-file-cache (cons dir (nreverse candidates)))))
-       (all-completions prefix
-                        (cdr prj-browse-file-cache))))
+     (let* ((prefix (car args))
+            (prefixs (or company-file-prefix
+                         (and (string= prefix "") '("~/"))
+                         `(,prefix)))
+            candidates-all)
+       (dolist (prefix prefixs)
+         (let ((dir (or (and (file-directory-p prefix)
+                             prefix)
+                        (file-name-directory prefix)))
+               candidates)
+           (when dir
+             ;; (company-directory-files "~/")
+             (dolist (file (company-directory-files dir))
+               (setq candidates (append candidates `(,file)))
+               ;; Add 2nd level of children.
+               (when (file-directory-p file)
+                 (dolist (file2 (company-directory-files file))
+                   (setq candidates (append candidates `(,file2))))))
+             (setq candidates (all-completions prefix candidates)
+                   candidates-all (append candidates-all candidates)))))
+       candidates-all))
     (ignore-case t)))
 
 (provide 'prj-default-frontend)

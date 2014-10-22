@@ -362,8 +362,8 @@ or go back to just one window (by deleting all but the selected window)."
   (setq company-idle-delay 0)
   (setq company-minimum-prefix-length 1)
   (setq company-frontends '(company-pseudo-tooltip-unless-just-one-frontend
-                            company-echo-metadata-frontend
-                            company-preview-frontend))
+                            company-preview-frontend
+                            company-echo-metadata-frontend))
   ;; Project management.
   (unless (prj-load-recent-project)
     (prj-load-project))

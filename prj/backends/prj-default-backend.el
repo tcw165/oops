@@ -137,7 +137,7 @@ Example:
     (save-buffer 0)
     (switch-to-buffer (current-buffer)))))
 
-(defun prj-process-sync-grep (match input-file output-file case-sensitive)
+(defun prj-process-sync-grep (match input-file output-file &optional case-sensitive)
   (call-process-shell-command (format "grep %s \"%s\" \"%s\" 1>>\"%s\" 2>/dev/null"
                                       (if (null case-sensitive) "-i" "")
                                       match
@@ -199,17 +199,19 @@ Example:
              (temp2 (prj-filedb-path "temp2"))
              file)
          ;; Filter document types
-         (and (file-exists-p temp1)
-              (delete-file temp1))
-         (dolist (doctype doctypes)
-           (when (and (setq file (prj-filedb-path doctype))
-                      (file-exists-p file))
-             (prj-process-cat file temp1)))
+         (with-temp-file temp1
+           (erase-buffer))
+         (if doctypes
+             (dolist (doctype doctypes)
+               (when (and (setq file (prj-filedb-path doctype))
+                          (file-exists-p file))
+                 (prj-process-cat file temp1)))
+           (setq temp1 (prj-filedb-path "all")))
          ;; Filter file paths
-         (and (file-exists-p temp2)
-              (delete-file temp2))
+         (with-temp-file temp2
+           (erase-buffer))
          (dolist (filepath filepaths)
-           (prj-process-sync-grep filepath temp1 temp2))
+           (prj-process-sync-grep (expand-file-name filepath) temp1 temp2))
          (if return-list
              (with-temp-buffer
                (insert-file-contents-literally temp2)
