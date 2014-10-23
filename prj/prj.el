@@ -121,7 +121,10 @@ is neither `:init' nor `:destroy' will make engine discard remaining iteration.
 
 ### Commands:
 `:init'             - Initialize frontends.
-`:destroy'          - Ask frontends to destroy their GUIs.
+`:destroy'          - Destroy frontends.
+
+`:show'             - Ask frontends to show their GUIs.
+`:hide'             - Ask frontends to hide their GUIs.
 
 `:create-project'   - Show GUI for creating project.
                       Default is `prj-create-project-frontend'.
@@ -244,22 +247,6 @@ format of JSON file. see `prj-new-config'.
     (with-temp-file filename
       (insert (json-encode-plist data)))))
 
-(defun prj-call-frontends (command &rest args)
-  (let ((commands '(:create-project
-                    :delete-project
-                    :edit-project
-                    :load-project
-                    :find-files
-                    :search-project))
-        (funcs prj-frontends))
-    (catch 'break
-      (while commands
-        (when (eq command (car commands))
-          (let ((ret (apply (car funcs) command args)))
-            (and ret (throw 'break ret))))
-        (setq commands (cdr commands)
-              funcs (cdr funcs))))))
-
 (defun prj-init-frontends ()
   (dolist (backend prj-frontends)
     (funcall backend :init)))
@@ -268,11 +255,21 @@ format of JSON file. see `prj-new-config'.
   (dolist (backend prj-frontends)
     (funcall backend :destroy)))
 
-(defun prj-call-backends (command &rest args)
-  (let ((commands '(:index-files
+(defun prj-hide-frontends ()
+  (dolist (backend prj-frontends)
+    (funcall backend :hide)))
+
+(defun prj-show-frontends (command &rest args)
+  ;; Hide all frontends.
+  (prj-hide-frontends)
+  ;; Find correct frontend.
+  (let ((commands '(:create-project
+                    :delete-project
+                    :edit-project
+                    :load-project
                     :find-files
-                    :search))
-        (funcs prj-backends))
+                    :search-project))
+        (funcs prj-frontends))
     (catch 'break
       (while commands
         (when (eq command (car commands))
@@ -289,11 +286,22 @@ format of JSON file. see `prj-new-config'.
   (dolist (backend prj-backends)
     (funcall backend :destroy)))
 
-(defun prj-destroy-all ()
+(defun prj-call-backends (command &rest args)
+  (let ((commands '(:index-files
+                    :find-files
+                    :search))
+        (funcs prj-backends))
+    (catch 'break
+      (while commands
+        (when (eq command (car commands))
+          (let ((ret (apply (car funcs) command args)))
+            (and ret (throw 'break ret))))
+        (setq commands (cdr commands)
+              funcs (cdr funcs))))))
+
+(defun prj-clean-config&search ()
   "Clean search buffer or widget buffers which belongs to other project when 
 user loads a project or unload a project."
-  ;; Clean frontends.
-  (prj-destroy-frontends)
   ;; Kill search buffer.
   (let ((buffer (prj-searchdb-buffer)))
     (and buffer (kill-buffer buffer)))
@@ -378,9 +386,7 @@ user loads a project or unload a project."
     (prj-plist-put config :filepaths filepaths)
     (prj-export-json path config)
     ;; Load project.
-    (prj-load-project name)
-    ;; Build database.
-    (prj-build-database)))
+    (prj-load-project name)))
 
 ;;;###autoload
 (defun prj-delete-project-impl (projects)
@@ -401,14 +407,14 @@ user loads a project or unload a project."
 `prj-load-project-frontend'."
   ;; Save files in the last session.
   (prj-save-file-names t)
-  (prj-destroy-all)
+  (prj-clean-config&search)
   ;; Read configuration.
   (setq prj-name name
         prj-config (prj-import-json (prj-config-path name)))
   ;; Open files.
   (mapc 'find-file-existing (prj-project-recent-files))
-  (prj-init-backends)
-  (prj-init-frontends)
+  (unless prj-project-mode
+    (prj-project-mode 1))
   ;; Update database
   (prj-build-database)
   (message "Load [%s] ...done" (prj-project-name)))
@@ -417,18 +423,15 @@ user loads a project or unload a project."
 (defun prj-edit-project-impl (doctypes filepaths)
   "Internal function to edit project. It is called by functions in the 
 `prj-edit-project-frontend'."
-  (prj-plist-put prj-config :doctypes doctypes)
-  (prj-plist-put prj-config :filepaths filepaths)
-  (prj-export-config)
-  ;; Update database.
   (let ((old-doctypes (prj-project-doctypes))
         (old-filepaths (prj-project-filepaths)))
-    (if (or (/= (length doctypes) (length old-doctypes))
-            (not (every 'equal doctypes old-doctypes))
-            (/= (length filepaths) (length old-filepaths))
-            (not (every 'equal filepaths old-filepaths)))
-        (prj-build-database t)
-      (prj-build-database))))
+    (prj-plist-put prj-config :doctypes doctypes)
+    (prj-plist-put prj-config :filepaths filepaths)
+    (prj-export-config)
+    ;; Update database.
+    (unless (and (equal doctypes old-doctypes)
+                 (equal filepaths old-filepaths))
+      (prj-build-database t))))
 
 ;;;###autoload
 (defun prj-find-file-impl (file)
@@ -461,7 +464,7 @@ user loads a project or unload a project."
 (defun prj-preference ()
   "Customize document types."
   (interactive)
-  (prj-destroy-frontends)
+  (prj-hide-frontends)
   (customize-group 'prj-group))
 
 ;;;###autoload
@@ -475,44 +478,29 @@ user loads a project or unload a project."
 (defun prj-create-project ()
   "Show configuration for creating new project."
   (interactive)
-  (unless prj-project-mode
-    (prj-project-mode 1))
-  (prj-destroy-frontends)
-  (prj-call-frontends :create-project))
+  (prj-show-frontends :create-project))
 
 ;;;###autoload
 (defun prj-delete-project ()
   "Show configuration for deleting projects."
   (interactive)
-  (unless prj-project-mode
-    (prj-project-mode 1))
-  (prj-destroy-frontends)
-  (prj-call-frontends :delete-project))
+  (prj-show-frontends :delete-project))
 
 ;;;###autoload
 (defun prj-edit-project ()
   "Show configuration for editing project's setting."
   (interactive)
-  (unless prj-project-mode
-    (prj-project-mode 1))
-  (prj-destroy-frontends)
-  ;; Load project if wasn't loaded.
-  (unless (prj-project-p)
-    (prj-load-project))
-  (prj-call-frontends :edit-project))
+  (when (prj-project-p)
+    (prj-show-frontends :edit-project)))
 
 ;;;###autoload
 (defun prj-load-project (&optional name)
   "List available prjects in current workspace and let user to choose which 
 project to be loaded."
   (interactive)
-  (unless prj-project-mode
-    (prj-project-mode 1))
-  (prj-destroy-frontends)
-  (prj-destroy-backends)
   (if name
       (prj-load-project-impl name)
-    (prj-call-frontends :load-project (prj-workspace-projects))))
+    (prj-show-frontends :load-project (prj-workspace-projects))))
 
 ;;;###autoload
 (defun prj-load-recent-project ()
@@ -520,7 +508,6 @@ project to be loaded."
   (interactive)
   (unless prj-project-mode
     (prj-project-mode 1))
-  (prj-destroy-frontends)
   ;; TODO:
   nil)
 
@@ -533,12 +520,11 @@ project to be loaded."
   ;; Save files in the last session.
   (prj-save-file-names t)
   (let ((name (prj-project-name)))
-    (prj-destroy-all)
+    (prj-clean-config&search)
     (message "Unload [%s] ...done" name)))
 
 ;;;###autoload
 (defun prj-build-database (&optional is-rebuild)
-  "Index file and tags."
   (interactive
    (when (string= "yes" (ido-completing-read
                          (format "[%s] Rebuild database? " (prj-project-name))
@@ -546,33 +532,27 @@ project to be loaded."
                          nil
                          t))
      '(t)))
-  (prj-destroy-frontends)
   ;; Create file list which is the data base of the project's files.
   (when (prj-project-p)
     (message "Building database might take a while, please wait ...")
     (prj-call-backends :index-files is-rebuild)
-    (run-hooks 'prj-after-build-database-hook)
+    (run-hook-with-args 'prj-after-build-database-hook is-rebuild)
     (message "Database is updated!")))
 
 ;;;###autoload
 (defun prj-find-file ()
   "Open file by the given file name."
   (interactive)
-  (prj-destroy-frontends)
-  ;; Load project if wasn't loaded.
-  (unless (prj-project-p)
-    (prj-load-project))
-  (prj-call-frontends :find-files (prj-project-files nil nil t)))
+  (when (prj-project-p)
+    (prj-show-frontends :find-files (prj-project-files nil nil t))))
 
 ;;;###autoload
 (defun prj-search-project ()
   "Search string in the project. Append new search result to the old caches."
   (interactive)
-  (prj-destroy-frontends)
   ;; Load project if no project was loaded.
-  (unless (prj-project-p)
-    (prj-load-project))
-  (prj-call-frontends :search-project))
+  (when (prj-project-p)
+    (prj-show-frontends :search-project)))
 
 ;;;###autoload
 (defun prj-toggle-search-buffer ()
@@ -621,7 +601,11 @@ project to be loaded."
   :global t
   (if prj-project-mode
       (progn
-        (add-hook 'kill-emacs-hook 'prj-kill-emacs-hook t nil))
-    (remove-hook 'kill-emacs-hook 'prj-kill-emacs-hook nil)))
+        (add-hook 'kill-emacs-hook 'prj-kill-emacs-hook t nil)
+        (prj-init-frontends)
+        (prj-init-backends))
+    (remove-hook 'kill-emacs-hook 'prj-kill-emacs-hook nil)
+    (prj-destroy-frontends)
+    (prj-destroy-backends)))
 
 (provide 'prj)

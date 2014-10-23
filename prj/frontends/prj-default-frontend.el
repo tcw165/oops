@@ -176,6 +176,8 @@
 ;;;###autoload
 (defun prj-create-project-frontend (command &rest args)
   (case command
+    (:init)
+    (:destroy)
     (:create-project
      (prj-with-widget "*Create Project*"
        ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -229,13 +231,15 @@ remove one.\n"
                             :entry-format "%i %d path: %v"
                             :value '("")
                             '(editable-field :company company-browse-file-backend)))))
-    (:destroy
+    (:hide
      (and (get-buffer "*Create Project*")
           (kill-buffer "*Create Project*")))))
 
 ;;;###autoload
 (defun prj-delete-project-frontend (command &rest args)
   (case command
+    (:init)
+    (:destroy)
     (:delete-project
      (prj-with-widget "*Delete Project*"
        ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -274,13 +278,15 @@ remove one.\n"
                                       :format (concat "%[%v%] " project "\n"))
                    prj-widget-checkboxes (append prj-widget-checkboxes
                                                   `(,wid))))))))
-    (:destroy
+    (:hide
      (and (get-buffer "*Delete Project*")
           (kill-buffer "*Delete Project*")))))
 
 ;;;###autoload
 (defun prj-load-project-frontend (command &optional projects)
   (case command
+    (:init)
+    (:destroy)
     (:load-project
      (if projects
          ;; Prompt user to load project and return project name.
@@ -293,6 +299,8 @@ remove one.\n"
 ;;;###autoload
 (defun prj-edit-project-frontend (command &rest args)
   (case command
+    (:init)
+    (:destroy)
     (:edit-project
      (prj-with-widget "*Edit Project*"
        ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -338,13 +346,15 @@ remove one.\n"
                             :entry-format "%i %d path: %v"
                             :value (copy-list (prj-project-filepaths))
                             '(editable-field :company company-browse-file-backend)))))
-    (:destroy
+    (:hide
      (and (get-buffer "*Edit Project*")
           (kill-buffer "*Edit Project*")))))
 
 ;;;###autoload
 (defun prj-find-file-frontend (command &optional files)
   (case command
+    (:init)
+    (:destroy)
     (:find-files
      (let ((file (ido-completing-read
                   (format "[%s] Find file: " (prj-project-name))
@@ -354,6 +364,8 @@ remove one.\n"
 ;;;###autoload
 (defun prj-search-project-frontend (command &rest args)
   (case command
+    (:init)
+    (:destroy)
     (:search-project
      (let ((thing (prj-thingatpt))
            ;; (history (car (prj-project-search-history)))
@@ -436,7 +448,7 @@ remove one.\n"
                               :entry-format "%i %d path: %v"
                               :value '("")
                               '(editable-field :company company-browse-file-backend))))))
-    (:destroy
+    (:hide
      (and (get-buffer "*Search Project*")
           (kill-buffer "*Search Project*")))))
 

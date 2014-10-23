@@ -82,20 +82,20 @@ If `is-exclude' is t:
     (let ((matches (concat "-name \"" doctype "\"")))
       (replace-regexp-in-string ";" "\" -o -name \"" matches))))
 
-(defun prj-process-find (output filepaths &optional matches excludes)
+(defun prj-process-find (filepaths output &optional matches excludes)
   "Use `call-process' to call FIND. FILEPATHS is a file list, (FILE1 FILE2 ...).
  MATCHES and EXCLUDES is strings in format of \"-name pattern\"."
-  (let ((dir (file-name-directory output))
-        (stream (shell-command-to-string (format "find %s %s %s"
-                                                 filepaths
-                                                 (or matches "")
-                                                 (or excludes "")))))
-    (and dir (make-directory dir t))
-    (with-temp-file output
-      (insert stream)
-      stream)))
+  (let ((dir (file-name-directory output)))
+    (unless (file-exists-p dir)
+      (make-directory dir t))
+    (call-process-shell-command
+     (format "find %s %s %s 1>\"%s\" 2>/dev/null"
+             filepaths
+             (or matches "")
+             (or excludes "")
+             output))))
 
-(defun prj-process-find-change ()
+(defun prj-process-find-change (filepaths compare-to output &optional matches excludes)
   ;; TODO:
   t)
 
@@ -167,21 +167,33 @@ Example:
      (setq prj-total-files-cache nil)
      (garbage-collect))
     (:index-files
-     (let (all-files)
-       ;; Collect files in respect of document types.
-       (dolist (doctype (prj-project-doctypes))
-         (setq all-files (concat
-                          all-files
-                          (prj-process-find
-                           (prj-filedb-path doctype)
-                           (prj-list-to-cmd-form (prj-project-filepaths))
-                           (prj-matches-to-find-form (cdr (assoc doctype prj-document-types)))
-                           (prj-matches-to-find-form prj-exclude-types t)))))
+     (let* ((all-files (prj-filedb-path "all"))
+            (dir (file-name-directory all-files)))
+       (if (or (not (file-exists-p all-files))
+               is-rebuild)
+           (progn
+             ;; New database.
+             (when (file-exists-p dir)
+               (delete-directory dir t nil))
+             (make-directory dir)
+             (write-region 1 1 all-files)
+             ;; Collect files in respect of document types.
+             (dolist (doctype (prj-project-doctypes))
+               (let ((files (prj-filedb-path doctype)))
+                 ;; Single category database.
+                 (prj-process-find
+                  (prj-list-to-cmd-form (prj-project-filepaths))
+                  files
+                  (prj-matches-to-find-form (cdr (assoc doctype prj-document-types)))
+                  (prj-matches-to-find-form prj-exclude-types t))
+                 ;; Set of categories database.
+                 (prj-process-cat files all-files))))
+         ;; (prj-process-find-change)
+         )
        ;; Export all database.
-       (when all-files
-         (setq prj-total-files-cache (split-string all-files "\n" t))
-         (with-temp-file (prj-filedb-path "all")
-           (insert all-files)))))))
+       (with-temp-buffer
+         (insert-file-contents-literally all-files)
+         (setq prj-total-files-cache (split-string (buffer-string) "\n" t)))))))
 
 ;;;###autoload
 (defun prj-find-files-backend (command &optional doctypes filepaths return-list)
@@ -206,7 +218,7 @@ Example:
              (temp2 (prj-filedb-path "temp2"))
              file)
          ;; Filter document types
-         (with-temp-file temp1)
+         (write-region 1 1 temp1)
          (if doctypes
              (dolist (doctype doctypes)
                (when (and (setq file (prj-filedb-path doctype))
@@ -214,7 +226,7 @@ Example:
                  (prj-process-cat file temp1)))
            (setq temp1 (prj-filedb-path "all")))
          ;; Filter file paths
-         (with-temp-file temp2)
+         (write-region 1 1 temp2)
          (if filepaths
              (dolist (filepath filepaths)
                (prj-process-sync-grep (expand-file-name filepath) temp1 temp2))

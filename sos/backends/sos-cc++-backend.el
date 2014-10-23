@@ -46,7 +46,7 @@
    ((eq (process-status process) 'run))
    ((memq (process-status process) '(stop exit signal))
     (setq sos-cc++-process-tag nil)
-    (message (format "c/c++ tags is created! %s" (process-status process))))))
+    (message (format "c/c++ tags is updated! %s" (process-status process))))))
 
 (defun sos-cc++-async-tag (input-files)
   (setq sos-cc++-process-tag
@@ -60,20 +60,22 @@
   ;; Add process sentinel.
   (set-process-sentinel sos-cc++-process-tag 'sos-cc++-async-tag-complete))
 
-(defun sos-cc++-init-tag ()
+(defun sos-cc++-build-tag (&optional is-rebuild &rest args)
   (let* ((tag-file (sos-cc++-tag))
          (tag-dir (file-name-directory tag-file)))
-    (unless (file-exists-p tag-dir)
-      (make-directory tag-dir t))
-    (unless (file-exists-p tag-file)
+    (when (or (not (file-exists-p tag-file))
+              is-rebuild)
+      (and (file-exists-p tag-dir)
+           (delete-directory tag-dir t))
+      (make-directory tag-dir t)
       (sos-cc++-async-tag (prj-project-files)))))
 
 ;;;###autoload
 (defun sos-cc++-backend (command &rest arg)
   (case command
     (:init
-     (add-hook 'prj-after-build-database-hook 'sos-cc++-init-tag)
-     (sos-cc++-init-tag))
+     (add-hook 'prj-after-build-database-hook 'sos-cc++-build-tag)
+     (sos-cc++-build-tag))
     (:symbol)
     (:candidates)))
 
