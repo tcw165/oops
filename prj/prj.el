@@ -47,8 +47,8 @@
 ;;  `prj-project-doctypes'
 ;;  `prj-project-filepaths'
 ;;  `prj-project-recent-files'
-;;  `prj-project-search-history'
 ;;  `prj-project-files'
+;;  `prj-project-set'
 ;;  `prj-export-config'
 ;;  `prj-searchdb-buffer'
 ;;
@@ -187,8 +187,7 @@ format of JSON file. see `prj-new-config'.
 `:filepaths'        - A list containing file-path(s) string(s).
 `:doctypes'         - A plist containing pairs of document type and document 
                       extensions. see `prj-document-types'.
-`:recent-files'     - A list containing recent file-path(s) string(s).
-`:search-history'   - A list containing recent searching string(s).")
+`:recent-files'     - A list containing recent file-path(s) string(s).")
 
 (defmacro prj-plist-put (plist prop val)
   `(setq ,plist (plist-put ,plist ,prop ,val)))
@@ -229,7 +228,6 @@ format of JSON file. see `prj-new-config'.
     (prj-plist-put config :filepaths '())
     (prj-plist-put config :doctypes '())
     (prj-plist-put config :recent-files '())
-    (prj-plist-put config :search-history '())
     config))
 
 (defun prj-import-json (filename)
@@ -344,13 +342,14 @@ user loads a project or unload a project."
   (plist-get prj-config :recent-files))
 
 ;;;###autoload
-(defun prj-project-search-history ()
-  (plist-get prj-config :search-history))
-
-;;;###autoload
 (defun prj-project-files (&optional doctypes filepaths return-list)
   "Return a list containing files in current project."
   (prj-call-backends :find-files doctypes filepaths return-list))
+
+;;;###autoload
+(defun prj-project-set (key value)
+  (and key value
+       (prj-plist-put prj-config key value)))
 
 ;;;###autoload
 (defun prj-export-config ()
@@ -444,18 +443,6 @@ user loads a project or unload a project."
 (defun prj-search-project-impl (match &optional doctypes filepaths case-sensitive word-only)
   "Internal function to edit project. It is called by functions in the 
 `prj-search-project-frontend'."
-  ;; Update search history.
-  (let ((history (prj-project-search-history)))
-    (if (member match history)
-        ;; Reorder the match.
-        (setq history (delete match history)
-              history (push match history))
-      (setq history (push match history)))
-    ;; Keep maximum history.
-    (and (> (length history) prj-search-history-max)
-         (setcdr (nthcdr (1- prj-search-history-max) history) nil))
-    (prj-plist-put prj-config :search-history history)
-    (prj-export-config))
   ;; Filter document types for acceleration.
   (and (equal doctypes (prj-project-doctypes))
        (setq doctypes nil))

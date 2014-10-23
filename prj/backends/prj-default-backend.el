@@ -129,13 +129,20 @@ Example:
    ((eq (process-status process) 'run))
    ((memq (process-status process) '(stop exit signal))
     (setq prj-process-grep nil)
+    (with-temp-file prj-grep-output-file
+      (insert-file-contents-literally prj-grep-output-file)
+      (goto-char (point-max))
+      (unless (looking-back "\n")
+        (insert "\n"))
+      (insert "<<<<<\n\n"))
     (find-file prj-grep-output-file)
     (goto-char (point-max))
-    (unless (looking-back "\n")
-      (insert "\n"))
-    (insert "<<<<<\n\n")
-    (save-buffer 0)
-    (switch-to-buffer (current-buffer)))))
+    (goto-char (or (re-search-backward "^>>>>>.*$" nil t)
+                   (point)))
+    (forward-line)
+    ;; Because executing `goto-char' and `forward-line' in script won't trigger
+    ;; `post-command-hook' which makes some features won't work correctly.
+    (run-hooks 'post-command-hook))))
 
 (defun prj-process-sync-grep (match input-file output-file &optional case-sensitive)
   (call-process-shell-command (format "grep %s \"%s\" \"%s\" 1>>\"%s\" 2>/dev/null"
@@ -199,8 +206,7 @@ Example:
              (temp2 (prj-filedb-path "temp2"))
              file)
          ;; Filter document types
-         (with-temp-file temp1
-           (erase-buffer))
+         (with-temp-file temp1)
          (if doctypes
              (dolist (doctype doctypes)
                (when (and (setq file (prj-filedb-path doctype))
@@ -208,8 +214,7 @@ Example:
                  (prj-process-cat file temp1)))
            (setq temp1 (prj-filedb-path "all")))
          ;; Filter file paths
-         (with-temp-file temp2
-           (erase-buffer))
+         (with-temp-file temp2)
          (dolist (filepath filepaths)
            (prj-process-sync-grep (expand-file-name filepath) temp1 temp2))
          (if return-list

@@ -356,7 +356,8 @@ remove one.\n"
   (case command
     (:search-project
      (let ((thing (prj-thingatpt))
-           (history (car (prj-project-search-history))))
+           ;; (history (car (prj-project-search-history)))
+           history)
        (prj-with-widget "*Search Project*"
          ;; Ok notify ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
          (lambda (&rest ignore)
@@ -369,6 +370,18 @@ remove one.\n"
                (error "Empty search!"))
              (unless (> (length doctypes) 0)
                (error "No document types is selected!"))
+             ;; Update search history.
+             ;; (let ((history (prj-project-search-history)))
+             ;;   (if (member match history)
+             ;;       ;; Reorder the match.
+             ;;       (setq history (delete match history)
+             ;;             history (push match history))
+             ;;     (setq history (push match history)))
+             ;;   ;; Keep maximum history.
+             ;;   (and (> (length history) prj-search-history-max)
+             ;;        (setcdr (nthcdr (1- prj-search-history-max) history) nil))
+             ;;   (prj-plist-put prj-config :search-history history)
+             ;;   (prj-export-config))
              (kill-buffer)
              (funcall 'prj-search-project-impl
                       match doctypes filepaths case-sensitive word-only)))
