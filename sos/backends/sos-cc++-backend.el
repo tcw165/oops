@@ -34,20 +34,19 @@
 
 (defconst sos-cc++-regexp ".*\\.[ch]\\(pp\\|xx\\)$")
 
-(defconst sos-cc++-tag
-  (concat (prj-project-config-dir) "/tags/ccpp.tags"))
-
 (defvar sos-cc++-process-tag nil)
 
+(defun sos-cc++-tag ()
+  (concat (prj-project-config-dir) "/tags/ccpp.tags"))
+
 ;; (find-tag)
+;; (visit-tags-table sos-cc++-tag)
 (defun sos-cc++-async-tag-complete (process message)
   (cond
    ((eq (process-status process) 'run))
    ((memq (process-status process) '(stop exit signal))
     (setq sos-cc++-process-tag nil)
-    (message "c/c++ tags is created!")
-    ;; (visit-tags-table sos-cc++-tag)
-    )))
+    (message (format "c/c++ tags is created! %s" (process-status process))))))
 
 (defun sos-cc++-async-tag (input-files)
   (setq sos-cc++-process-tag
@@ -57,15 +56,17 @@
          (format "grep \"%s\" \"%s\" | xargs etags -o \"%s\""
                  sos-cc++-regexp
                  input-files
-                 sos-cc++-tag)))
+                 (sos-cc++-tag))))
   ;; Add process sentinel.
   (set-process-sentinel sos-cc++-process-tag 'sos-cc++-async-tag-complete))
 
 (defun sos-cc++-init-tag ()
-  (let ((dir (file-name-directory sos-cc++-tag)))
-    (unless (file-exists-p dir)
-      (make-directory dir t))
-    (sos-cc++-async-tag (prj-project-files))))
+  (let* ((tag-file (sos-cc++-tag))
+         (tag-dir (file-name-directory tag-file)))
+    (unless (file-exists-p tag-dir)
+      (make-directory tag-dir t))
+    (unless (file-exists-p tag-file)
+      (sos-cc++-async-tag (prj-project-files)))))
 
 ;;;###autoload
 (defun sos-cc++-backend (command &rest arg)

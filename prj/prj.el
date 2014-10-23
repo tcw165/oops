@@ -178,12 +178,13 @@ command.
   :type 'hook
   :group 'prj-group)
 
+(defvar prj-name nil)
+
 (defvar prj-config nil
   "A plist which represent a project's configuration, it will be exported as 
 format of JSON file. see `prj-new-config'.
 
 ### Plist Format:
-`:name'             - Project's name. A string.
 `:filepaths'        - A list containing file-path(s) string(s).
 `:doctypes'         - A plist containing pairs of document type and document 
                       extensions. see `prj-document-types'.
@@ -224,7 +225,6 @@ format of JSON file. see `prj-new-config'.
 (defun prj-new-config ()
   "Return a config template. Check `prj-config' for detail."
   (let (config)
-    (prj-plist-put config :name "")
     (prj-plist-put config :filepaths '())
     (prj-plist-put config :doctypes '())
     (prj-plist-put config :recent-files '())
@@ -298,7 +298,8 @@ user loads a project or unload a project."
   (let ((buffer (prj-searchdb-buffer)))
     (and buffer (kill-buffer buffer)))
   ;; Reset configuration.
-  (setq prj-config nil))
+  (setq prj-name nil
+        prj-config nil))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Developer API ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -306,8 +307,7 @@ user loads a project or unload a project."
 ;;;###autoload
 (defun prj-project-p ()
   "Return t if any project was loaded (current project)."
-  (and prj-config
-       (plist-get prj-config :name)))
+  (and prj-config t))
 
 ;;;###autoload
 (defun prj-workspace-projects ()
@@ -329,7 +329,7 @@ user loads a project or unload a project."
 
 ;;;###autoload
 (defun prj-project-name ()
-  (plist-get prj-config :name))
+  prj-name)
 
 ;;;###autoload
 (defun prj-project-doctypes (&optional key)
@@ -374,7 +374,6 @@ user loads a project or unload a project."
     (unless (file-directory-p dir)
       (make-directory dir t))
     ;; Export configuration.
-    (prj-plist-put config :name name)
     (prj-plist-put config :doctypes doctypes)
     (prj-plist-put config :filepaths filepaths)
     (prj-export-json path config)
@@ -404,17 +403,14 @@ user loads a project or unload a project."
   (prj-save-file-names t)
   (prj-destroy-all)
   ;; Read configuration.
-  (setq prj-config (prj-import-json (prj-config-path name)))
+  (setq prj-name name
+        prj-config (prj-import-json (prj-config-path name)))
   ;; Open files.
-  (let ((files (prj-project-recent-files)))
-    (when files
-      (dolist (file (cdr files))
-        (find-file-existing file))
-      (find-file-existing (car files))))
-  ;; Update database
-  (prj-build-database)
+  (mapc 'find-file-existing (prj-project-recent-files))
   (prj-init-backends)
   (prj-init-frontends)
+  ;; Update database
+  (prj-build-database)
   (message "Load [%s] ...done" (prj-project-name)))
 
 ;;;###autoload
@@ -551,8 +547,6 @@ project to be loaded."
                          t))
      '(t)))
   (prj-destroy-frontends)
-  (unless (prj-project-p)
-    (prj-load-project))
   ;; Create file list which is the data base of the project's files.
   (when (prj-project-p)
     (message "Building database might take a while, please wait ...")
@@ -609,7 +603,7 @@ project to be loaded."
                    ;; Skip search database.
                    (not (eq buffer (prj-searchdb-buffer)))
                    (setq file (buffer-file-name buffer)))
-          (setq files (append files `(,file)))
+          (push file files)
           ;; Close buffers.
           (when close
             (kill-buffer buffer))))
