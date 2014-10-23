@@ -526,12 +526,11 @@ project to be loaded."
 ;;;###autoload
 (defun prj-build-database (&optional is-rebuild)
   (interactive
-   (when (string= "all" (ido-completing-read
+   (and (string= "all" (ido-completing-read
                          (format "[%s] How to build database? " (prj-project-name))
                          '("partial" "all")
                          nil
-                         t))
-     '(t)))
+                         t)) '(t)))
   ;; Create file list which is the data base of the project's files.
   (when (prj-project-p)
     (message "Building database might take a while, please wait ...")
