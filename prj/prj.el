@@ -490,8 +490,8 @@ user loads a project or unload a project."
 (defun prj-edit-project ()
   "Show configuration for editing project's setting."
   (interactive)
-  (when (prj-project-p)
-    (prj-show-frontends :edit-project)))
+  (and (prj-project-p)
+       (prj-show-frontends :edit-project)))
 
 ;;;###autoload
 (defun prj-load-project (&optional name)
@@ -526,9 +526,9 @@ project to be loaded."
 ;;;###autoload
 (defun prj-build-database (&optional is-rebuild)
   (interactive
-   (when (string= "yes" (ido-completing-read
-                         (format "[%s] Rebuild database? " (prj-project-name))
-                         '("yes" "no")
+   (when (string= "all" (ido-completing-read
+                         (format "[%s] How to build database? " (prj-project-name))
+                         '("partial" "all")
                          nil
                          t))
      '(t)))
@@ -543,32 +543,29 @@ project to be loaded."
 (defun prj-find-file ()
   "Open file by the given file name."
   (interactive)
-  (when (prj-project-p)
-    (prj-show-frontends :find-files (prj-project-files nil nil t))))
+  (and (prj-project-p)
+       (prj-show-frontends :find-files (prj-project-files nil nil t))))
 
 ;;;###autoload
 (defun prj-search-project ()
   "Search string in the project. Append new search result to the old caches."
   (interactive)
   ;; Load project if no project was loaded.
-  (when (prj-project-p)
-    (prj-show-frontends :search-project)))
+  (and (prj-project-p)
+       (prj-show-frontends :search-project)))
 
 ;;;###autoload
 (defun prj-toggle-search-buffer ()
   (interactive)
-  ;; TODO: bug when user is select definition window and try to toggle search buffer off.
-  ;; TODO: use front-end???
-  (unless (prj-project-p)
-    (prj-load-project))
-  (let ((buffer (prj-searchdb-buffer)))
-    (if (eq (window-buffer) buffer)
-        (kill-buffer)
-      (and buffer (kill-buffer buffer))
-      ;; Go to search buffer.
-      (his-add-position-type-history)
-      (switch-to-buffer (prj-searchdb-buffer t) t t)
-      (his-add-position-type-history))))
+  (when (prj-project-p)
+    (let ((buffer (prj-searchdb-buffer)))
+      (if (eq (window-buffer) buffer)
+          (kill-buffer)
+        (and buffer (kill-buffer buffer))
+        ;; Go to search buffer.
+        (his-add-position-type-history)
+        (switch-to-buffer (prj-searchdb-buffer t) t t)
+        (his-add-position-type-history)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Project Mode ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
