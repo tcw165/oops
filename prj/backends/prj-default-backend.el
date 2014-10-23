@@ -106,24 +106,6 @@ Example:
   (let ((matches (concat "-name \"" doctype "\"")))
     (replace-regexp-in-string ";" "\" -o -name \"" matches)))
 
-(defun prj-process-async-grep (match input-file output-file case-sensitive)
-  (message (format "[%s] Searching is processing..." (prj-project-name)))
-  (call-process-shell-command (format "echo \">>>>> %s\" 1>>\"%s\""
-                                      match
-                                      output-file))
-  (setq prj-process-grep (start-process-shell-command
-                          "prj-process-grep"
-                          nil
-                          (format "xargs grep -nH %s \"%s\" < \"%s\" 1>>\"%s\" 2>/dev/null"
-                                  (if (null case-sensitive) "-i" "")
-                                  match
-                                  input-file
-                                  output-file))
-        ;; Remember filename of output file.
-        prj-grep-output-file output-file)
-  ;; add process sentinel.
-  (set-process-sentinel prj-process-grep 'prj-async-grep-complete))
-
 (defun prj-async-grep-complete (process message)
   (cond
    ((eq (process-status process) 'run))
@@ -144,6 +126,24 @@ Example:
     ;; `post-command-hook' which makes some features won't work correctly.
     (run-hooks 'post-command-hook))))
 
+(defun prj-process-async-grep (match input-file output-file case-sensitive)
+  (message (format "[%s] Searching is processing..." (prj-project-name)))
+  (call-process-shell-command (format "echo \">>>>> %s\" 1>>\"%s\""
+                                      match
+                                      output-file))
+  (setq prj-process-grep (start-process-shell-command
+                          "prj-process-grep"
+                          nil
+                          (format "xargs grep -nH %s \"%s\" < \"%s\" 1>>\"%s\" 2>/dev/null"
+                                  (if (null case-sensitive) "-i" "")
+                                  match
+                                  input-file
+                                  output-file))
+        ;; Remember filename of output file.
+        prj-grep-output-file output-file)
+  ;; Add process sentinel.
+  (set-process-sentinel prj-process-grep 'prj-async-grep-complete))
+
 (defun prj-process-sync-grep (match input-file output-file &optional case-sensitive)
   (call-process-shell-command (format "grep %s \"%s\" \"%s\" 1>>\"%s\" 2>/dev/null"
                                       (if (null case-sensitive) "-i" "")
@@ -152,7 +152,7 @@ Example:
                                       output-file)))
 
 (defun prj-process-cat (input-file output-file)
-  (call-process-shell-command (format "cat \"%s\" 1>>\"%s\" 2>/dev/null"
+  (call-process-shell-command (format "cat \"%s\" 1>>\"%s\""
                                       input-file
                                       output-file)))
 
@@ -215,8 +215,10 @@ Example:
            (setq temp1 (prj-filedb-path "all")))
          ;; Filter file paths
          (with-temp-file temp2)
-         (dolist (filepath filepaths)
-           (prj-process-sync-grep (expand-file-name filepath) temp1 temp2))
+         (if filepaths
+             (dolist (filepath filepaths)
+               (prj-process-sync-grep (expand-file-name filepath) temp1 temp2))
+           (setq temp2 temp1))
          (if return-list
              (with-temp-buffer
                (insert-file-contents-literally temp2)

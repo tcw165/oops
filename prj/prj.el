@@ -323,7 +323,9 @@ user loads a project or unload a project."
 
 ;;;###autoload
 (defun prj-project-config-dir ()
-  (expand-file-name (format "%s/%s" prj-workspace-path)))
+  (expand-file-name (format "%s/%s"
+                            prj-workspace-path
+                            (prj-project-name))))
 
 ;;;###autoload
 (defun prj-project-name ()

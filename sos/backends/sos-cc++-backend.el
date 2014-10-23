@@ -28,16 +28,52 @@
 ;; 2014-10-01 (0.0.1)
 ;;    Initial release.
 
+;; (require 'etags)
+
 (require 'prj)
 
+(defconst sos-cc++-regexp ".*\\.[ch]\\(pp\\|xx\\)$")
+
+(defconst sos-cc++-tag
+  (concat (prj-project-config-dir) "/tags/ccpp.tags"))
+
+(defvar sos-cc++-process-tag nil)
+
+;; (find-tag)
+(defun sos-cc++-async-tag-complete (process message)
+  (cond
+   ((eq (process-status process) 'run))
+   ((memq (process-status process) '(stop exit signal))
+    (setq sos-cc++-process-tag nil)
+    (message "c/c++ tags is created!")
+    ;; (visit-tags-table sos-cc++-tag)
+    )))
+
+(defun sos-cc++-async-tag (input-files)
+  (setq sos-cc++-process-tag
+        (start-process-shell-command
+         "sos-cc++-tag"
+         nil
+         (format "grep \"%s\" \"%s\" | xargs etags -o \"%s\""
+                 sos-cc++-regexp
+                 input-files
+                 sos-cc++-tag)))
+  ;; Add process sentinel.
+  (set-process-sentinel sos-cc++-process-tag 'sos-cc++-async-tag-complete))
+
 (defun sos-cc++-init-tag ()
-  )
+  (let ((dir (file-name-directory sos-cc++-tag)))
+    (unless (file-exists-p dir)
+      (make-directory dir t))
+    (sos-cc++-async-tag (prj-project-files))))
 
 ;;;###autoload
 (defun sos-cc++-backend (command &rest arg)
   (case command
     (:init
      (add-hook 'prj-after-build-database-hook 'sos-cc++-init-tag)
-     (sos-cc++-init-tag))))
+     (sos-cc++-init-tag))
+    (:symbol)
+    (:candidates)))
 
 (provide 'sos-cc++-backend)
