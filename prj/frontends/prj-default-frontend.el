@@ -21,8 +21,9 @@
 (require 'widget)
 (require 'wid-edit)
 (require 'tooltip)
+
 (require 'company)
-(require 'company-files)
+(require 'grizzl)
 
 (defface prj-button-face
   '((t (:background "lightgrey" :foreground "black" :weight bold)))
@@ -356,10 +357,11 @@ remove one.\n"
     (:init)
     (:destroy)
     (:find-files
-     (let ((file (ido-completing-read
+     (let ((file (grizzl-completing-read
                   (format "[%s] Find file: " (prj-project-name))
                   files)))
-       (funcall 'prj-find-file-impl file)))))
+       (when file
+         (funcall 'prj-find-file-impl file))))))
 
 ;;;###autoload
 (defun prj-search-project-frontend (command &rest args)
@@ -415,7 +417,7 @@ remove one.\n"
          (setq prj-widget-word-only
                (widget-create 'checkbox
                               :format "%[%v%] Match Whole Word  "))
-         (widget-insert "\n")
+         (widget-insert "\n\n")
          (widget-insert "Document Types ")
          (widget-create 'push-button
                         :notify (prj-widget-checkbox-select-all prj-widget-doctypes)

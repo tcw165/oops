@@ -67,10 +67,8 @@
 ;; 2014-08-01 (0.0.1)
 ;;    Initial release.
 
-(require 'cl)
-(require 'ido)
-
 (require 'json)
+(require 'grizzl)
 (require 'prj-default-frontend)
 (require 'prj-default-backend)
 
@@ -352,9 +350,9 @@ user loads a project or unload a project."
   (plist-get prj-config :recent-files))
 
 ;;;###autoload
-(defun prj-project-files (&optional doctypes filepaths return-list)
+(defun prj-project-files (&optional doctypes filepaths other-format)
   "Return a list containing files in current project."
-  (prj-call-backends :find-files doctypes filepaths return-list))
+  (prj-call-backends :find-files doctypes filepaths other-format))
 
 ;;;###autoload
 (defun prj-project-set (key value)

@@ -28,7 +28,7 @@
 ;; 2014-08-01 (0.0.1)
 ;;    Initial release.
 
-(require 'ido)
+(require 'grizzl)
 
 (defvar prj-total-files-cache nil)
 
@@ -62,18 +62,14 @@
                                       (secure-hash 'sha1 name)))
       dir)))
 
-(defun prj-filedb-new-changes ()
-  (prj-filedb-path "new"))
-
-(defun prj-filedb-delete-changes ()
-  (prj-filedb-path "delete"))
-
 (defun prj-total-files-cache ()
   (let ((db-all (prj-filedb-path "all")))
     (when (file-exists-p db-all)
       (with-temp-buffer
         (insert-file-contents-literally db-all)
-        (setq prj-total-files-cache (split-string (buffer-string) "\n" t))))))
+        (message "[%s] Init fuzzy search for files..." (prj-project-name))
+        (setq prj-total-files-cache
+              (grizzl-make-index (split-string (buffer-string) "\n" t)))))))
 
 (defun prj-list-to-cmd-form (filepaths)
   (let ((filepath filepaths)
@@ -107,23 +103,6 @@ If `is-exclude' is t:
              (or matches "")
              (or excludes "")
              output))))
-
-(defun prj-process-find-new (filepaths newer-to output &optional matches excludes)
-  (let ((dir (file-name-directory output)))
-    (unless (file-exists-p dir)
-      (make-directory dir t))
-    (call-process-shell-command
-     (format "find %s -type f -newer \"%s\" %s 1>>\"%s\""
-             filepaths
-             newer-to
-             (or (and (or matches excludes)
-                      (format "\\( %s %s \\)"
-                              matches excludes))
-                 "")
-             output))))
-
-(defun prj-process-find-delete (filepaths output)
-  )
 
 (defun prj-matches-to-grep-form (doctype)
   "Convert DOCTYPE to string as include-path parameter for FIND.
@@ -188,8 +167,7 @@ Example:
 ;;;###autoload
 (defun prj-index-files-backend (command &rest args)
   (case command
-    (:init
-     (prj-total-files-cache))
+    (:init)
     (:destroy
      (setq prj-total-files-cache nil)
      (garbage-collect))
@@ -197,14 +175,12 @@ Example:
      (let* ((filepaths (prj-list-to-cmd-form (prj-project-filepaths)))
             (excludes (prj-matches-to-find-form prj-exclude-types t))
             (db-all (prj-filedb-path "all"))
-            (db-dir (file-name-directory db-all))
-            (db-new (prj-filedb-new-changes))
-            (db-delete (prj-filedb-delete-changes)))
+            (db-dir (file-name-directory db-all)))
        ;; New database.
        (when (file-exists-p db-dir)
          (delete-directory db-dir t nil))
        (make-directory db-dir)
-       (write-region 1 1 db-all)
+       (write-region 1 1 db-all nil 0)
        ;; Collect files in respect of document types.
        (dolist (doctype (prj-project-doctypes))
          (let ((matches (prj-matches-to-find-form
@@ -218,7 +194,7 @@ Example:
      (prj-total-files-cache))))
 
 ;;;###autoload
-(defun prj-find-files-backend (command &optional doctypes filepaths return-list)
+(defun prj-find-files-backend (command &optional doctypes filepaths other-format)
   (case command
     (:init)
     (:destroy)
@@ -227,12 +203,14 @@ Example:
        (error "The parameter, doctypes, must be a list!"))
      (unless (listp filepaths)
        (error "The parameter, filepaths, must be a list!"))
+     (unless prj-total-files-cache
+       (prj-total-files-cache))
      (cond
       ;; Return "all" file ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-      ((and (null doctypes) (null filepaths) (null return-list))
+      ((and (null doctypes) (null filepaths) (null other-format))
        (prj-filedb-path "all"))
       ;; Return list of all files ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-      ((and (null doctypes) (null filepaths) return-list)
+      ((and (null doctypes) (null filepaths) other-format)
        prj-total-files-cache)
       ;; Others ... ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
       (t
@@ -240,7 +218,7 @@ Example:
              (temp2 (prj-filedb-path "temp2"))
              file)
          ;; Filter document types
-         (write-region 1 1 temp1)
+         (write-region 1 1 temp1  nil 0)
          (if doctypes
              (dolist (doctype doctypes)
                (when (and (setq file (prj-filedb-path doctype))
@@ -248,12 +226,12 @@ Example:
                  (prj-process-cat file temp1)))
            (setq temp1 (prj-filedb-path "all")))
          ;; Filter file paths
-         (write-region 1 1 temp2)
+         (write-region 1 1 temp2  nil 0)
          (if filepaths
              (dolist (filepath filepaths)
                (prj-process-sync-grep (expand-file-name filepath) temp1 temp2))
            (setq temp2 temp1))
-         (if return-list
+         (if other-format
              (with-temp-buffer
                (insert-file-contents-literally temp2)
                (split-string (buffer-string) "\n" t))
