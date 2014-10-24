@@ -46,7 +46,7 @@
    ((eq (process-status process) 'run))
    ((memq (process-status process) '(stop exit signal))
     (setq sos-cc++-process-tag nil)
-    (message (format "c/c++ tags is updated! %s" (process-status process))))))
+    (message "c/c++ tags is updated! %s" (process-status process)))))
 
 (defun sos-cc++-async-tag (input-files)
   (setq sos-cc++-process-tag
@@ -60,11 +60,10 @@
   ;; Add process sentinel.
   (set-process-sentinel sos-cc++-process-tag 'sos-cc++-async-tag-complete))
 
-(defun sos-cc++-build-tag (&optional is-rebuild &rest args)
+(defun sos-cc++-build-tag ()
   (let* ((tag-file (sos-cc++-tag))
          (tag-dir (file-name-directory tag-file)))
-    (when (or (not (file-exists-p tag-file))
-              is-rebuild)
+    (unless (file-exists-p tag-file)
       (and (file-exists-p tag-dir)
            (delete-directory tag-dir t))
       (make-directory tag-dir t)

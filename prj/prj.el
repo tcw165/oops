@@ -386,7 +386,9 @@ user loads a project or unload a project."
     (prj-plist-put config :filepaths filepaths)
     (prj-export-json path config)
     ;; Load project.
-    (prj-load-project name)))
+    (prj-load-project name)
+    ;; Update database
+    (prj-build-database)))
 
 ;;;###autoload
 (defun prj-delete-project-impl (projects)
@@ -413,10 +415,11 @@ user loads a project or unload a project."
         prj-config (prj-import-json (prj-config-path name)))
   ;; Open files.
   (mapc 'find-file-existing (prj-project-recent-files))
-  (unless prj-project-mode
+  (if prj-project-mode
+      (progn
+        (prj-destroy-backends)
+        (prj-init-backends))
     (prj-project-mode 1))
-  ;; Update database
-  (prj-build-database)
   (message "Load [%s] ...done" (prj-project-name)))
 
 ;;;###autoload
@@ -431,7 +434,7 @@ user loads a project or unload a project."
     ;; Update database.
     (unless (and (equal doctypes old-doctypes)
                  (equal filepaths old-filepaths))
-      (prj-build-database t))))
+      (prj-build-database))))
 
 ;;;###autoload
 (defun prj-find-file-impl (file)
@@ -524,19 +527,15 @@ project to be loaded."
     (message "Unload [%s] ...done" name)))
 
 ;;;###autoload
-(defun prj-build-database (&optional is-rebuild)
-  (interactive
-   (and (string= "all" (ido-completing-read
-                         (format "[%s] How to build database? " (prj-project-name))
-                         '("partial" "all")
-                         nil
-                         t)) '(t)))
+(defun prj-build-database ()
+  (interactive)
   ;; Create file list which is the data base of the project's files.
   (when (prj-project-p)
-    (message "Building database might take a while, please wait ...")
-    (prj-call-backends :index-files is-rebuild)
-    (run-hook-with-args 'prj-after-build-database-hook is-rebuild)
-    (message "Database is updated!")))
+    (message "[%s] Building database might take a while, please wait ..."
+             (prj-project-name))
+    (prj-call-backends :index-files)
+    (run-hooks 'prj-after-build-database-hook)
+    (message "[%s] Database is updated!" (prj-project-name))))
 
 ;;;###autoload
 (defun prj-find-file ()

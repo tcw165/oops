@@ -36,16 +36,6 @@
 
 (defvar prj-grep-output-file nil)
 
-(defun prj-filedb-path (&optional name)
-  (let ((dir (expand-file-name (format "%s/%s/files"
-                                       prj-workspace-path
-                                       (prj-project-name)))))
-    (if name
-        (format "%s/%s.files" dir (or (and (string= name "all") name)
-                                      (and (string-match "^temp.*" name) name)
-                                      (secure-hash 'sha1 name)))
-      dir)))
-
 (defun prj-export-data (filename data)
   "Export `data' to `filename' file. The saved data can be imported with `prj-import-data'."
   (when (file-writable-p filename)
@@ -59,6 +49,31 @@
     (with-temp-buffer
       (insert-file-contents filename)
       (read (buffer-string)))))
+
+(defun prj-filedb-path (&optional name)
+  (let ((dir (expand-file-name (format "%s/%s/files"
+                                       prj-workspace-path
+                                       (prj-project-name)))))
+    (if name
+        (format "%s/%s.files" dir (or (and (string= name "all") name)
+                                      (and (string-match "^new.*" name) name)
+                                      (and (string-match "^delete.*" name) name)
+                                      (and (string-match "^temp.*" name) name)
+                                      (secure-hash 'sha1 name)))
+      dir)))
+
+(defun prj-filedb-new-changes ()
+  (prj-filedb-path "new"))
+
+(defun prj-filedb-delete-changes ()
+  (prj-filedb-path "delete"))
+
+(defun prj-total-files-cache ()
+  (let ((db-all (prj-filedb-path "all")))
+    (when (file-exists-p db-all)
+      (with-temp-buffer
+        (insert-file-contents-literally db-all)
+        (setq prj-total-files-cache (split-string (buffer-string) "\n" t))))))
 
 (defun prj-list-to-cmd-form (filepaths)
   (let ((filepath filepaths)
@@ -83,21 +98,32 @@ If `is-exclude' is t:
       (replace-regexp-in-string ";" "\" -o -name \"" matches))))
 
 (defun prj-process-find (filepaths output &optional matches excludes)
-  "Use `call-process' to call FIND. FILEPATHS is a file list, (FILE1 FILE2 ...).
- MATCHES and EXCLUDES is strings in format of \"-name pattern\"."
   (let ((dir (file-name-directory output)))
     (unless (file-exists-p dir)
       (make-directory dir t))
     (call-process-shell-command
-     (format "find %s %s %s 1>\"%s\" 2>/dev/null"
+     (format "find %s -type f %s %s 1>\"%s\""
              filepaths
              (or matches "")
              (or excludes "")
              output))))
 
-(defun prj-process-find-change (filepaths compare-to output &optional matches excludes)
-  ;; TODO:
-  t)
+(defun prj-process-find-new (filepaths newer-to output &optional matches excludes)
+  (let ((dir (file-name-directory output)))
+    (unless (file-exists-p dir)
+      (make-directory dir t))
+    (call-process-shell-command
+     (format "find %s -type f -newer \"%s\" %s 1>>\"%s\""
+             filepaths
+             newer-to
+             (or (and (or matches excludes)
+                      (format "\\( %s %s \\)"
+                              matches excludes))
+                 "")
+             output))))
+
+(defun prj-process-find-delete (filepaths output)
+  )
 
 (defun prj-matches-to-grep-form (doctype)
   "Convert DOCTYPE to string as include-path parameter for FIND.
@@ -127,14 +153,14 @@ Example:
     (run-hooks 'post-command-hook))))
 
 (defun prj-process-async-grep (match input-file output-file case-sensitive)
-  (message (format "[%s] Searching is processing..." (prj-project-name)))
+  (message "[%s] Searching is processing..." (prj-project-name))
   (call-process-shell-command (format "echo \">>>>> %s\" 1>>\"%s\""
                                       match
                                       output-file))
   (setq prj-process-grep (start-process-shell-command
                           "prj-process-grep"
                           nil
-                          (format "xargs grep -nH %s \"%s\" < \"%s\" 1>>\"%s\" 2>/dev/null"
+                          (format "xargs grep -nH %s \"%s\" < \"%s\" 1>>\"%s\""
                                   (if (null case-sensitive) "-i" "")
                                   match
                                   input-file
@@ -160,40 +186,36 @@ Example:
 ;; Back-ends ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
-(defun prj-index-files-backend (command &optional is-rebuild)
+(defun prj-index-files-backend (command &rest args)
   (case command
-    (:init)
+    (:init
+     (prj-total-files-cache))
     (:destroy
      (setq prj-total-files-cache nil)
      (garbage-collect))
     (:index-files
-     (let* ((all-files (prj-filedb-path "all"))
-            (dir (file-name-directory all-files)))
-       (if (or (not (file-exists-p all-files))
-               is-rebuild)
-           (progn
-             ;; New database.
-             (when (file-exists-p dir)
-               (delete-directory dir t nil))
-             (make-directory dir)
-             (write-region 1 1 all-files)
-             ;; Collect files in respect of document types.
-             (dolist (doctype (prj-project-doctypes))
-               (let ((files (prj-filedb-path doctype)))
-                 ;; Single category database.
-                 (prj-process-find
-                  (prj-list-to-cmd-form (prj-project-filepaths))
-                  files
-                  (prj-matches-to-find-form (cdr (assoc doctype prj-document-types)))
-                  (prj-matches-to-find-form prj-exclude-types t))
-                 ;; Set of categories database.
-                 (prj-process-cat files all-files))))
-         ;; (prj-process-find-change)
-         )
-       ;; Export all database.
-       (with-temp-buffer
-         (insert-file-contents-literally all-files)
-         (setq prj-total-files-cache (split-string (buffer-string) "\n" t)))))))
+     (let* ((filepaths (prj-list-to-cmd-form (prj-project-filepaths)))
+            (excludes (prj-matches-to-find-form prj-exclude-types t))
+            (db-all (prj-filedb-path "all"))
+            (db-dir (file-name-directory db-all))
+            (db-new (prj-filedb-new-changes))
+            (db-delete (prj-filedb-delete-changes)))
+       ;; New database.
+       (when (file-exists-p db-dir)
+         (delete-directory db-dir t nil))
+       (make-directory db-dir)
+       (write-region 1 1 db-all)
+       ;; Collect files in respect of document types.
+       (dolist (doctype (prj-project-doctypes))
+         (let ((matches (prj-matches-to-find-form
+                         (cdr (assoc doctype prj-document-types))))
+               (db-doctype (prj-filedb-path doctype)))
+           ;; Create single category database.
+           (prj-process-find filepaths db-doctype matches excludes)
+           ;; Concatenate single category database to all categories database.
+           (prj-process-cat db-doctype db-all))))
+     ;; Load database.
+     (prj-total-files-cache))))
 
 ;;;###autoload
 (defun prj-find-files-backend (command &optional doctypes filepaths return-list)
