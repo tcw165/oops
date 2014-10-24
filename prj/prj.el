@@ -473,7 +473,9 @@ user loads a project or unload a project."
   (interactive)
   (message "[%s] %s total files."
            (prj-project-name)
-           (length (prj-project-files nil nil t))))
+           (with-temp-buffer
+             (insert-file-contents-literally (prj-project-files))
+             (1- (count-lines 1 (point-max))))))
 
 ;;;###autoload
 (defun prj-create-project ()

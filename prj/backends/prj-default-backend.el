@@ -56,20 +56,12 @@
                                        (prj-project-name)))))
     (if name
         (format "%s/%s.files" dir (or (and (string= name "all") name)
-                                      (and (string-match "^new.*" name) name)
-                                      (and (string-match "^delete.*" name) name)
                                       (and (string-match "^temp.*" name) name)
                                       (secure-hash 'sha1 name)))
       dir)))
 
-(defun prj-total-files-cache ()
-  (let ((db-all (prj-filedb-path "all")))
-    (when (file-exists-p db-all)
-      (with-temp-buffer
-        (insert-file-contents-literally db-all)
-        (message "[%s] Init fuzzy search for files..." (prj-project-name))
-        (setq prj-total-files-cache
-              (grizzl-make-index (split-string (buffer-string) "\n" t)))))))
+(defun prj-total-files-cache-path ()
+  (prj-filedb-path "temp0"))
 
 (defun prj-list-to-cmd-form (filepaths)
   (let ((filepath filepaths)
@@ -167,7 +159,11 @@ Example:
 ;;;###autoload
 (defun prj-index-files-backend (command &rest args)
   (case command
-    (:init)
+    (:init
+     (unless prj-total-files-cache
+       (message "[%s] Initializing fuzzy search for files..." (prj-project-name))
+       (setq prj-total-files-cache (prj-import-data
+                                    (prj-total-files-cache-path)))))
     (:destroy
      (setq prj-total-files-cache nil)
      (garbage-collect))
@@ -189,9 +185,15 @@ Example:
            ;; Create single category database.
            (prj-process-find filepaths db-doctype matches excludes)
            ;; Concatenate single category database to all categories database.
-           (prj-process-cat db-doctype db-all))))
-     ;; Load database.
-     (prj-total-files-cache))))
+           (prj-process-cat db-doctype db-all)))
+       ;; Create fuzzy search table in the memory.
+       (with-temp-buffer
+         (message "[%s] Initializing fuzzy search for files..." (prj-project-name))
+         (insert-file-contents-literally db-all)
+         (prj-export-data
+          (prj-total-files-cache-path)
+          (setq prj-total-files-cache
+                (grizzl-make-index (split-string (buffer-string) "\n" t)))))))))
 
 ;;;###autoload
 (defun prj-find-files-backend (command &optional doctypes filepaths other-format)
@@ -203,8 +205,6 @@ Example:
        (error "The parameter, doctypes, must be a list!"))
      (unless (listp filepaths)
        (error "The parameter, filepaths, must be a list!"))
-     (unless prj-total-files-cache
-       (prj-total-files-cache))
      (cond
       ;; Return "all" file ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
       ((and (null doctypes) (null filepaths) (null other-format))
