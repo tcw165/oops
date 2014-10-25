@@ -88,6 +88,7 @@ project; Powerful selective grep string or regular expression in a project, etc.
 
 (defcustom prj-document-types '(("Text" . "*.txt;*.md")
                                 ("Emacs Lisp" . ".emacs;*.el")
+                                ("Shell" . "*.sh")
                                 ("Python" . "*.py")
                                 ("C/C++ Header" . "*.h;*.hxx;*.hpp")
                                 ("C/C++ Source" . "*.c;*.cxx;*.cpp"))

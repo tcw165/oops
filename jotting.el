@@ -5,3 +5,5 @@
                                                   "/Users/Boy/Documents/_CPP/ycmd/ycmd/completers/general/tests/testdata/filename_completer/test.cpp")))
 (grizzl-result-count prj-total-files-cache)
 (hash-table-count prj-total-files-cache)
+
+(grizzl-mode)
