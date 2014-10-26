@@ -112,6 +112,7 @@ LIBRARY should be a string (the name of the library)."
                                                  sos-elisp-find-feature-regexp))
              (linum (nth 1 doc&linum))
              (keywords (nth 2 doc&linum)))
+        (and (= linum 0) (error "linum should be a positive integer!"))
         `(:symbol ,thing :type "feature" :file ,file :linum ,linum
                   :keywords ,keywords)))))
 

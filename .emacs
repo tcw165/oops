@@ -1,7 +1,3 @@
-;; Initalize packages before `custom-set-variables' is called.
-;; It is especially for 3rd party packages which are added to load-path lately.
-(package-initialize)
-
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
@@ -11,6 +7,8 @@
  '(cua-mode t nil (cua-base))
  '(electric-indent-mode t)
  '(electric-pair-mode t)
+ '(enable-local-eval nil)
+ '(enable-local-variables nil)
  '(hl-line-sticky-flag nil)
  '(ido-mode (quote both) nil (ido))
  '(imenu-sort-function (quote imenu--sort-by-name))
@@ -35,6 +33,9 @@
  '(link ((t (:foreground "blue" :underline t :weight bold))))
  '(tooltip ((t (:background "cornsilk" :foreground "Black" :weight bold :family "Monaco")))))
 
+;; Initalize packages before `custom-set-variables' is called.
+;; It is especially for 3rd party packages which are added to load-path lately.
+(package-initialize)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Key Binding ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

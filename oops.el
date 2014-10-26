@@ -349,6 +349,7 @@ or go back to just one window (by deleting all but the selected window)."
 (defun oops-add-hooks (hook &optional funcs)
   (add-hook hook 'linum-mode t)
   (add-hook hook 'hl-line-mode t)
+  (add-hook hook 'company-mode t)
   (dolist (func funcs)
     (add-hook hook func t)))
 
@@ -361,18 +362,20 @@ or go back to just one window (by deleting all but the selected window)."
   (setq save-place-file "~/.emacs.d/.emacs-places")
   (setq-default save-place t)
   ;; Mode hooks
-  (oops-add-hooks 'emacs-lisp-mode-hook '(imenu-add-menubar-index
-                                          company-mode))
+  (oops-add-hooks 'emacs-lisp-mode-hook '(hl-paren-mode
+                                          imenu-add-menubar-index))
   (oops-add-hooks 'python-mode-hook)
-  ;; (oops-add-hooks 'python-mode-hook '(company-mode))
-  ;; (oops-add-hooks 'c-mode-hook)
-  ;; (oops-add-hooks 'c++-mode-hook)
+  (oops-add-hooks 'c-mode-hook)
+  (oops-add-hooks 'c++-mode-hook)
   ;; Company extension.
   (setq company-idle-delay 0)
   (setq company-minimum-prefix-length 1)
   (setq company-frontends '(company-pseudo-tooltip-unless-just-one-frontend
                             company-preview-frontend
                             company-echo-metadata-frontend))
+  (setq company-backends '((company-elisp company-files)
+                           ;; (company-clang company-files)
+                           (company-cmake company-files)))
   ;; Project management.
   (unless (prj-load-recent-project)
     (prj-load-project))
