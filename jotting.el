@@ -13,11 +13,11 @@
 (require 'jedi)
 (add-hook 'python-mode-hook 'auto-complete-mode)
 (add-hook 'python-mode-hook 'jedi:setup)
-;; (add-hook 'python-mode-hook 'jedi:ac-setup)
 (setq jedi:complete-on-dot t
       ;; jedi:server-command "/Library/Frameworks/Python.framework/Versions/3.4/lib/python3.4/site-packages//jediepcserver.py"
       )
-(jedi:install-server)
+;; (jedi:start-server)
+;; (jedi:install-server)
 ;; (jedi:show-setup-info)
 ;; jedi:server-command
 ;; (getenv "PATH")

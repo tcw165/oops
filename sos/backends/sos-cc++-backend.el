@@ -61,13 +61,14 @@
   (set-process-sentinel sos-cc++-process-tag 'sos-cc++-async-tag-complete))
 
 (defun sos-cc++-build-tag ()
-  (let* ((tag-file (sos-cc++-tag))
-         (tag-dir (file-name-directory tag-file)))
-    (unless (file-exists-p tag-file)
-      (and (file-exists-p tag-dir)
-           (delete-directory tag-dir t))
-      (make-directory tag-dir t)
-      (sos-cc++-async-tag (prj-project-files)))))
+  ;; (let* ((tag-file (sos-cc++-tag))
+  ;;        (tag-dir (file-name-directory tag-file)))
+  ;;   (unless (file-exists-p tag-file)
+  ;;     (and (file-exists-p tag-dir)
+  ;;          (delete-directory tag-dir t))
+  ;;     (make-directory tag-dir t)
+  ;;     (sos-cc++-async-tag (prj-project-files))))
+  )
 
 ;;;###autoload
 (defun sos-cc++-backend (command &rest arg)

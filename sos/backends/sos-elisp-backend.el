@@ -392,7 +392,7 @@ file-local variable.\n")
 (defun sos-elisp-backend (command &rest args)
   (case command
     (:symbol
-     (when (member major-mode '(emacs-lisp-mode
+     (when (memq major-mode '(emacs-lisp-mode
                                 lisp-interaction-mode))
        (let ((symb (sos-elisp-thingatpt)))
          ;; Return the thing in string or `:stop'.

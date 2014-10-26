@@ -40,6 +40,7 @@
 (require 'sos-grep-backend)
 (require 'sos-candidates-preview-backend)
 (require 'sos-elisp-backend)
+(require 'sos-jedi-backend)
 (require 'sos-cc++-backend)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -53,6 +54,7 @@ meaningful information around the point."
 (defcustom sos-backends '(sos-candidates-preview-backend
                           sos-grep-backend
                           sos-elisp-backend
+                          sos-jedi-backend
                           sos-cc++-backend)
   "The list of back-ends for the purpose of collecting candidates. The sos 
 engine will dispatch all the back-ends and pass specific commands in order. 
