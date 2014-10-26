@@ -39,6 +39,7 @@
 
 ;;; 3rd party library ==========================================================
 (require 'company)
+(require 'exec-path-from-shell)
 
 (require 'grep-mode)
 (require 'hl-anything)
@@ -356,6 +357,10 @@ or go back to just one window (by deleting all but the selected window)."
 ;;;###autoload
 (defun oops-default-config ()
   (interactive)
+  ;; Emacs instance started from the GUI inherits a default set of environment
+  ;; variables on OSX.
+  (when (memq window-system '(mac ns))
+    (exec-path-from-shell-initialize))
   ;; Mode line.
   (setq-default mode-line-format oops-default-mode-line)
   ;; Save place.
