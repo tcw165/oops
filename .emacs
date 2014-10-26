@@ -11,7 +11,6 @@
  '(cua-mode t nil (cua-base))
  '(electric-indent-mode t)
  '(electric-pair-mode t)
- '(emacs-lisp-mode-hook (quote (hl-paren-mode imenu-add-menubar-index linum-mode hl-line-mode)))
  '(hl-line-sticky-flag nil)
  '(ido-mode (quote both) nil (ido))
  '(imenu-sort-function (quote imenu--sort-by-name))

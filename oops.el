@@ -346,6 +346,12 @@ or go back to just one window (by deleting all but the selected window)."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Configuration Sets ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defun oops-add-hooks (hook &optional funcs)
+  (add-hook hook 'linum-mode t)
+  (add-hook hook 'hl-line-mode t)
+  (dolist (func funcs)
+    (add-hook hook func t)))
+
 ;;;###autoload
 (defun oops-default-config ()
   (interactive)
@@ -354,11 +360,14 @@ or go back to just one window (by deleting all but the selected window)."
   ;; Save place.
   (setq save-place-file "~/.emacs.d/.emacs-places")
   (setq-default save-place t)
+  ;; Mode hooks
+  (oops-add-hooks 'emacs-lisp-mode-hook '(imenu-add-menubar-index
+                                          company-mode))
+  (oops-add-hooks 'python-mode-hook)
+  ;; (oops-add-hooks 'python-mode-hook '(company-mode))
+  ;; (oops-add-hooks 'c-mode-hook)
+  ;; (oops-add-hooks 'c++-mode-hook)
   ;; Company extension.
-  (add-hook 'emacs-lisp-mode-hook 'company-mode)
-  ;; (add-hook 'c-mode-hook 'company-mode)
-  ;; (add-hook 'c++-mode-hook 'company-mode)
-  (add-hook 'python-mode-hook 'company-mode)
   (setq company-idle-delay 0)
   (setq company-minimum-prefix-length 1)
   (setq company-frontends '(company-pseudo-tooltip-unless-just-one-frontend
