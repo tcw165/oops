@@ -35,7 +35,6 @@
 (require 'imenu)
 (require 'thingatpt)
 (require 'company)
-(require 'saveplace)
 
 ;;; 3rd party library ==========================================================
 (require 'company)
@@ -236,6 +235,7 @@
     (let ((process-connection-type nil))
       (start-process "" nil "xdg-open" ".")))))
 
+;; TODO: deprecated
 ;;;###autoload
 (defun oops-goto-global-symbol ()
   ""
@@ -245,6 +245,7 @@
    ((memq major-mode (list 'emacs-lisp-mode
                            'lisp-interaction-mode)))))
 
+;; TODO: deprecated
 ;;;###autoload
 (defun oops-goto-local-symbol ()
   (interactive)
@@ -363,9 +364,6 @@ or go back to just one window (by deleting all but the selected window)."
     (exec-path-from-shell-initialize))
   ;; Mode line.
   (setq-default mode-line-format oops-default-mode-line)
-  ;; Save place.
-  (setq save-place-file "~/.emacs.d/.emacs-places")
-  (setq-default save-place t)
   ;; Mode hooks
   (oops-add-hooks 'emacs-lisp-mode-hook '(hl-paren-mode
                                           imenu-add-menubar-index))

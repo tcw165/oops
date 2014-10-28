@@ -67,6 +67,8 @@
 ;; 2014-08-01 (0.0.1)
 ;;    Initial release.
 
+(require 'saveplace)
+
 (require 'json)
 (require 'grizzl)
 (require 'prj-default-frontend)
@@ -90,6 +92,7 @@ project; Powerful selective grep string or regular expression in a project, etc.
                                 ("Emacs Lisp" . ".emacs;*.el")
                                 ("Shell" . ".bashrc;.bash_profile;.zshrc;*.sh")
                                 ("Python" . "*.py")
+                                ("Octave" . "*.m")
                                 ("C/C++ Header" . "*.h;*.hxx;*.hpp")
                                 ("C/C++ Source" . "*.c;*.cxx;*.cpp"))
   "Categorize file names refer to specific matches and give them type names. 
@@ -407,7 +410,7 @@ user loads a project or unload a project."
   "Internal function to edit project. It is called by functions in the 
 `prj-load-project-frontend'."
   ;; Save files in the last session.
-  (prj-save-file-names t)
+  (prj-save-recent-files t)
   (prj-clean-config&search)
   ;; Read configuration.
   (setq prj-name name
@@ -522,7 +525,9 @@ project to be loaded."
   (unless prj-project-mode
     (prj-project-mode 1))
   ;; Save files in the last session.
-  (prj-save-file-names t)
+  (prj-save-recent-files t)
+  ;; Stop saveplaces.
+  (setq-default save-place nil)
   (let ((name (prj-project-name)))
     (prj-clean-config&search)
     (message "Unload [%s] ...done" name)))
@@ -566,10 +571,15 @@ project to be loaded."
         (switch-to-buffer (prj-searchdb-buffer t) t t)
         (his-add-position-type-history)))))
 
+;;;###autoload
+(defun prj-list-files ()
+  (interactive)
+  (switch-to-buffer (list-buffers-noselect t) t t))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Project Mode ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun prj-save-file-names (&optional close)
+(defun prj-save-recent-files (&optional close)
   (when (prj-project-p)
     ;; Save file names opened in current session.
     (let (file
@@ -588,7 +598,7 @@ project to be loaded."
       (prj-export-config))))
 
 (defun prj-kill-emacs-hook ()
-  (prj-save-file-names))
+  (prj-save-recent-files))
 
 ;;;###autoload
 (define-minor-mode prj-project-mode
@@ -603,5 +613,11 @@ project to be loaded."
     (remove-hook 'kill-emacs-hook 'prj-kill-emacs-hook nil)
     (prj-destroy-frontends)
     (prj-destroy-backends)))
+
+;; Force to reload save-place database.
+(setq-default save-place t)
+(setq save-place-loaded nil
+      save-place-file (format "%s/saveplaces.db"
+                              (expand-file-name prj-workspace-path)))
 
 (provide 'prj)

@@ -150,7 +150,7 @@ into the stack when user navigate to deeper definition in the definition window.
     (sos-candidates-mode)
     ;; Recover the selection in the last session.
     (when (and select-index (integerp select-index))
-      (goto-line (1+ select-index)))))
+      (forward-line select-index))))
 
 (defun sos-show-candidates-common ()
   "Show multiple candidates prompt."
@@ -263,7 +263,8 @@ into the stack when user navigate to deeper definition in the definition window.
 (defvar sos-candidate-mode-map
   (let ((map (make-sparse-keymap)))
     (suppress-keymap map t)
-    (define-key map [?q] 'sos-back-to-source-window)
+    (define-key map [?q] 'sos-jump-out-candidate)
+    (define-key map [escape] 'sos-back-to-source-window)
     (define-key map [return] 'sos-open-candidate)
     map))
 
@@ -331,7 +332,9 @@ into the stack when user navigate to deeper definition in the definition window.
            (linum (plist-get candidate :linum)))
       (when (and linum (integerp linum))
         (sos-with-definition-buffer
-          (goto-line linum)
+          (goto-char 1)
+          (forward-line (1- linum))
+          (end-of-line)
           (recenter 3))))))
 
 ;;;###autoload
@@ -355,8 +358,8 @@ into the stack when user navigate to deeper definition in the definition window.
   (let ((map (make-sparse-keymap)))
     (suppress-keymap map t)
     (define-key map [?e] 'sos-jump-in-candidate)
-    (define-key map [?q] 'sos-back-to-source-window)
     (define-key map [return] 'sos-jump-in-candidate)
+    (define-key map [escape] 'sos-back-to-source-window)
     (define-key map [left] '(lambda () (interactive) (sos-left-char)))
     (define-key map [right] '(lambda () (interactive) (sos-right-char)))
     (define-key map [up] '(lambda () (interactive) (sos-previous-line)))

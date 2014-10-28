@@ -51,11 +51,11 @@
 meaningful information around the point."
   :tag "Sos")
 
-(defcustom sos-backends '(sos-candidates-preview-backend
-                          sos-grep-backend
-                          sos-elisp-backend
+(defcustom sos-backends '(sos-elisp-backend
                           sos-jedi-backend
-                          sos-cc++-backend)
+                          sos-cc++-backend
+                          sos-grep-backend
+                          sos-candidates-preview-backend)
   "The list of back-ends for the purpose of collecting candidates. The sos 
 engine will dispatch all the back-ends and pass specific commands in order. 
 Every command has its purpose, paremeter rule and return rule (get meaningful 
@@ -292,18 +292,6 @@ result to the `sos-def-buf' displayed in the `sos-def-win'."
         nil)
     nil))
 
-;;;###autoload
-(defun sos-goto-local-symbol ()
-  (interactive)
-  ;; TODO:
-  )
-
-;;;###autoload
-(defun sos-goto-global-symbol ()
-  (interactive)
-  ;; TODO:
-  )
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Go to Definition ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -349,5 +337,17 @@ result to the `sos-def-buf' displayed in the `sos-def-win'."
   (if (null sos-backend)
       (sos-goto-def-1st-process)
     (sos-goto-def-normal-process sos-backend)))
+
+;;;###autoload
+(defun sos-goto-local-symbol ()
+  (interactive)
+  ;; TODO:
+  )
+
+;;;###autoload
+(defun sos-goto-global-symbol ()
+  (interactive)
+  ;; TODO:
+  )
 
 (provide 'sos)

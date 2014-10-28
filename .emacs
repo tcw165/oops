@@ -57,7 +57,7 @@
 ;; Ctrl + l
 (global-set-key (kbd "C-l") 'goto-line)
 ;; Ctrl + Alt + l
-(global-set-key (kbd "C-M-l") 'ido-switch-buffer)
+(global-set-key (kbd "C-M-l") 'prj-list-files)
 
 ;; Ctrl + /
 (global-set-key (kbd "C-/") 'oops-toggle-comment)
