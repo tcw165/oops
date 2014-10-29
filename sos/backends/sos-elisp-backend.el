@@ -140,25 +140,22 @@ refer to `find-function-noselect', `find-function-search-for-symbol' and
                 (princ usage)
                 (terpri)(terpri)
                 (princ doc)
-                `(:symbol ,thing :doc ,(buffer-string) :type "built-in function"
-                          :linum 1 :keywords ,keywords
-                          :mode-line ,(format "%s is a built-in Elisp function. "
-                                              (propertize thing
-                                                          'face 'tooltip)))))
+                (list :symbol thing
+                      :type "built-in function"
+                      :doc (buffer-string)
+                      :linum 1
+                      :keywords keywords)))
           ;; Normal Function ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           (let* ((file (sos-elisp-normalize-path (symbol-file real-symb 'defun)))
                  (doc&linum (sos-elisp-get-doc&linum file thing
                                                      sos-elisp-find-function-regexp))
                  (linum (nth 1 doc&linum))
                  (keywords (nth 2 doc&linum)))
-            `(:symbol ,thing :type "function" :file ,file :linum ,linum
-                      :keywords ,keywords
-                      :mode-line ,(unless (eq real-symb symb)
-                                    (format "%s is an alias of %s "
-                                            (propertize (symbol-name symb)
-                                                        'face 'tooltip)
-                                            (propertize (symbol-name real-symb)
-                                                        'face 'tooltip))))))))))
+            (list :symbol thing
+                  :type "function"
+                  :file file
+                  :linum linum
+                  :keywords keywords)))))))
 
 (defun sos-elisp-find-variable (thing symb)
   "Return the candidate pointing to the definition of `symb'. It was written 
@@ -166,7 +163,7 @@ refer to `find-variable-noselect', `find-function-search-for-symbol' and
 `describe-variable'."
   (ignore-errors
     (when symb
-      (let* ((file (symbol-file symb 'defvar)))
+      (let ((file (symbol-file symb 'defvar)))
         (if file
             ;; Normal Variable ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
             (let* ((file (sos-elisp-normalize-path file))
@@ -174,8 +171,11 @@ refer to `find-variable-noselect', `find-function-search-for-symbol' and
                                                        sos-elisp-find-variable-regexp))
                    (linum (nth 1 doc&linum))
                    (keywords (nth 2 doc&linum)))
-              `(:symbol ,thing :type "variable" :file ,file :linum ,linum
-                        :keywords ,keywords))
+              (list :symbol thing
+                    :type "variable"
+                    :file file
+                    :linum linum
+                    :keywords keywords))
           ;; Built-in Variable ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           (let* ((doc (documentation-property symb 'variable-documentation))
                  (keywords (sos-elisp-variable-document-keywords thing))
@@ -269,10 +269,11 @@ file-local variable.\n")
                              (format "`%s'.\n" safe-var))))
                   (and extra-line (terpri)))
                 (princ (format "Documentation:\n%s" doc))
-                `(:symbol ,thing :doc ,(buffer-string) :type "built-in variable"
-                          :linum 1 :keywords ,keywords
-                          :mode-line ,(format "%s is a built-in Elisp variable."
-                                              (propertize thing 'face 'link)))))))))))
+                (list :symbol thing
+                      :doc (buffer-string)
+                      :type "built-in variable"
+                      :linum 1
+                      :keywords keywords)))))))))
 
 (defun sos-elisp-lets-pos ()
   (let (pos)
@@ -334,10 +335,11 @@ file-local variable.\n")
                                           (regexp-quote thing)
                                           "\\)")))
                     (throw 'break)))))))))
-    (when regexp
-      `(:symbol ,thing :type "local variable" :file ,(buffer-file-name)
-                :linum ,linum
-                :keywords ((,regexp 1 'hl-symbol-face prepend))))))
+    (and regexp (list :symbol thing
+                      :type "local variable"
+                      :file (buffer-file-name)
+                      :linum linum
+                      :keywords `((,regexp 1 'hl-symbol-face prepend))))))
 
 (defun sos-elisp-find-function-parameter (thing)
   (let ((linum 0)
@@ -346,36 +348,38 @@ file-local variable.\n")
     (ignore-errors
       (save-excursion
         (beginning-of-defun)
-        (setq linum (line-number-at-pos))
-        (down-list 2)
-        (catch 'break
-          (while (progn (forward-sexp) t)
-            (save-excursion
-              (setq end (point))
-              (backward-sexp)
-              (setq beg (point))
-              (when (string= thing (buffer-substring-no-properties
-                                    beg
-                                    end))
-                (setq regexp (concat
-                              "^"
-                              (regexp-quote
-                               (buffer-substring-no-properties
-                                (line-beginning-position)
-                                beg))
-                              (concat "\\(?1:"
-                                      (regexp-quote thing)
-                                      "\\)")
-                              (regexp-quote
-                               (buffer-substring-no-properties
-                                end
-                                (line-end-position)))
-                              "$"))
-                (throw 'break)))))))
-    (when regexp
-      `(:symbol ,thing :type "function param" :file ,(buffer-file-name)
-                :linum ,linum
-                :keywords ((,regexp 1 'hl-symbol-face prepend))))))
+        (when (looking-at "^(defun\\s-.*")
+          (setq linum (line-number-at-pos))
+          (down-list 2)
+          (catch 'break
+            (while (progn (forward-sexp) t)
+              (save-excursion
+                (setq end (point))
+                (backward-sexp)
+                (setq beg (point))
+                (when (string= thing (buffer-substring-no-properties
+                                      beg
+                                      end))
+                  (setq regexp (concat
+                                "^"
+                                (regexp-quote
+                                 (buffer-substring-no-properties
+                                  (line-beginning-position)
+                                  beg))
+                                (concat "\\(?1:"
+                                        (regexp-quote thing)
+                                        "\\)")
+                                (regexp-quote
+                                 (buffer-substring-no-properties
+                                  end
+                                  (line-end-position)))
+                                "$"))
+                  (throw 'break))))))))
+    (and regexp (list :symbol thing
+                      :type "function param"
+                      :file (buffer-file-name)
+                      :linum linum
+                      :keywords `((,regexp 1 'hl-symbol-face prepend))))))
 
 (defun sos-elisp-find-face (thing symb)
   (ignore-errors
@@ -385,8 +389,14 @@ file-local variable.\n")
                                                  sos-elisp-find-face-regexp))
              (linum (nth 1 doc&linum))
              (keywords (nth 2 doc&linum)))
-        `(:symbol ,thing :type "face" :file ,file :linum ,linum
-                  :keywords ,keywords)))))
+        (list :symbol thing
+              :type "face"
+              :file file
+              :linum linum
+              :keywords keywords)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Back-ends ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
 (defun sos-elisp-backend (command &rest args)

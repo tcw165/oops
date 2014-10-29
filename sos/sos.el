@@ -119,24 +119,19 @@ the following back-ends.
 
  `:show': t indicates front-ends show this CANDIDATE by default.
 
- `:mode-line': The additional string which will be concatenate to 
-               `mode-line-format'.
-
    ### Example - File Candidate:
    ((:symbol STRING
      :doc BUFFER_STRING
      :type STRING
      :file STRING
      :linum INTEGER
-     :match REGEXP
-     :mode-line STRING) ...)
+     :match REGEXP) ...)
 
    ### Example - Document Candidate:
    ((:symbol STRING
      :doc BUFFER_STRING
      :type STRING
-     :linum INTEGER
-     :mode-line STRING) ...)"
+     :linum INTEGER) ...)"
   :type '(repeat (symbol :tag "Back-end"))
   :group 'sos-group)
 
