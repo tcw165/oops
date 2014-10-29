@@ -50,8 +50,7 @@
                                  font-lock-string-face
                                  font-lock-comment-face))
                    (bounds-of-thing-at-point 'symbol)))))
-    (when bound
-      (buffer-substring-no-properties (car bound) (cdr bound)))))
+    (and bound (buffer-substring-no-properties (car bound) (cdr bound)))))
 
 (defun sos-elisp-normalize-path (file)
   ;; Convert extension from .elc to .el.
@@ -408,20 +407,18 @@ file-local variable.\n")
          ;; Return the thing in string or `:stop'.
          (or symb :stop))))
     (:candidates
-     (when args
-       (let* ((thing (car args))
-              (symb (intern-soft thing))
-              candidates)
-         ;; TODO: use tag system.
-         ;; The last one gets the top priority.
-         (dolist (cand (list (sos-elisp-find-feature thing symb)
-                             (sos-elisp-find-face thing symb)
-                             (sos-elisp-find-variable thing symb)
-                             (sos-elisp-find-function thing symb)
-                             (sos-elisp-find-function-parameter thing)
-                             (sos-elisp-find-let-variable thing)))
-           (and cand
-                (push cand candidates)))
-         candidates)))))
+     (let* ((thing (car args))
+            (symb (intern-soft thing))
+            candidates)
+       ;; TODO: use tag system.
+       ;; The last one gets the top priority.
+       (dolist (cand (list (sos-elisp-find-feature thing symb)
+                           (sos-elisp-find-face thing symb)
+                           (sos-elisp-find-variable thing symb)
+                           (sos-elisp-find-function thing symb)
+                           (sos-elisp-find-function-parameter thing)
+                           (sos-elisp-find-let-variable thing)))
+         (and cand (push cand candidates)))
+       candidates))))
 
 (provide 'sos-elisp-backend)

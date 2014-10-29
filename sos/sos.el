@@ -216,7 +216,7 @@ the following back-ends.
         (setq sos-backend backend
               sos-symbol symb)
         (let ((candidates (sos-call-backend sos-backend :candidates symb)))
-          (if candidates
+          (if (and candidates (listp candidates))
               (sos-call-def-win-frontends :show candidates)
             (sos-call-def-win-frontends :hide))))))))
 
@@ -317,8 +317,9 @@ result to the `sos-def-buf' displayed in the `sos-def-win'."
      (t
       (setq sos-backend backend)
       (let ((candidates (sos-call-backend sos-backend :candidates symb)))
-        (when (and candidates (listp candidates))
-          (sos-call-goto-def-frontends :show candidates)))))))
+        (and candidates
+             (listp candidates)
+             (sos-call-goto-def-frontends :show candidates)))))))
 
 (defun sos-goto-def-1st-process ()
   (dolist (backend sos-backends)

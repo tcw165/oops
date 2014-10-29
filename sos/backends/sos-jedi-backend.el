@@ -31,28 +31,70 @@
 (require 'thingatpt)
 
 (require 'hl-faces)
-(require 'jedi)
+
+;; (defun jedi:call-deferred (method-name)
+;;   "Call ``Script(...).METHOD-NAME`` and return a deferred object."
+;;   (let ((source      (buffer-substring-no-properties (point-min) (point-max)))
+;;         (line        (count-lines (point-min) (min (1+ (point)) (point-max))))
+;;         (column      (current-column))
+;;         (source-path (jedi:-buffer-file-name)))
+;;     (epc:call-deferred (jedi:get-epc)
+;;                        method-name
+;;                        (list source line column source-path))))
+
+(defvar sos-jedi-d-reply nil)
+
+(defun sos-jedi-thingatpt ()
+  "Find symbol string around the point or text selection."
+  (let ((bound (if mark-active
+                   (cons (region-beginning) (region-end))
+                 (unless (memq (get-text-property (point) 'face)
+                               '(font-lock-doc-face
+                                 font-lock-string-face
+                                 font-lock-comment-face))
+                   (bounds-of-thing-at-point 'symbol)))))
+    (and bound (buffer-substring-no-properties (car bound) (cdr bound)))))
+
+(defun sos-jedi-call:goto_definitions (thing)
+  (let (candidates)
+    (ignore-errors
+      (dolist (reply (epc:call-sync (jedi:get-epc) 'goto
+                                    (list (buffer-substring-no-properties 1 (point-max))
+                                          (line-number-at-pos)
+                                          (current-column)
+                                          (jedi:-buffer-file-name))))
+        (let ((type "symbol")
+              (file (plist-get reply :module_path))
+              (linum (or (plist-get reply :line_nr) 1))
+              (keywords))
+          (and file (push (list :symbol thing
+                                :type type
+                                :file file
+                                :linum linum
+                                :keywords keywords)
+                          candidates)))))
+    candidates))
+
+(defun sos-jedi-call:goto_assignments (thing)
+  )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Back-end ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
 (defun sos-jedi-backend (command &rest args)
   (case command
     (:symbol
-     (when (and (eq major-mode 'python-mode)
-                jedi-mode)
-       (or (thing-at-point 'symbol) :stop)))
+     (when (and (eq major-mode 'python-mode))
+       (or (sos-jedi-thingatpt) :stop)))
     (:candidates
-     ;; 1st argument is (FILEPATH . NUM) struct.
-     ;; (let* ((symb (car args))
-     ;;        (file (car symb))
-     ;;        (linum (cdr symb))
-     ;;        (match (save-excursion
-     ;;                 (search-backward-regexp
-     ;;                  (concat "^" sos-grep-prefix ".+$") nil t)
-     ;;                 (buffer-substring-no-properties
-     ;;                  (+ (length sos-grep-prefix) (point))
-     ;;                  (line-end-position))))
-     ;;        (keywords `((,match 0 'hl-symbol-face prepend))))
-     ;;   `((:file ,file :linum ,linum :keywords ,keywords)))
-     )))
+     (require 'jedi)
+     (let ((thing (car args))
+           candidates)
+       (dolist (cand (list (sos-jedi-call:goto_definitions thing)
+                           (sos-jedi-call:goto_assignments thing)))
+         (and cand (setq candidates
+                         (append candidates cand))))
+       candidates))))
 
 (provide 'sos-jedi-backend)
