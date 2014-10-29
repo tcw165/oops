@@ -161,6 +161,11 @@ into the stack when user navigate to deeper definition in the definition window.
   ;; Content
   (let ((id 0)
         entries)
+    (setq tabulated-list-format '[("symbol" 24 t)
+                                  ("type" 16 t)
+                                  ("linum" 6 t)
+                                  ("file" 128 t)]
+          tabulated-list-entries nil)
     (dolist (candidate sos-candidates)
       (let* ((symb (plist-get candidate :symbol))
              (type (plist-get candidate :type))
@@ -179,13 +184,9 @@ into the stack when user navigate to deeper definition in the definition window.
                                    ;; candidate.
                                    ,doc]))))
         (when entry
-          (setq entries (append entries `(,entry))
-                id (1+ id)))))
-    (setq tabulated-list-format '[("symbol" 24 t)
-                                  ("type" 16 t)
-                                  ("linum" 6 t)
-                                  ("file" 128 t)]
-          tabulated-list-entries entries)))
+          (push entry tabulated-list-entries)
+          (incf id))))
+    (setq tabulated-list-entries (nreverse tabulated-list-entries))))
 
 (defun sos-goto-definition-from-candidates-common ()
   (let* ((candidate (nth 0 sos-candidates))

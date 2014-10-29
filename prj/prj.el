@@ -574,7 +574,7 @@ project to be loaded."
 ;;;###autoload
 (defun prj-list-files ()
   (interactive)
-  (switch-to-buffer (list-buffers-noselect t) t t))
+  (switch-to-buffer (list-buffers-noselect) t t))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Project Mode ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

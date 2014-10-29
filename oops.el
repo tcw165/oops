@@ -138,7 +138,8 @@
                   (goto-char (region-end))
                   (beginning-of-line 2)
                   (point))))
-    (delete-region beg end)))
+    (delete-region beg end))
+  (and (eobp) (forward-line -1)))
 
 ;;;###autoload
 (defun oops--move-lines (step)
