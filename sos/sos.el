@@ -31,17 +31,16 @@
 ;;    Initial release.
 
 (require 'history)
-(require 'prj)
 
-;; Front-ends.
+;; Default frontends.
 (require 'sos-default-frontend)
 
-;; Back-ends.
-(require 'sos-grep-backend)
-(require 'sos-candidates-preview-backend)
+;; Default backends.
 (require 'sos-elisp-backend)
 (require 'sos-jedi-backend)
 (require 'sos-cc++-backend)
+(require 'sos-grep-backend)
+(require 'sos-candidates-preview-backend)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Common ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -216,8 +215,16 @@ the following back-ends.
         (setq sos-backend backend
               sos-symbol symb)
         (let ((candidates (sos-call-backend sos-backend :candidates symb)))
-          (if (and candidates (listp candidates))
-              (sos-call-def-win-frontends :show candidates)
+          (if candidates
+              (cond
+               ((listp candidates)
+                (sos-call-def-win-frontends :show candidates))
+               ;; Load `deferred' module at runtime.
+               ((and (require 'deferred) (deferred-p candidates))
+                (deferred:nextc
+                  candidates
+                  (lambda (real-candidates)
+                    (sos-call-def-win-frontends :show real-candidates)))))
             (sos-call-def-win-frontends :hide))))))))
 
 (defun sos-def-win-1st-process ()
@@ -318,8 +325,15 @@ result to the `sos-def-buf' displayed in the `sos-def-win'."
       (setq sos-backend backend)
       (let ((candidates (sos-call-backend sos-backend :candidates symb)))
         (and candidates
-             (listp candidates)
-             (sos-call-goto-def-frontends :show candidates)))))))
+             (cond
+              ((listp candidates)
+               (sos-call-goto-def-frontends :show candidates))
+              ;; Load `deferred' module at runtime.
+              ((and (require 'deferred) (deferred-p candidates))
+               (deferred:nextc
+                 candidates
+                 (lambda (real-candidates)
+                   (sos-call-goto-def-frontends :show real-candidates)))))))))))
 
 (defun sos-goto-def-1st-process ()
   (dolist (backend sos-backends)

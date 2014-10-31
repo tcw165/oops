@@ -134,5 +134,3 @@ The `base' should be a directory string and the `exclude' should be a list that 
 (require 'oops)
 (oops-default-config)
 
-(require 'semantic)
-(require 'auto-complete)

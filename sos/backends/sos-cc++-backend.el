@@ -30,8 +30,6 @@
 
 ;; (require 'etags)
 
-(require 'prj)
-
 (defconst sos-cc++-regexp ".*\\.[ch]\\(pp\\|xx\\)$")
 
 (defvar sos-cc++-process-tag nil)
@@ -61,21 +59,22 @@
   (set-process-sentinel sos-cc++-process-tag 'sos-cc++-async-tag-complete))
 
 (defun sos-cc++-build-tag ()
-  ;; (let* ((tag-file (sos-cc++-tag))
-  ;;        (tag-dir (file-name-directory tag-file)))
-  ;;   (unless (file-exists-p tag-file)
-  ;;     (and (file-exists-p tag-dir)
-  ;;          (delete-directory tag-dir t))
-  ;;     (make-directory tag-dir t)
-  ;;     (sos-cc++-async-tag (prj-project-files))))
-  )
+  (let* ((tag-file (sos-cc++-tag))
+         (tag-dir (file-name-directory tag-file)))
+    (unless (file-exists-p tag-file)
+      (and (file-exists-p tag-dir)
+           (delete-directory tag-dir t))
+      (make-directory tag-dir t)
+      (sos-cc++-async-tag (prj-project-files)))))
 
 ;;;###autoload
 (defun sos-cc++-backend (command &rest arg)
   (case command
     (:init
-     (add-hook 'prj-after-build-database-hook 'sos-cc++-build-tag)
-     (sos-cc++-build-tag))
+     ;; (when (require 'prj)
+     ;;   (add-hook 'prj-after-build-database-hook 'sos-cc++-build-tag)
+     ;;   (sos-cc++-build-tag))
+     )
     (:symbol)
     (:candidates)))
 

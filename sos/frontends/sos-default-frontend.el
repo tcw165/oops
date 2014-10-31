@@ -494,7 +494,7 @@ into the stack when user navigate to deeper definition in the definition window.
     (:init (sos-toggle-definition-buffer&window 1))
     (:destroy (sos-toggle-definition-buffer&window -1))
     (:show
-     ;; TODO: remember user choice at last session in the prj.
+     ;; TODO: remember user choice at last session in the project.
      (setq sos-candidates (car args)
            sos-index 0
            ;; Clean the stack.

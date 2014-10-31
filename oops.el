@@ -31,14 +31,10 @@
 ;;    Initial release.
 
 ;;; GNU Library ================================================================
-(require 'ido)
 (require 'imenu)
-(require 'thingatpt)
-(require 'company)
 
 ;;; 3rd party library ==========================================================
 (require 'company)
-(require 'exec-path-from-shell)
 
 (require 'grep-mode)
 (require 'hl-anything)
@@ -65,6 +61,7 @@
   (interactive
    (if (eq (selected-window) (frame-root-window))
        (list "buffer")
+     (require 'ido)
      (list (ido-completing-read "[Oops] What to kill? " (list "buffer" "window" "frame")))))
   (cond
    ((string-equal buffer-window-or-frame "buffer")
@@ -336,6 +333,7 @@ or go back to just one window (by deleting all but the selected window)."
 ;;;###autoload
 (defun oops-split-window ()
   (interactive)
+  (require 'ido)
   (let ((dir (ido-completing-read "Split direction: "
                                   '("horizontal" "vertical")
                                   nil
@@ -362,6 +360,7 @@ or go back to just one window (by deleting all but the selected window)."
   ;; Emacs instance started from the GUI inherits a default set of environment
   ;; variables on OSX.
   (when (memq window-system '(mac ns))
+    (require 'exec-path-from-shell)
     (exec-path-from-shell-initialize))
   ;; Mode line.
   (setq-default mode-line-format oops-default-mode-line)

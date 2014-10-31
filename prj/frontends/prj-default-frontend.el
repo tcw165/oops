@@ -18,13 +18,6 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-(require 'widget)
-(require 'wid-edit)
-(require 'tooltip)
-
-(require 'company)
-(require 'grizzl)
-
 (defface prj-button-face
   '((t (:background "lightgrey" :foreground "black" :weight bold)))
   "Face for button."
@@ -67,6 +60,8 @@
 
 (defmacro prj-with-widget (name ok-notify &rest body)
   (declare (indent 1) (debug t))
+  ;; (require 'widget)
+  (require 'wid-edit)
   `(progn
      (switch-to-buffer (get-buffer-create ,name))
      ;; TODO: fix compatibility with `company'.
@@ -77,15 +72,8 @@
      (setq-local widget-mouse-face 'prj-button-mouse-face)
      (setq-local widget-push-button-prefix " ")
      (setq-local widget-push-button-suffix " ")
-     (setq header-line-format '((:eval (format "  %s"
-                                               (propertize ,name
-                                                           'face 'bold)))
-                                " | "
-                                (:eval (format "%s or %s to jump among widgets."
-                                               (propertize " TAB "
-                                                           'face 'tooltip)
-                                               (propertize " Shift-TAB "
-                                                           'face 'tooltip)))))
+     (setq header-line-format `(,(format "  %s | TAB or Shift-TAB to jump among widgets."
+                                         (propertize ,name 'face 'bold))))
      (widget-insert "\n")
      ;; ==> body
      ,@body
@@ -106,9 +94,10 @@
                          (widget-field-end (car widget-field-list)))
                     (point)))
      ;; Enable specific feature.
-     (setq-local company-frontends '(company-preview-frontend))
-     (setq-local company-backends '(company-browse-file-backend))
-     (company-mode 1)))
+     (when (require 'company)
+       (setq-local company-frontends '(company-preview-frontend))
+       (setq-local company-backends '(company-browse-file-backend))
+       (company-mode 1))))
 
 (defmacro prj-widget-checkbox-select-all (checkboxes)
   `(lambda (&rest ignore)
@@ -357,9 +346,10 @@ remove one.\n"
     (:init)
     (:destroy)
     (:find-files
-     (let ((file (grizzl-completing-read
-                  (format "[%s] Find file: " (prj-project-name))
-                  files)))
+     (let ((file (and (require 'grizzl)
+                      (grizzl-completing-read
+                       (format "[%s] Find file: " (prj-project-name))
+                       files))))
        (when file
          (funcall 'prj-find-file-impl file))))))
 

@@ -67,10 +67,11 @@
 ;; 2014-08-01 (0.0.1)
 ;;    Initial release.
 
+;; Built-in library.
 (require 'saveplace)
 
+;; 3rd party library.
 (require 'json)
-(require 'grizzl)
 (require 'prj-default-frontend)
 (require 'prj-default-backend)
 
