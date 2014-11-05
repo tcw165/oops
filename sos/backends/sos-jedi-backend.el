@@ -28,8 +28,10 @@
 ;; 2014-10-01 (0.0.1)
 ;;    Initial release.
 
+;; GNU library.
 (require 'thingatpt)
 
+;; 3rd party library.
 (require 'hl-faces)
 
 (defun sos-jedi-thingatpt ()

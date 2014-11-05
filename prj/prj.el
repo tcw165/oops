@@ -67,13 +67,17 @@
 ;; 2014-08-01 (0.0.1)
 ;;    Initial release.
 
-;; Built-in library.
-(require 'saveplace)
+(and load-file-name
+     (let ((dir (file-name-directory load-file-name)))
+       (add-to-list 'load-path (concat dir "/frontends"))
+       (add-to-list 'load-path (concat dir "/backends"))))
 
-;; 3rd party library.
-(require 'json)
+;; Default frontends.
 (require 'prj-default-frontend)
+;; Default backends.
 (require 'prj-default-backend)
+;; Default modes.
+(require 'prj-grep-mode)
 
 (defgroup prj-group nil
   "A Project management utility. This utility provides you a workspace and many 
@@ -180,7 +184,7 @@ command.
   :group 'prj-group)
 
 (defcustom prj-after-build-database-hook nil
-  "Hook run when entering `grep-mode' mode."
+  "Hook run after project's database is built."
   :type 'hook
   :group 'prj-group)
 
@@ -238,7 +242,7 @@ format of JSON file. see `prj-new-config'.
 
 (defun prj-import-json (filename)
   "Read data exported by `prj-export-json' from file `filename'."
-  (when (file-exists-p filename)
+  (when (and (file-exists-p filename) (require 'json))
     (let ((json-object-type 'plist)
           (json-key-type 'keyword)
           (json-array-type 'list))
@@ -246,7 +250,7 @@ format of JSON file. see `prj-new-config'.
 
 (defun prj-export-json (filename data)
   "Export `data' to `filename' file.."
-  (when (file-writable-p filename)
+  (when (and (file-writable-p filename) (require 'json))
     (with-temp-file filename
       (insert (json-encode-plist data)))))
 
@@ -616,6 +620,7 @@ project to be loaded."
     (prj-destroy-backends)))
 
 ;; Force to reload save-place database.
+(require 'saveplace)
 (setq-default save-place t)
 (setq save-place-loaded nil
       save-place-file (format "%s/saveplaces.db"

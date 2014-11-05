@@ -30,16 +30,15 @@
 ;; 2014-10-01 (0.0.1)
 ;;    Initial release.
 
-(require 'align)
-(require 'cus-edit)
+;; GNU Library.
 (require 'font-lock)
 (require 'hl-line)
 (require 'linum)
 (require 'tabulated-list)
-(require 'thingatpt)
 
+;; 3rd Party Library.
 (require 'history)
-(require 'hl-faces)
+(require 'hl-anything)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Common ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -114,31 +113,32 @@ into the stack when user navigate to deeper definition in the definition window.
          (file (plist-get candidate :file))
          (linum (plist-get candidate :linum))
          (keywords (plist-get candidate :keywords)))
-    (sos-with-definition-buffer
-      (kill-all-local-variables)
-      (remove-overlays)
-      ;; Insert content and set major mode.
-      (or (when doc
-            (erase-buffer)
-            (insert doc))
-          (when (and file (file-exists-p file))
-            (insert-file-contents-literally file nil nil nil t)
-            ;; Change major-mode refer to file name.
-            (dolist (mode auto-mode-alist)
-              (and (not (null (cdr mode)))
-                   (string-match (car mode) file)
-                   (funcall (cdr mode))))))
-      ;; Minor mode.
-      (sos-candidate-mode 1)
-      ;; Move point and recenter.
-      (when (integerp linum)
-        (goto-char 1)
-        (end-of-line linum)
-        (recenter 3))
-      ;; Highlight word.
-      (when keywords
-        (font-lock-add-keywords nil keywords 'append)
-        (font-lock-fontify-buffer)))))
+    (and candidate
+         (sos-with-definition-buffer
+           (kill-all-local-variables)
+           (remove-overlays)
+           ;; Insert content and set major mode.
+           (or (when doc
+                 (erase-buffer)
+                 (insert doc))
+               (when (and file (file-exists-p file))
+                 (insert-file-contents-literally file nil nil nil t)
+                 ;; Change major-mode refer to file name.
+                 (dolist (mode auto-mode-alist)
+                   (and (not (null (cdr mode)))
+                        (string-match (car mode) file)
+                        (funcall (cdr mode))))))
+           ;; Move point and recenter.
+           (when (integerp linum)
+             (goto-char 1)
+             (end-of-line linum)
+             (recenter 3))
+           ;; Highlight word.
+           (when keywords
+             (font-lock-add-keywords nil keywords 'append)
+             (font-lock-fontify-buffer))
+           ;; Minor mode.
+           (sos-candidate-mode 1)))))
 
 (defun sos-show-candidates (&optional select-index)
   "Show multiple candidates prompt."
@@ -249,8 +249,8 @@ into the stack when user navigate to deeper definition in the definition window.
 
 (defvar sos-candidate-mode-hook '((lambda ()
                                     (linum-mode 1)
-                                    (hl-line-mode 1)
-                                    (hl-line-unhighlight))
+                                    (setq-local hl-line-sticky-flag t)
+                                    (hl-line-mode 1))
                                   (lambda ()
                                     ;; Use `hl-highlight-mode' to prevent highlights to being blocked.
                                     (setq hl-is-highlight-special-faces t)

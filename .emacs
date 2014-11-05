@@ -19,7 +19,6 @@
  '(mouse-wheel-follow-mouse t)
  '(mouse-wheel-scroll-amount (quote (1 ((shift) . 1))))
  '(normal-erase-is-backspace t)
- '(package-archives (quote (("gnu" . "http://elpa.gnu.org/packages/") ("elpa" . "http://melpa.milkbox.net/packages/") ("marmalade" . "http://marmalade-repo.org/packages/"))))
  '(parse-sexp-ignore-comments t)
  '(scroll-step 1)
  '(show-paren-mode nil)
@@ -33,9 +32,6 @@
  '(link ((t (:foreground "blue" :underline t :weight bold))))
  '(tooltip ((t (:background "cornsilk" :foreground "Black" :weight bold :family "Monaco")))))
 
-;; Initalize packages before `custom-set-variables' is called.
-;; It is especially for 3rd party packages which are added to load-path lately.
-(package-initialize)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Key Binding ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -120,17 +116,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Oops Extension ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun oops-update-loadpath (base exclude)
-  "Add sub-directories recursively to `load-path'.
-The `base' should be a directory string and the `exclude' should be a list that to be skipped."
-  (dolist (f (directory-files base))
-    (let ((name (concat base "/" f)))
-      (when (and (file-directory-p name)
-                 (not (member f exclude)))
-        (oops-update-loadpath name exclude))))
-  (add-to-list 'load-path base))
-(oops-update-loadpath "~/.emacs.d" '("." ".." ".svn" ".git"))
-
+(add-to-list 'load-path "~/.emacs.d/oops")
 (require 'oops)
-(oops-default-config)
 

@@ -32,9 +32,13 @@
 
 (require 'history)
 
+(and load-file-name
+     (let ((dir (file-name-directory load-file-name)))
+       (add-to-list 'load-path (concat dir "/frontends"))
+       (add-to-list 'load-path (concat dir "/backends"))))
+
 ;; Default frontends.
 (require 'sos-default-frontend)
-
 ;; Default backends.
 (require 'sos-elisp-backend)
 (require 'sos-jedi-backend)

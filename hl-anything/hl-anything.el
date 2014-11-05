@@ -349,7 +349,8 @@ Format: (START . END)"
   (if hl-highlight-mode
       (progn
         (add-hook 'pre-command-hook 'hl-highlight-pre-command t t)
-        (add-hook 'post-command-hook 'hl-highlight-post-command t t))
+        (add-hook 'post-command-hook 'hl-highlight-post-command t t)
+        (hl-add-highlight-overlays))
     (remove-hook 'pre-command-hook 'hl-highlight-pre-command t)
     (remove-hook 'post-command-hook 'hl-highlight-post-command t)))
 

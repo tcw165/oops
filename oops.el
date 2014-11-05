@@ -30,20 +30,6 @@
 ;; 2014-06-07 (0.0.1)
 ;;    Initial release.
 
-;;; GNU Library ================================================================
-(require 'imenu)
-
-;;; 3rd party library ==========================================================
-(require 'company)
-
-(require 'grep-mode)
-(require 'hl-anything)
-(require 'history)
-(require 'prj)
-(require 'sos)
-;; TODO: deprecated
-(require 'oops-lisp-lib)
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Text ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -280,7 +266,6 @@ or go back to just one window (by deleting all but the selected window)."
    (t
     (company-cancel))))
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Buffer ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -345,7 +330,7 @@ or go back to just one window (by deleting all but the selected window)."
        (split-window (selected-window) nil 'right)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Configuration Sets ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Common Initialization ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun oops-add-hooks (hook &optional funcs)
   (add-hook hook 'linum-mode t)
@@ -354,23 +339,54 @@ or go back to just one window (by deleting all but the selected window)."
   (dolist (func funcs)
     (add-hook hook func t)))
 
-;;;###autoload
-(defun oops-default-config ()
-  (interactive)
-  ;; Emacs instance started from the GUI inherits a default set of environment
-  ;; variables on OSX.
-  (when (memq window-system '(mac ns))
-    (require 'exec-path-from-shell)
-    (exec-path-from-shell-initialize))
-  ;; Mode line.
-  (setq-default mode-line-format oops-default-mode-line)
-  ;; Mode hooks
-  (oops-add-hooks 'emacs-lisp-mode-hook '(hl-paren-mode
-                                          imenu-add-menubar-index))
+(defun oops-init-mode-hooks ()
+  (oops-add-hooks 'emacs-lisp-mode-hook `(hl-paren-mode
+                                          ,(and (require 'imenu)
+                                                'imenu-add-menubar-index)))
   (oops-add-hooks 'python-mode-hook)
   (oops-add-hooks 'c-mode-hook)
-  (oops-add-hooks 'c++-mode-hook)
-  ;; Company extension.
+  (oops-add-hooks 'c++-mode-hook))
+
+(defun oops-init-packages ()
+  (require 'package)
+  (dolist (arch '(("elpa" . "http://melpa.milkbox.net/packages/")
+                  ("marmalade" . "http://marmalade-repo.org/packages/")))
+    (add-to-list 'package-archives arch t))
+  ;; Install required packages.
+  ;; (package-install 'jedi)
+  ;; Update `load-path' refer to `package-load-list'.
+  (package-initialize))
+
+(and load-file-name
+     (let ((dir (file-name-directory load-file-name)))
+       (add-to-list 'load-path (concat dir "/hl-anything"))
+       (add-to-list 'load-path (concat dir "/history"))
+       (add-to-list 'load-path (concat dir "/prj"))
+       (add-to-list 'load-path (concat dir "/sos"))
+       (add-to-list 'load-path (concat dir "/lang")) ;; TODO: deprecated!
+       ))
+
+;; TODO: Deprecated after packaging following modules.
+(require 'hl-anything)
+(require 'history)
+(require 'prj)
+(require 'sos)
+;; TODO: deprecated
+(require 'oops-lisp-lib)
+
+;; Packages.
+(oops-init-packages)
+;; Hooks.
+(oops-init-mode-hooks)
+;; Emacs instance started from the GUI inherits a default set of environment
+;; variables on OSX.
+(when (and (memq window-system '(mac ns))
+           (require 'exec-path-from-shell))
+  (exec-path-from-shell-initialize))
+;; Mode line.
+(setq-default mode-line-format oops-default-mode-line)
+;; Company extension.
+(when (require 'company)
   (setq company-idle-delay 0)
   (setq company-minimum-prefix-length 1)
   (setq company-frontends '(company-pseudo-tooltip-unless-just-one-frontend
@@ -378,8 +394,9 @@ or go back to just one window (by deleting all but the selected window)."
                             company-echo-metadata-frontend))
   (setq company-backends '((company-elisp company-files)
                            ;; (company-clang company-files)
-                           (company-cmake company-files)))
-  ;; Project management.
+                           (company-cmake company-files))))
+;; Project management.
+(when (require 'prj)
   (unless (prj-load-recent-project)
     (prj-load-project))
   (sos-definition-window-mode 1))

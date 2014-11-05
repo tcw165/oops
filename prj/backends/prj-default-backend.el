@@ -28,8 +28,6 @@
 ;; 2014-08-01 (0.0.1)
 ;;    Initial release.
 
-(require 'grizzl)
-
 (defvar prj-total-files-cache nil)
 
 (defvar prj-process-grep nil)
@@ -187,13 +185,16 @@ Example:
            ;; Concatenate single category database to all categories database.
            (prj-process-cat db-doctype db-all)))
        ;; Create fuzzy search table in the memory.
-       (with-temp-buffer
-         (message "[%s] Initializing fuzzy search for files..." (prj-project-name))
-         (insert-file-contents-literally db-all)
-         (prj-export-data
-          (prj-total-files-cache-path)
-          (setq prj-total-files-cache
-                (grizzl-make-index (split-string (buffer-string) "\n" t)))))))))
+       (message "[%s] Initializing fuzzy search for files..." (prj-project-name))
+       (if (require 'grizzl)
+           (with-temp-buffer
+             (insert-file-contents-literally db-all)
+             (prj-export-data
+              (prj-total-files-cache-path)
+              (setq prj-total-files-cache
+                    (grizzl-make-index (split-string (buffer-string) "\n" t)))))
+         (message "[%s] Initialize fuzzy search for files... failed"
+                  (prj-project-name)))))))
 
 ;;;###autoload
 (defun prj-find-files-backend (command &optional doctypes filepaths other-format)
