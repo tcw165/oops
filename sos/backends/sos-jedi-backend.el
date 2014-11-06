@@ -56,24 +56,23 @@
   (lexical-let ((thing (car thing)))
     (deferred:nextc
       (jedi:call-deferred 'goto)
-      (lambda (reply)
+      (lambda (reply &rest ignore)
         (let (candidates)
           (dolist (cand reply)
             (let* ((type "symbol")
                    (file (plist-get cand :module_path))
                    (linum (or (plist-get cand :line_nr) 1))
                    (column (or (plist-get cand :column) 1))
-                   (module-name (plist-get cand :module_name))
                    (description (plist-get cand :description))
-                   (keywords `((,(progn
-                                   (string-match thing description)
-                                   (replace-regexp-in-string
-                                    "\\s-+"
-                                    "\\\\s-*"
-                                    (format "%s\\\(%s\\\)%s"
-                                            (regexp-quote (substring-no-properties description 0 (match-beginning 0)))
-                                            (regexp-quote thing)
-                                            (regexp-quote (substring-no-properties description (match-end 0))))))
+                   (keywords `((,(if (string-match thing description)
+                                     (replace-regexp-in-string
+                                      "\\s-+"
+                                      "\\\\s-*"
+                                      (format "%s\\\(%s\\\)%s"
+                                              (regexp-quote (substring-no-properties description 0 (match-beginning 0)))
+                                              (regexp-quote thing)
+                                              (regexp-quote (substring-no-properties description (match-end 0)))))
+                                   thing)
                                 1 'hl-symbol-face prepend))))
               (and file (file-exists-p file)
                    (push (list :symbol thing

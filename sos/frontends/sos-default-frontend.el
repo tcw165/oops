@@ -499,10 +499,11 @@ into the stack when user navigate to deeper definition in the definition window.
            sos-index 0
            ;; Clean the stack.
            sos-candidates-stack nil)
-     (sos-toggle-definition-buffer&window 1)
-     (if (sos-is-multiple-candidates)
-         (sos-show-candidates)
-       (sos-show-candidate))))
+     (and sos-candidates
+          (sos-toggle-definition-buffer&window 1)
+          (if (sos-is-multiple-candidates)
+              (sos-show-candidates)
+            (sos-show-candidate)))))
   ;; Save the height of definition window.
   (and (window-live-p sos-def-win)
        (setq sos-def-win-height (window-height sos-def-win))))
