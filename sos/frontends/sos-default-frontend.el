@@ -111,7 +111,7 @@ into the stack when user navigate to deeper definition in the definition window.
   (let* ((candidate (nth 0 sos-candidates))
          (doc (plist-get candidate :doc))
          (file (plist-get candidate :file))
-         (linum (plist-get candidate :linum))
+         (linum (or (plist-get candidate :linum) 1))
          (keywords (plist-get candidate :keywords)))
     (and candidate
          (sos-with-definition-buffer
@@ -170,7 +170,7 @@ into the stack when user navigate to deeper definition in the definition window.
       (let* ((symb (plist-get candidate :symbol))
              (type (plist-get candidate :type))
              (doc (plist-get candidate :doc))
-             (linum (plist-get candidate :linum))
+             (linum (or (plist-get candidate :linum) 1))
              (file (plist-get candidate :file))
              (show (plist-get candidate :show))
              (entry (when (and symb (stringp symb)

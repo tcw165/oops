@@ -138,13 +138,13 @@ the following back-ends.
   :type '(repeat (symbol :tag "Back-end"))
   :group 'sos-group)
 
+(defvar sos-symbol nil
+  "Cache the return value from back-end with `:symbol' command.")
+(make-variable-frame-local 'sos-symbol)
+
 (defvar sos-backend nil
   "The back-end which takes control of current session in the back-ends list.")
 (make-variable-buffer-local 'sos-backend)
-
-(defvar sos-symbol nil
-  "Cache the return value from back-end with `:symbol' command.")
-(make-variable-buffer-local 'sos-symbol)
 
 (defun sos-call-backend (backend command &rest args)
   "Call certain backend `backend' and pass `command' to it."

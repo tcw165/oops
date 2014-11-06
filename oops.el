@@ -180,8 +180,7 @@
 (defun oops-indent-or-company ()
   (interactive)
   (if (or mark-active
-          ;; including: "begining of line"", "end of line"", "space"", "("
-          (looking-at "\\(^\\|$\\|\(\\|\\s-+\\)"))
+          (looking-at "^"))
       (indent-for-tab-command)
     (company-complete)))
 
@@ -389,11 +388,13 @@ or go back to just one window (by deleting all but the selected window)."
 (when (require 'company)
   (setq company-idle-delay 0)
   (setq company-minimum-prefix-length 1)
-  (setq company-frontends '(company-pseudo-tooltip-unless-just-one-frontend
+  (setq company-frontends `(company-pseudo-tooltip-unless-just-one-frontend
                             company-preview-frontend
                             company-echo-metadata-frontend))
-  (setq company-backends '((company-elisp company-files)
+  (setq company-backends `((company-elisp company-files)
                            ;; (company-clang company-files)
+                           ,(and (require 'company-jedi)
+                                 '(company-jedi company-files))
                            (company-cmake company-files))))
 ;; Project management.
 (when (require 'prj)

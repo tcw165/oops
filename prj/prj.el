@@ -421,7 +421,8 @@ user loads a project or unload a project."
   (setq prj-name name
         prj-config (prj-import-json (prj-config-path name)))
   ;; Open files.
-  (mapc 'find-file-existing (prj-project-recent-files))
+  (ignore-errors
+    (mapc 'find-file-existing (prj-project-recent-files)))
   (if prj-project-mode
       (progn
         (prj-destroy-backends)

@@ -32,7 +32,7 @@
 (require 'thingatpt)
 
 ;; 3rd party library.
-(require 'hl-faces)
+(require 'hl-anything)
 
 (defun sos-jedi-thingatpt ()
   "Find symbol string around the point or text selection."
@@ -43,29 +43,45 @@
                                  font-lock-string-face
                                  font-lock-comment-face))
                    (bounds-of-thing-at-point 'symbol)))))
-    (and bound (buffer-substring-no-properties (car bound) (cdr bound)))))
+    (and bound
+         ;; Return (THING BEG END FILENAME)
+         (list (buffer-substring-no-properties (car bound) (cdr bound))
+               (car bound)
+               (cdr bound)
+               (substring-no-properties (or buffer-file-name ""))))))
 
+;; ((:column 19 :module_name "jediepcserver" :description "*args" :line_nr 103 :module_path "/Users/Boy/Documents/_LISP/emacs-jedi/jediepcserver.py"))
+;; `font-lock-add-keywords'
 (defun sos-jedi-call:goto_definitions (thing)
-  (lexical-let ((thing thing))
+  (lexical-let ((thing (car thing)))
     (deferred:nextc
-      (epc:call-deferred (jedi:get-epc) 'goto
-                         (list (buffer-substring-no-properties 1 (point-max))
-                               (line-number-at-pos)
-                               (current-column)
-                               (jedi:-buffer-file-name)))
+      (jedi:call-deferred 'goto)
       (lambda (reply)
         (let (candidates)
           (dolist (cand reply)
-            (let ((type "symbol")
-                  (file (plist-get cand :module_path))
-                  (linum (or (plist-get cand :line_nr) 1))
-                  (keywords))
-              (and file (push (list :symbol thing
-                                    :type type
-                                    :file file
-                                    :linum linum
-                                    :keywords keywords)
-                              candidates))))
+            (let* ((type "symbol")
+                   (file (plist-get cand :module_path))
+                   (linum (or (plist-get cand :line_nr) 1))
+                   (column (or (plist-get cand :column) 1))
+                   (module-name (plist-get cand :module_name))
+                   (description (plist-get cand :description))
+                   (keywords `((,(progn
+                                   (string-match thing description)
+                                   (replace-regexp-in-string
+                                    "\\s-+"
+                                    "\\\\s-*"
+                                    (format "%s\\\(%s\\\)%s"
+                                            (regexp-quote (substring-no-properties description 0 (match-beginning 0)))
+                                            (regexp-quote thing)
+                                            (regexp-quote (substring-no-properties description (match-end 0))))))
+                                1 'hl-symbol-face prepend))))
+              (and file (file-exists-p file)
+                   (push (list :symbol thing
+                               :type type
+                               :file file
+                               :linum linum
+                               :keywords keywords)
+                         candidates))))
           candidates)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
