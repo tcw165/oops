@@ -1,0 +1,3 @@
+[submodule "hl-anything"]
+	path = hl-anything
+	url = https://github.com/boyw165/hl-anything.git
