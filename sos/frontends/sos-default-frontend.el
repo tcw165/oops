@@ -207,7 +207,7 @@ into the stack when user navigate to deeper definition in the definition window.
       (end-of-line)
       ;; Keyword.
       ;; (when keywords
-      ;;   (hl-highlight-keywords-local&temp keywords))
+      ;;   (hl-highlight-keywords-temporarily keywords))
       (his-add-history))))
 
 (defun sos-right-char ()
