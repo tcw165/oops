@@ -28,7 +28,7 @@
 ;; 2014-10-01 (0.0.1)
 ;;    Initial release.
 
-(require 'hl-faces)
+(require 'hl-anything)
 
 (defconst sos-grep-prefix ">>>>> ")
 

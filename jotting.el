@@ -8,8 +8,7 @@
 
 (require 'deferred)
 
-;; `deferred:schedule-worker' use `run-at-time' to schedule works.
-;; `deferred:queue' is the task queue.
+;; "highlight-things-in-a-highlighted-thing-0123456789"
 
 (deferred:$
   (deferred:next 
@@ -22,11 +21,6 @@
   (deferred:nextc it
     (lambda (x)
       (message "chain 2 : %s" x))))
-;; (let (it)
-;;   (setq it (deferred:next (function (lambda nil (message deferred start)))))
-;;   (setq it (deferred:nextc it (function (lambda nil (message chain 1) 1))))
-;;   (setq it (deferred:nextc it (function (lambda (x) (message chain 2 : %s x)))))
-;;   it)
 
 (deferred:$
   (deferred:wait 1000) ; 1000msec

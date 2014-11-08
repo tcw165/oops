@@ -1,8 +1,10 @@
+;;; sos.el --- Show helpful information refer to things at the point and more.
+;;
 ;; Copyright (C) 2014
 ;;
-;; Author: BoyW165
+;; Author: boyw165
 ;; Version: 0.0.1
-;; Compatibility: GNU Emacs 22.x, GNU Emacs 23.x, GNU Emacs 24.x
+;; Compatibility: GNU Emacs 24.3+
 ;;
 ;; This file is NOT part of GNU Emacs.
 ;;
@@ -27,9 +29,15 @@
 ;;
 ;;; Change Log:
 ;;
-;; 2014-11-01 (0.0.1)
+;; 2014-10-31 (0.0.x)
+;;    - Support asynchronous backends which use `deferred' library.
+;;
+;; 2014-08-01 (0.0.1)
 ;;    Initial release.
+;;
+;;; Code:
 
+;; 3rd party library.
 (require 'history)
 
 (and load-file-name
@@ -348,9 +356,10 @@ result to the `sos-def-buf' displayed in the `sos-def-win'."
 ;;;###autoload
 (defun sos-goto-definition ()
   (interactive)
-  (if (null sos-backend)
-      (sos-goto-def-1st-process)
-    (sos-goto-def-normal-process sos-backend)))
+  (and (sos-is-idle-begin)
+       (if (null sos-backend)
+           (sos-goto-def-1st-process)
+         (sos-goto-def-normal-process sos-backend))))
 
 ;;;###autoload
 (defun sos-goto-local-symbol ()
