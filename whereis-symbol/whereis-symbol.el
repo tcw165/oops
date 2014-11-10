@@ -363,6 +363,27 @@ Commands:
 (defun ws-goto-local-symbol ()
   (interactive)
   ;; TODO:
+  (minibuffer-with-setup-hook
+      (lambda ()
+        ;; (setq *grizzl-current-result* nil)
+        ;; (setq *grizzl-current-selection* 0)
+        ;; (grizzl-mode 1)
+        ;; (lexical-let*
+        ;;     ((hookfun (lambda ()
+        ;;                 (setq *grizzl-current-result*
+        ;;                       (grizzl-search (minibuffer-contents)
+        ;;                                      index
+        ;;                                      *grizzl-current-result*))
+        ;;                 (grizzl-display-result index prompt)))
+        ;;      (exitfun (lambda ()
+        ;;                 (grizzl-mode -1)
+        ;;                 (remove-hook 'post-command-hook    hookfun t))))
+        ;;   (add-hook 'minibuffer-exit-hook exitfun nil t)
+        ;;   (add-hook 'post-command-hook    hookfun nil t))
+        )
+    (read-from-minibuffer ">>> ")
+    ;; (grizzl-selected-result index)
+    )
   )
 
 ;;;###autoload
