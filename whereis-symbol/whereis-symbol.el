@@ -56,64 +56,56 @@
 (require 'ws-candidates-preview-backend)
 
 (defgroup whereis-symbol nil
-  "A utility to show you documentation at button window by finding some 
-meaningful information around the point.")
+  "An utility to show you documentation in an isolated bottom window by finding 
+meaningful information at point.")
 
 (defcustom ws-backends '(ws-elisp-backend
                          ws-jedi-backend
                          ws-cc++-backend
                          ws-grep-backend
                          ws-candidates-preview-backend)
-  "The list of back-ends for the purpose of collecting candidates. The sos 
-engine will dispatch all the back-ends and pass specific commands in order. 
-Every command has its purpose, paremeter rule and return rule (get meaningful 
-symbol name around the point, find candidates refer to a symbol name). By 
-passing command and get return data from a back-end, the sos engine gets 
-information to show the result to another window, minibuffer or popup a GUI 
-dialog, etc. Be aware, not every back-ends will be dispatched. If a back-end 
-return candidates to sos engine, it inform the sos engine that there's no need 
-to dispatch remaining back-ends.
+  "The list of backends for the purpose of collecting candidates. The engine 
+will dispatch all the back-ends and pass specific commands in order. By passing 
+command and get return data from a backend, the engine gets information to show 
+the result in an isolated bottom window, minibuffer or popup a GUI dialog, etc.
 
 Example:
 --------
-  (defun some-backend (command &optional arg)
+  (defun some-backend (command &rest args)
     (case command
       (:init t)
       (:symbol (and (member major-mode MAJOR_MODE_CANDIDATES)
                     (thing-at-point 'symbol))))
       (:candidates (list STRING01 STRING02 STRING03 ...)))
 
-Each back-end is a function that takes a variable number of arguments. The
-first argument is the command requested from the sos enine.  It is one of
-the following:
+Each backend is a function that takes numbers of arguments. The first argument is 
+the COMMAND requested from the enine. The remaining arguments depends on the 1st 
+argument, COMMAND.
 
 Commands:
 ---------
-`:init': Called once for each buffer. The back-end can check for external
-programs and files and load any required libraries.  Raising an error here
-will show up in message log once, and the back-end will not be used for
-completion.
+`:init': Called once for each buffer. The backend can check for external programs
+and files and load any required libraries.
 
-`:symbol': The back-end should return a symbol, nil or 'stop.
-- Return a symbol tells sos engine that the back-end will take charge current 
-task. It also tells sos engine don't iterate the following back-ends.
-- Return nil tells sos engine to skip the back-end.
-- Return `:stop' tells sos engine to stop iterating the following back-ends.
-- Return value will be cached to `ws-symbol'.
+`:symbol': The back-end should return anything non-nil, nil or 'stop.
+  * Return non-nil except `:stop' tells engine that it is for the current buffer.
+    Then, the engine will stop iteration and ask backend for candidates refer 
+    to returned value; `:stop' tells engine to do nothing.
+    Note: Return value will be saved in `ws-symbol'.
+  * Return nil tells engine to skip the backend and continue the iteration.
 
-`:symbol-completion': ...
+`:candidates': The backend should return a CANDIDATE list or nil.
+  The 2nd argument is the symbol (stored in `ws-symbol');
+  The 3rd argument is a boolean indicating whether the symbol is just a prefix or 
+  not;
 
-`:candidates': The back-end should return a CANDIDATE list or nil.
-Return a list tells sos engine where the definition is and it must be a list
-even if there's only one candidate. It also tells sos engine don't iterate the
-following back-ends.
-Return nil tells sos engine it cannot find any definition and stop iterating
-the following back-ends.
+  Backend could use the symbol and remaining argument to find candidates.
+  * Return a CANDIDATE list tells engine where the definition are at. The CANDIDATE 
+    is an alist with pre-defined keys and respective values.
+  * Return nil tells engine there's no definition.
 
-  CANDIDATE is an alist!
-
-  Keys:
-  -----------
+  CANDIDATE's Keys:
+  -----------------
   `:doc': Buffer text which is the file content (buffer-string).
   or
   `:file': The absolute file path.
@@ -121,64 +113,62 @@ the following back-ends.
 
   `:linum': The line number (integer).
 
-  Optional Keys:
-  --------------------
+  CANDIDATE's Optional Keys:
+  --------------------------
   `:keywords': A list containing elements to highlight keywords. Its format is 
                `font-lock-keywords'. The 1st matcher must be for the symbol 
                definition.
 
-  `:symbol': The symbol's name.
+  `:symbol': The symbol's name (string).
 
-  `:type': The String which describe the symbol.
-
-  `:show': t indicates front-ends show this CANDIDATE by default.
+  `:type': A string describing the type of symbol.
 
   Example - File Candidates:
   --------------------------
-  ((:symbol STRING
-    :doc BUFFER_STRING
-    :type STRING
-    :file STRING
-    :linum INTEGER
-    :match REGEXP) ...)
+  ((:symbol \"HelloFunc\"
+    :type   \"function\"
+    :file   \"~/project/a/b/c\"
+    :linum  100
+    :match  '((\"HelloFunc\" . highlight))) ...)
 
   Example - Document Candidates:
   ------------------------------
-  ((:symbol STRING
-    :doc BUFFER_STRING
-    :type STRING
-    :linum INTEGER) ...)"
+  ((:symbol \"HelloFunc\"
+    :doc    \"This is a documentary of the built-in ...\"
+    :type   \"built-in\"
+    :linum  1) ...)"
   :type '(repeat (symbol :tag "Back-end"))
   :group 'whereis-symbol)
 
 (defvar ws-symbol nil
-  "Cache the return value from back-end with `:symbol' command.")
+  "Cache the returned value from backends by `:symbol' command.")
 (make-variable-frame-local 'ws-symbol)
 
 (defvar ws-backend nil
-  "The back-end which takes control of current session in the back-ends list.")
+  "Cache backend which is specifically for the current buffer.")
 (make-variable-buffer-local 'ws-backend)
 
 (defun ws-call-backend (backend command &rest args)
-  "Call certain backend `backend' and pass `command' to it."
+  "Call BACKEND."
   (apply backend command args))
 
 (defun ws-init-backend (backend)
+  "Ask BACKEND to initialize itself."
   (ws-call-backend backend :init))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Where Is Symbol Mode ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defcustom ws-frontends '(ws-definition-window-frontend)
-  "The list of front-ends for the purpose of visualization.
+  "The list of frontends for the purpose of visualization.
 
 Commands:
 ---------
-`:init'     - When the visualization should be initialized.
-`:destroy'  - When the visualization should be destroied.
-`:show'     - When the visualization should be showed.
-`:hide'     - When the visualization should be hidden.
-`:update'   - When the data has been updated.
+`:init'     - Initialize something (called once).
+`:destroy'  - Destroy something (called once).
+`:show'     - Show visualization.
+`:hide'     - Hide visualization.
+`:update'   - Update visualization.
 
 Example:
 --------
@@ -192,17 +182,17 @@ Example:
   :group 'whereis-symbol)
 
 (defcustom ws-idle-delay 0.3
-  "The idle delay in seconds until sos starts automatically."
+  "The idle delay in seconds before the engine starts."
   :type '(number :tag "Seconds"))
 
 (defvar ws-timer nil
   "The idle timer to call `ws-idle-begin'.")
 
 (defvar ws-source-buffer nil
-  "The current source code buffer.")
+  "Cached source code buffer.")
 
 (defvar ws-source-window nil
-  "The current window where the source code buffer is at.")
+  "Cached window where the source code buffer is at.")
 
 (defvar ws-is-skip nil
   "t to skip `ws-idle-begin'.")
@@ -285,7 +275,6 @@ and show the reference visually through frontends. Usually frontends output the
 result to the `ws-def-buf' displayed in the `ws-def-win'."
   :global t
   :group 'whereis-symbol
-  ;; TODO: menu-bar and tool-bar keymap.
   (if whereis-symbol-mode
       (progn
         ;; Initialize front-ends & back-ends.
@@ -298,31 +287,33 @@ result to the `ws-def-buf' displayed in the `ws-def-win'."
       (cancel-timer ws-timer)
       (setq ws-timer nil))))
 
+;; TODO: menu-bar and tool-bar keymap.
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Go to Definition ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defcustom ws-goto-frontend 'ws-goto-definitions-frontend
-  "The list of front-ends for the purpose of visualization.
+  "A frontend controls the way to goto definition both for single candidate and 
+multiple candidates. Default is `ws-goto-definitions-frontend'.
 
 Commands:
 ---------
-`:show': When the visualization should be showed. The 1st argument is the 
-         candidates."
+`:show': Show the result. The 1st argument is the candidates."
   :type '(symbol :tag "Front-end")
   :group 'whereis-symbol)
 
 (defcustom ws-before-goto-hook nil
-  ""
+  "A hook triggered before going to the definition."
   :type '(repeat function)
   :group 'whereis-symbol)
 
 (defcustom ws-after-goto-hook nil
-  ""
+  "A hook triggered after going to the definition."
   :type '(repeat function)
   :group 'whereis-symbol)
 
 (defun ws-call-goto-frontends (command &rest arg)
-  "Iterate all the `ws-backends' and pass `command' by order."
+  "Call goto-frontends."
   (apply ws-goto-frontend command arg))
 
 (defun ws-goto-normal-process (backend)
