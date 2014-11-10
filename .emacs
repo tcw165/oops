@@ -96,7 +96,7 @@
 ;; F3
 (global-set-key (kbd "<f3>") 'hl-find-thing-forwardly)
 ;; F4
-(global-set-key (kbd "<f4>") 'sos-goto-definition)
+(global-set-key (kbd "<f4>") 'ws-goto-definition)
 
 ;; Shift + F1
 ;; Shift + F2
