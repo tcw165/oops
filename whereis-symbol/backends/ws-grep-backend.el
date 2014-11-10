@@ -30,10 +30,10 @@
 
 (require 'hl-anything)
 
-(defconst sos-grep-prefix ">>>>> ")
+(defconst ws-grep-prefix ">>>>> ")
 
 ;;;###autoload
-(defun sos-grep-backend (command &rest args)
+(defun ws-grep-backend (command &rest args)
   (case command
     (:symbol
      (when (eq major-mode (or (and (featurep 'prj-grep-mode)
@@ -59,11 +59,11 @@
             (linum (cdr symb))
             (match (save-excursion
                      (search-backward-regexp
-                      (concat "^" sos-grep-prefix ".+$") nil t)
+                      (concat "^" ws-grep-prefix ".+$") nil t)
                      (buffer-substring-no-properties
-                      (+ (length sos-grep-prefix) (point))
+                      (+ (length ws-grep-prefix) (point))
                       (line-end-position))))
             (keywords `((,match 0 'hl-symbol-face prepend))))
        `((:file ,file :linum ,linum :keywords ,keywords))))))
 
-(provide 'sos-grep-backend)
+(provide 'ws-grep-backend)

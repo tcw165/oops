@@ -30,52 +30,52 @@
 
 ;; (require 'etags)
 
-(defconst sos-cc++-regexp ".*\\.[ch]\\(pp\\|xx\\)$")
+(defconst ws-cc++-regexp ".*\\.[ch]\\(pp\\|xx\\)$")
 
-(defvar sos-cc++-process-tag nil)
+(defvar ws-cc++-process-tag nil)
 
-(defun sos-cc++-tag ()
+(defun ws-cc++-tag ()
   (concat (prj-project-config-dir) "/tags/ccpp.tags"))
 
 ;; (find-tag)
-;; (visit-tags-table sos-cc++-tag)
-(defun sos-cc++-async-tag-complete (process message)
+;; (visit-tags-table ws-cc++-tag)
+(defun ws-cc++-async-tag-complete (process message)
   (cond
    ((eq (process-status process) 'run))
    ((memq (process-status process) '(stop exit signal))
-    (setq sos-cc++-process-tag nil)
+    (setq ws-cc++-process-tag nil)
     (message "c/c++ tags is updated! %s" (process-status process)))))
 
-(defun sos-cc++-async-tag (input-files)
-  (setq sos-cc++-process-tag
+(defun ws-cc++-async-tag (input-files)
+  (setq ws-cc++-process-tag
         (start-process-shell-command
-         "sos-cc++-tag"
+         "ws-cc++-tag"
          nil
          (format "grep \"%s\" \"%s\" | xargs etags -o \"%s\""
-                 sos-cc++-regexp
+                 ws-cc++-regexp
                  input-files
-                 (sos-cc++-tag))))
+                 (ws-cc++-tag))))
   ;; Add process sentinel.
-  (set-process-sentinel sos-cc++-process-tag 'sos-cc++-async-tag-complete))
+  (set-process-sentinel ws-cc++-process-tag 'ws-cc++-async-tag-complete))
 
-(defun sos-cc++-build-tag ()
-  (let* ((tag-file (sos-cc++-tag))
+(defun ws-cc++-build-tag ()
+  (let* ((tag-file (ws-cc++-tag))
          (tag-dir (file-name-directory tag-file)))
     (unless (file-exists-p tag-file)
       (and (file-exists-p tag-dir)
            (delete-directory tag-dir t))
       (make-directory tag-dir t)
-      (sos-cc++-async-tag (prj-project-files)))))
+      (ws-cc++-async-tag (prj-project-files)))))
 
 ;;;###autoload
-(defun sos-cc++-backend (command &rest arg)
+(defun ws-cc++-backend (command &rest arg)
   (case command
     (:init
      ;; (when (require 'prj)
-     ;;   (add-hook 'prj-after-build-database-hook 'sos-cc++-build-tag)
-     ;;   (sos-cc++-build-tag))
+     ;;   (add-hook 'prj-after-build-database-hook 'ws-cc++-build-tag)
+     ;;   (ws-cc++-build-tag))
      )
     (:symbol)
     (:candidates)))
 
-(provide 'sos-cc++-backend)
+(provide 'ws-cc++-backend)

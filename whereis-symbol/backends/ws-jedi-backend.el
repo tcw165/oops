@@ -34,7 +34,7 @@
 ;; 3rd party library.
 (require 'hl-anything)
 
-(defun sos-jedi-thingatpt ()
+(defun ws-jedi-thingatpt ()
   "Find symbol string around the point or text selection."
   (let ((bound (if mark-active
                    (cons (region-beginning) (region-end))
@@ -52,7 +52,7 @@
 
 ;; ((:column 19 :module_name "jediepcserver" :description "*args" :line_nr 103 :module_path "/Users/Boy/Documents/_LISP/emacs-jedi/jediepcserver.py"))
 ;; `font-lock-add-keywords'
-(defun sos-jedi-call:goto_definitions (thing)
+(defun ws-jedi-call:goto_definitions (thing)
   (lexical-let ((thing (car thing)))
     (deferred:nextc
       (jedi:call-deferred 'goto)
@@ -87,15 +87,15 @@
 ;; Back-end ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
-(defun sos-jedi-backend (command &rest args)
+(defun ws-jedi-backend (command &rest args)
   (case command
     (:symbol
      (when (and (eq major-mode 'python-mode))
-       (or (sos-jedi-thingatpt) :stop)))
+       (or (ws-jedi-thingatpt) :stop)))
     (:candidates
      (let ((thing (car args)))
        (require 'jedi)
        ;; (setq epc:debug-out t)
-       (sos-jedi-call:goto_definitions thing)))))
+       (ws-jedi-call:goto_definitions thing)))))
 
-(provide 'sos-jedi-backend)
+(provide 'ws-jedi-backend)

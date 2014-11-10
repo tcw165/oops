@@ -33,7 +33,7 @@
 (require 'hl-anything)
 
 ;;;###autoload
-(defun sos-candidates-preview-backend (command &rest args)
+(defun ws-candidates-preview-backend (command &rest args)
   (case command
     (:symbol
      (when (string= (buffer-name) "*Goto Definition*")
@@ -63,4 +63,4 @@
          (setq keywords `((,(regexp-quote symb) 0 'hl-symbol-face prepend)))
          `((:file ,file :linum ,linum :keywords ,keywords))))))))
 
-(provide 'sos-candidates-preview-backend)
+(provide 'ws-candidates-preview-backend)

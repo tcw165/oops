@@ -9,9 +9,10 @@
 (require 'deferred)
 
 ;; "highlight-things-in-a-highlighted-thing-0123456789"
+;; (indent-rigidly 672 881 2)
 
 (deferred:$
-  (deferred:next 
+  (deferred:next
     (lambda ()
       (message "deferred start")))
   (deferred:nextc it

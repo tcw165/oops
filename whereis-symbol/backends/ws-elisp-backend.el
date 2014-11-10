@@ -30,18 +30,18 @@
 
 (require 'thingatpt)
 
-(defconst sos-elisp-find-function-regexp "^\\s-*(\\(?:def\\(ine-skeleton\\|ine-generic-mode\\|ine-derived-mode\\|ine\\(?:-global\\)?-minor-mode\\|ine-compilation-mode\\|un-cvs-mode\\|foo\\|[^icfgv]\\(\\w\\|\\s_\\)+\\*?\\)\\|easy-mmode-define-[a-z-]+\\|easy-menu-define\\|menu-bar-make-toggle\\)\\(?:\\s-\\|\\|;.*\n\\)+\\(?:'\\|(quote \\)?\\\\?\\(?1:%s\\)\\(?:\\s-\\|$\\|(\\|)\\)"
+(defconst ws-elisp-find-function-regexp "^\\s-*(\\(?:def\\(ine-skeleton\\|ine-generic-mode\\|ine-derived-mode\\|ine\\(?:-global\\)?-minor-mode\\|ine-compilation-mode\\|un-cvs-mode\\|foo\\|[^icfgv]\\(\\w\\|\\s_\\)+\\*?\\)\\|easy-mmode-define-[a-z-]+\\|easy-menu-define\\|menu-bar-make-toggle\\)\\(?:\\s-\\|\\|;.*\n\\)+\\(?:'\\|(quote \\)?\\\\?\\(?1:%s\\)\\(?:\\s-\\|$\\|(\\|)\\)"
   "Refer to `find-function-regexp'.")
 
-(defconst sos-elisp-find-variable-regexp "^\\s-*(\\(?:def[^fumag]\\(\\w\\|\\s_\\)+\\*?\\|\easy-mmode-def\\(?:map\\|syntax\\)\\|easy-menu-define\\)\\(?:\\s-\\|\n\\|;.*\n\\)+\\(?1:%s\\)\\(?:\\s-\\|$\\)"
+(defconst ws-elisp-find-variable-regexp "^\\s-*(\\(?:def[^fumag]\\(\\w\\|\\s_\\)+\\*?\\|\easy-mmode-def\\(?:map\\|syntax\\)\\|easy-menu-define\\)\\(?:\\s-\\|\n\\|;.*\n\\)+\\(?1:%s\\)\\(?:\\s-\\|$\\)"
   "Refer to `find-variable-regexp'.")
 
-(defconst sos-elisp-find-face-regexp "^\\s-*(defface\\(?:\\s-\\|\n\\|;.*\n\\)+\\(?1:%s\\)\\(?:\\s-\\|$\\)"
+(defconst ws-elisp-find-face-regexp "^\\s-*(defface\\(?:\\s-\\|\n\\|;.*\n\\)+\\(?1:%s\\)\\(?:\\s-\\|$\\)"
   "Refer to `find-face-regexp'.")
 
-(defconst sos-elisp-find-feature-regexp "^\\s-*(provide '\\(?1:%s\\)")
+(defconst ws-elisp-find-feature-regexp "^\\s-*(provide '\\(?1:%s\\)")
 
-(defun sos-elisp-thingatpt ()
+(defun ws-elisp-thingatpt ()
   "Find symbol string around the point or text selection."
   (let ((bound (if mark-active
                    (cons (region-beginning) (region-end))
@@ -52,7 +52,7 @@
                    (bounds-of-thing-at-point 'symbol)))))
     (and bound (buffer-substring-no-properties (car bound) (cdr bound)))))
 
-(defun sos-elisp-normalize-path (file)
+(defun ws-elisp-normalize-path (file)
   ;; Convert extension from .elc to .el.
   (when (string-match "\\.el\\(c\\)\\'" file)
     (setq file (substring file 0 (match-beginning 1))))
@@ -62,7 +62,7 @@
     (setq file (substring file 0 (match-beginning 1))))
   file)
 
-(defun sos-elisp-get-doc&linum (filename symb-name regexp-temp)
+(defun ws-elisp-get-doc&linum (filename symb-name regexp-temp)
   (let ((regexp (format regexp-temp (regexp-quote symb-name)))
         (case-fold-search nil)
         (linum 0)
@@ -80,7 +80,7 @@
     ;; document string + line number + keywords.
     `(,doc ,linum ((,regexp 1 'hl-symbol-face prepend)))))
 
-(defun sos-elisp-function-document-keywords (usage)
+(defun ws-elisp-function-document-keywords (usage)
   (when usage
     (let ((regexp (concat "^\\(?1:" (regexp-quote usage) "\\)$"))
           keyword keywords)
@@ -88,7 +88,7 @@
             keywords (append keywords keyword))
       keywords)))
 
-(defun sos-elisp-variable-document-keywords (name)
+(defun ws-elisp-variable-document-keywords (name)
   (when name
     (let* ((regexp (concat "^\\(?1:" name "\\)$"))
            keyword keywords)
@@ -96,7 +96,7 @@
             keywords (append keywords keyword))
       keywords)))
 
-(defun sos-elisp-find-feature (thing symb)
+(defun ws-elisp-find-feature (thing symb)
   "Return the absolute file name of the Emacs Lisp source of LIBRARY.
 LIBRARY should be a string (the name of the library)."
   (ignore-errors
@@ -107,15 +107,15 @@ LIBRARY should be a string (the name of the library)."
                        (locate-file thing
                                     (or find-function-source-path load-path)
                                     load-file-rep-suffixes)))
-             (doc&linum (sos-elisp-get-doc&linum file thing
-                                                 sos-elisp-find-feature-regexp))
+             (doc&linum (ws-elisp-get-doc&linum file thing
+                                                 ws-elisp-find-feature-regexp))
              (linum (nth 1 doc&linum))
              (keywords (nth 2 doc&linum)))
         (and (= linum 0) (error "linum should be a positive integer!"))
         `(:symbol ,thing :type "feature" :file ,file :linum ,linum
                   :keywords ,keywords)))))
 
-(defun sos-elisp-find-function (thing symb)
+(defun ws-elisp-find-function (thing symb)
   "Return the candidate pointing to the definition of `symb'. It was written 
 refer to `find-function-noselect', `find-function-search-for-symbol' and 
 `describe-function'."
@@ -133,7 +133,7 @@ refer to `find-function-noselect', `find-function-search-for-symbol' and
                    (data (help-split-fundoc doc-raw real-symb))
                    (usage (car data))
                    (doc (cdr data))
-                   (keywords (sos-elisp-function-document-keywords usage)))
+                   (keywords (ws-elisp-function-document-keywords usage)))
               (with-temp-buffer
                 (setq standard-output (current-buffer))
                 (princ usage)
@@ -145,9 +145,9 @@ refer to `find-function-noselect', `find-function-search-for-symbol' and
                       :linum 1
                       :keywords keywords)))
           ;; Normal Function ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-          (let* ((file (sos-elisp-normalize-path (symbol-file real-symb 'defun)))
-                 (doc&linum (sos-elisp-get-doc&linum file thing
-                                                     sos-elisp-find-function-regexp))
+          (let* ((file (ws-elisp-normalize-path (symbol-file real-symb 'defun)))
+                 (doc&linum (ws-elisp-get-doc&linum file thing
+                                                     ws-elisp-find-function-regexp))
                  (linum (nth 1 doc&linum))
                  (keywords (nth 2 doc&linum)))
             (list :symbol thing
@@ -156,7 +156,7 @@ refer to `find-function-noselect', `find-function-search-for-symbol' and
                   :linum linum
                   :keywords keywords)))))))
 
-(defun sos-elisp-find-variable (thing symb)
+(defun ws-elisp-find-variable (thing symb)
   "Return the candidate pointing to the definition of `symb'. It was written 
 refer to `find-variable-noselect', `find-function-search-for-symbol' and 
 `describe-variable'."
@@ -165,9 +165,9 @@ refer to `find-variable-noselect', `find-function-search-for-symbol' and
       (let ((file (symbol-file symb 'defvar)))
         (if file
             ;; Normal Variable ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-            (let* ((file (sos-elisp-normalize-path file))
-                   (doc&linum (sos-elisp-get-doc&linum file thing
-                                                       sos-elisp-find-variable-regexp))
+            (let* ((file (ws-elisp-normalize-path file))
+                   (doc&linum (ws-elisp-get-doc&linum file thing
+                                                       ws-elisp-find-variable-regexp))
                    (linum (nth 1 doc&linum))
                    (keywords (nth 2 doc&linum)))
               (list :symbol thing
@@ -177,7 +177,7 @@ refer to `find-variable-noselect', `find-function-search-for-symbol' and
                     :keywords keywords))
           ;; Built-in Variable ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           (let* ((doc (documentation-property symb 'variable-documentation))
-                 (keywords (sos-elisp-variable-document-keywords thing))
+                 (keywords (ws-elisp-variable-document-keywords thing))
                  val locus)
             (when doc
               (with-selected-frame (selected-frame)
@@ -274,7 +274,7 @@ file-local variable.\n")
                       :linum 1
                       :keywords keywords)))))))))
 
-(defun sos-elisp-lets-pos ()
+(defun ws-elisp-lets-pos ()
   (let (pos)
     (ignore-errors
       (save-excursion
@@ -285,10 +285,10 @@ file-local variable.\n")
             (setq pos (append pos `(,(point))))))))
     pos))
 
-(defun sos-elisp-find-let-variable (thing)
+(defun ws-elisp-find-let-variable (thing)
   (let ((linum 0)
         regexp
-        (lets-pos (sos-elisp-lets-pos))
+        (lets-pos (ws-elisp-lets-pos))
         beg end)
     (catch 'break
       (dolist (pos lets-pos)
@@ -340,7 +340,7 @@ file-local variable.\n")
                       :linum linum
                       :keywords `((,regexp 1 'hl-symbol-face prepend))))))
 
-(defun sos-elisp-find-function-parameter (thing)
+(defun ws-elisp-find-function-parameter (thing)
   (let ((linum 0)
         regexp
         beg end)
@@ -380,12 +380,12 @@ file-local variable.\n")
                       :linum linum
                       :keywords `((,regexp 1 'hl-symbol-face prepend))))))
 
-(defun sos-elisp-find-face (thing symb)
+(defun ws-elisp-find-face (thing symb)
   (ignore-errors
     (when symb
-      (let* ((file (sos-elisp-normalize-path (symbol-file symb 'defface)))
-             (doc&linum (sos-elisp-get-doc&linum file thing
-                                                 sos-elisp-find-face-regexp))
+      (let* ((file (ws-elisp-normalize-path (symbol-file symb 'defface)))
+             (doc&linum (ws-elisp-get-doc&linum file thing
+                                                 ws-elisp-find-face-regexp))
              (linum (nth 1 doc&linum))
              (keywords (nth 2 doc&linum)))
         (list :symbol thing
@@ -398,12 +398,12 @@ file-local variable.\n")
 ;; Back-ends ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
-(defun sos-elisp-backend (command &rest args)
+(defun ws-elisp-backend (command &rest args)
   (case command
     (:symbol
      (when (memq major-mode '(emacs-lisp-mode
                                 lisp-interaction-mode))
-       (let ((symb (sos-elisp-thingatpt)))
+       (let ((symb (ws-elisp-thingatpt)))
          ;; Return the thing in string or `:stop'.
          (or symb :stop))))
     (:candidates
@@ -412,13 +412,13 @@ file-local variable.\n")
             candidates)
        ;; TODO: use tag system.
        ;; The last one gets the top priority.
-       (dolist (cand (list (sos-elisp-find-feature thing symb)
-                           (sos-elisp-find-face thing symb)
-                           (sos-elisp-find-variable thing symb)
-                           (sos-elisp-find-function thing symb)
-                           (sos-elisp-find-function-parameter thing)
-                           (sos-elisp-find-let-variable thing)))
+       (dolist (cand (list (ws-elisp-find-feature thing symb)
+                           (ws-elisp-find-face thing symb)
+                           (ws-elisp-find-variable thing symb)
+                           (ws-elisp-find-function thing symb)
+                           (ws-elisp-find-function-parameter thing)
+                           (ws-elisp-find-let-variable thing)))
          (and cand (push cand candidates)))
        candidates))))
 
-(provide 'sos-elisp-backend)
+(provide 'ws-elisp-backend)

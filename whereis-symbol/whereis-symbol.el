@@ -1,4 +1,4 @@
-;;; sos.el --- Show helpful information refer to things at the point and more.
+;;; whereis-symbol.el --- Smartly detect symbol at point and show symbol's whence in an isolated window.
 ;;
 ;; Copyright (C) 2014
 ;;
@@ -30,43 +30,40 @@
 ;;; Change Log:
 ;;
 ;; 2014-10-31 (0.0.x)
-;;    - Support asynchronous backends which use `deferred' library.
+;; * Support asynchronous backends which use `deferred' library.
 ;;
 ;; 2014-08-01 (0.0.1)
-;;    Initial release.
+;; * Initial release which was inspired by `company-mode'.
+;;   https://github.com/company-mode/company-mode
 ;;
 ;;; Code:
 
-;; 3rd party library.
-(require 'history)
+;; GNU library.
+(eval-when-compile (require 'cl))
 
+;; whereis-symbol's library.
 (and load-file-name
      (let ((dir (file-name-directory load-file-name)))
        (add-to-list 'load-path (concat dir "/frontends"))
        (add-to-list 'load-path (concat dir "/backends"))))
-
 ;; Default frontends.
-(require 'sos-default-frontend)
+(require 'ws-default-frontend)
 ;; Default backends.
-(require 'sos-elisp-backend)
-(require 'sos-jedi-backend)
-(require 'sos-cc++-backend)
-(require 'sos-grep-backend)
-(require 'sos-candidates-preview-backend)
+(require 'ws-elisp-backend)
+(require 'ws-jedi-backend)
+(require 'ws-cc++-backend)
+(require 'ws-grep-backend)
+(require 'ws-candidates-preview-backend)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Common ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defgroup sos-group nil
+(defgroup whereis-symbol nil
   "A utility to show you documentation at button window by finding some 
-meaningful information around the point."
-  :tag "Sos")
+meaningful information around the point.")
 
-(defcustom sos-backends '(sos-elisp-backend
-                          sos-jedi-backend
-                          sos-cc++-backend
-                          sos-grep-backend
-                          sos-candidates-preview-backend)
+(defcustom ws-backends '(ws-elisp-backend
+                         ws-jedi-backend
+                         ws-cc++-backend
+                         ws-grep-backend
+                         ws-candidates-preview-backend)
   "The list of back-ends for the purpose of collecting candidates. The sos 
 engine will dispatch all the back-ends and pass specific commands in order. 
 Every command has its purpose, paremeter rule and return rule (get meaningful 
@@ -77,8 +74,8 @@ dialog, etc. Be aware, not every back-ends will be dispatched. If a back-end
 return candidates to sos engine, it inform the sos engine that there's no need 
 to dispatch remaining back-ends.
 
-### The sample of a back-end:
-
+Example:
+--------
   (defun some-backend (command &optional arg)
     (case command
       (:init t)
@@ -90,19 +87,21 @@ Each back-end is a function that takes a variable number of arguments. The
 first argument is the command requested from the sos enine.  It is one of
 the following:
 
-### The order of the commands to be called by sos engine, begins from top to down:
-
+Commands:
+---------
 `:init': Called once for each buffer. The back-end can check for external
 programs and files and load any required libraries.  Raising an error here
 will show up in message log once, and the back-end will not be used for
 completion.
 
 `:symbol': The back-end should return a symbol, nil or 'stop.
-- Return a symbol tells sos engine that the back-end will take charge current task. It 
-also tells sos engine don't iterate the following back-ends.
+- Return a symbol tells sos engine that the back-end will take charge current 
+task. It also tells sos engine don't iterate the following back-ends.
 - Return nil tells sos engine to skip the back-end.
 - Return `:stop' tells sos engine to stop iterating the following back-ends.
-- Return value will be cached to `sos-symbol'.
+- Return value will be cached to `ws-symbol'.
+
+`:symbol-completion': ...
 
 `:candidates': The back-end should return a CANDIDATE list or nil.
 Return a list tells sos engine where the definition is and it must be a list
@@ -111,145 +110,152 @@ following back-ends.
 Return nil tells sos engine it cannot find any definition and stop iterating
 the following back-ends.
 
- CANDIDATE is an alist. There are must-have properties and optional properties:
- ### Must-Have Properties:
- `:doc': Buffer text which is the file content (buffer-string).
+  CANDIDATE is an alist!
 
- `:file': The absolute file path.
+  Keys:
+  -----------
+  `:doc': Buffer text which is the file content (buffer-string).
+  or
+  `:file': The absolute file path.
+  Note: `:doc' and `:file' are exclusive.
 
- `:linum': The line number (integer).
+  `:linum': The line number (integer).
 
- ### Optional Properties:
- `:keywords': A list containing elements to highlight keywords. Its format is 
-              `font-lock-keywords'. The 1st matcher must be for the symbol 
-              definition.
+  Optional Keys:
+  --------------------
+  `:keywords': A list containing elements to highlight keywords. Its format is 
+               `font-lock-keywords'. The 1st matcher must be for the symbol 
+               definition.
 
- `:symbol': The symbol's name.
+  `:symbol': The symbol's name.
 
- `:type': The String which describe the symbol.
+  `:type': The String which describe the symbol.
 
- `:show': t indicates front-ends show this CANDIDATE by default.
+  `:show': t indicates front-ends show this CANDIDATE by default.
 
-   ### Example - File Candidate:
-   ((:symbol STRING
-     :doc BUFFER_STRING
-     :type STRING
-     :file STRING
-     :linum INTEGER
-     :match REGEXP) ...)
+  Example - File Candidates:
+  --------------------------
+  ((:symbol STRING
+    :doc BUFFER_STRING
+    :type STRING
+    :file STRING
+    :linum INTEGER
+    :match REGEXP) ...)
 
-   ### Example - Document Candidate:
-   ((:symbol STRING
-     :doc BUFFER_STRING
-     :type STRING
-     :linum INTEGER) ...)"
+  Example - Document Candidates:
+  ------------------------------
+  ((:symbol STRING
+    :doc BUFFER_STRING
+    :type STRING
+    :linum INTEGER) ...)"
   :type '(repeat (symbol :tag "Back-end"))
-  :group 'sos-group)
+  :group 'whereis-symbol)
 
-(defvar sos-symbol nil
+(defvar ws-symbol nil
   "Cache the return value from back-end with `:symbol' command.")
-(make-variable-frame-local 'sos-symbol)
+(make-variable-frame-local 'ws-symbol)
 
-(defvar sos-backend nil
+(defvar ws-backend nil
   "The back-end which takes control of current session in the back-ends list.")
-(make-variable-buffer-local 'sos-backend)
+(make-variable-buffer-local 'ws-backend)
 
-(defun sos-call-backend (backend command &rest args)
+(defun ws-call-backend (backend command &rest args)
   "Call certain backend `backend' and pass `command' to it."
   (apply backend command args))
 
-(defun sos-init-backend (backend)
-  (sos-call-backend backend :init))
+(defun ws-init-backend (backend)
+  (ws-call-backend backend :init))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Definition Window ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Where Is Symbol Mode ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defcustom sos-definition-window-frontends '(sos-definition-buffer-frontend)
+(defcustom ws-frontends '(ws-definition-window-frontend)
   "The list of front-ends for the purpose of visualization.
 
-### Commands:
+Commands:
+---------
 `:init'     - When the visualization should be initialized.
 `:destroy'  - When the visualization should be destroied.
 `:show'     - When the visualization should be showed.
 `:hide'     - When the visualization should be hidden.
 `:update'   - When the data has been updated.
 
-### The sample of a front-end:
+Example:
+--------
   (defun some-frontend (command &rest args)
     (case command
       (:init t)
       (:show (message PROMPTY)))
       (:hide ...)
-      (:destroy ...))
-"
+      (:destroy ...))"
   :type '(repeat (symbol :tag "Front-end"))
-  :group 'sos-group)
+  :group 'whereis-symbol)
 
-(defcustom sos-idle-delay 0.3
+(defcustom ws-idle-delay 0.3
   "The idle delay in seconds until sos starts automatically."
   :type '(number :tag "Seconds"))
 
-(defvar sos-timer nil
-  "The idle timer to call `sos-idle-begin'.")
+(defvar ws-timer nil
+  "The idle timer to call `ws-idle-begin'.")
 
-(defvar sos-source-buffer nil
+(defvar ws-source-buffer nil
   "The current source code buffer.")
 
-(defvar sos-source-window nil
+(defvar ws-source-window nil
   "The current window where the source code buffer is at.")
 
-(defvar sos-is-skip nil
-  "t to skip `sos-idle-begin'.")
-(make-variable-buffer-local 'sos-is-skip)
+(defvar ws-is-skip nil
+  "t to skip `ws-idle-begin'.")
+(make-variable-buffer-local 'ws-is-skip)
 
-(defun sos-call-def-win-frontends (command &rest args)
-  (dolist (frontend sos-definition-window-frontends)
+(defun ws-call-frontends (command &rest args)
+  (dolist (frontend ws-frontends)
     (apply frontend command args)))
 
-(defun sos-def-win-normal-process (backend)
-  (let ((symb (sos-call-backend backend :symbol)))
+(defun ws-normal-process (backend)
+  (let ((symb (ws-call-backend backend :symbol)))
     (cond
      ;; Return `:stop' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
      ((eq symb :stop)
-      (setq sos-backend backend
-            sos-symbol nil)
-      (sos-call-def-win-frontends :hide))
+      (setq ws-backend backend
+            ws-symbol nil)
+      (ws-call-frontends :hide))
 
      ;; Return nil ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
      ((null symb)
-      (setq sos-symbol nil)
-      (sos-call-def-win-frontends :hide))
+      (setq ws-symbol nil)
+      (ws-call-frontends :hide))
 
      ;; Something ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
      (t
-      (if (equal symb sos-symbol)
-          (sos-call-def-win-frontends :update)
-        (setq sos-backend backend
-              sos-symbol symb)
-        (let ((candidates (sos-call-backend sos-backend :candidates symb)))
+      (if (equal symb ws-symbol)
+          (ws-call-frontends :update)
+        (setq ws-backend backend
+              ws-symbol symb)
+        (let ((candidates (ws-call-backend ws-backend :candidates symb)))
           (if candidates
               (cond
                ((listp candidates)
-                (sos-call-def-win-frontends :show candidates))
+                (ws-call-frontends :show candidates))
                ;; Load `deferred' module at runtime.
                ((and (require 'deferred) (deferred-p candidates))
                 (deferred:nextc
                   candidates
                   (lambda (real-candidates)
-                    (sos-call-def-win-frontends :show real-candidates)))))
-            (sos-call-def-win-frontends :hide))))))))
+                    (ws-call-frontends :show real-candidates)))))
+            (ws-call-frontends :hide))))))))
 
-(defun sos-def-win-1st-process ()
-  (dolist (backend sos-backends)
-    (sos-def-win-normal-process backend)
-    (if sos-backend
+(defun ws-1st-process ()
+  (dolist (backend ws-backends)
+    (ws-normal-process backend)
+    (if ws-backend
         (return t)
-      (sos-call-def-win-frontends :hide))))
+      (ws-call-frontends :hide))))
 
-(defun sos-is-skip-command (&rest commands)
+(defun ws-is-skip-command (&rest commands)
   "Return t if `this-command' should be skipped.
 If you want to skip additional commands, try example:
-  (sos-is-skip-command 'self-insert-command 'previous-line ...)"
+  (ws-is-skip-command 'self-insert-command 'previous-line ...)"
   (memq this-command `(mwheel-scroll
                        save-buffer
                        eval-buffer
@@ -257,120 +263,121 @@ If you want to skip additional commands, try example:
                        ;; Additional commands.
                        ,@commands)))
 
-(defun sos-is-idle-begin ()
+(defun ws-is-idle-begin ()
   (not (or (active-minibuffer-window)
-           (sos-is-skip-command)
-           sos-is-skip)))
+           (ws-is-skip-command)
+           ws-is-skip)))
 
-(defun sos-idle-begin ()
-  (when (sos-is-idle-begin)
-    (setq sos-source-buffer (current-buffer)
-          sos-source-window (selected-window))
+(defun ws-idle-begin ()
+  (when (ws-is-idle-begin)
+    (setq ws-source-buffer (current-buffer)
+          ws-source-window (selected-window))
     (condition-case err
-        (if (null sos-backend)
-            (sos-def-win-1st-process)
-          (sos-def-win-normal-process sos-backend))
-      (error err))))
+        (if (null ws-backend)
+            (ws-1st-process)
+          (ws-normal-process ws-backend))
+      (error (message "whereis-symbol-mode error: %s" err)))))
 
 ;;;###autoload
-(define-minor-mode sos-definition-window-mode
+(define-minor-mode whereis-symbol-mode
   "This local minor mode gethers symbol returned from backends around the point 
 and show the reference visually through frontends. Usually frontends output the 
-result to the `sos-def-buf' displayed in the `sos-def-win'."
+result to the `ws-def-buf' displayed in the `ws-def-win'."
   :global t
-  :group 'sos-group
+  :group 'whereis-symbol
   ;; TODO: menu-bar and tool-bar keymap.
-  (if sos-definition-window-mode
+  (if whereis-symbol-mode
       (progn
         ;; Initialize front-ends & back-ends.
-        (sos-call-def-win-frontends :init)
-        (mapc 'sos-init-backend sos-backends)
-        (setq sos-timer (run-with-idle-timer sos-idle-delay t 'sos-idle-begin)))
+        (ws-call-frontends :init)
+        (mapc 'ws-init-backend ws-backends)
+        (setq ws-timer (run-with-idle-timer ws-idle-delay t 'ws-idle-begin)))
     ;; Destroy front-ends & back-ends.
-    (sos-call-def-win-frontends :destroy)
-    (when sos-timer
-      (cancel-timer sos-timer)
-      (setq sos-timer nil))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Outline Window ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;;###autoload
-(define-minor-mode sos-outline-window-mode
-  ""
-  :global t
-  :group 'sos-group
-  ;; TODO: menu-bar and tool-bar keymap.
-  (if sos-outline-window-mode
-      (progn
-        nil)
-    nil))
+    (ws-call-frontends :destroy)
+    (when ws-timer
+      (cancel-timer ws-timer)
+      (setq ws-timer nil))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Go to Definition ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defcustom sos-goto-definition-frontend 'sos-goto-definitions-frontend
+(defcustom ws-goto-frontend 'ws-goto-definitions-frontend
   "The list of front-ends for the purpose of visualization.
 
-### Commands:
+Commands:
+---------
 `:show': When the visualization should be showed. The 1st argument is the 
          candidates."
   :type '(symbol :tag "Front-end")
-  :group 'sos-group)
+  :group 'whereis-symbol)
 
-(defun sos-call-goto-def-frontends (command &rest arg)
-  "Iterate all the `sos-backends' and pass `command' by order."
-  (apply sos-goto-definition-frontend command arg))
+(defcustom ws-before-goto-hook nil
+  ""
+  :type '(repeat function)
+  :group 'whereis-symbol)
 
-(defun sos-goto-def-normal-process (backend)
-  (let ((symb (sos-call-backend backend :symbol)))
+(defcustom ws-after-goto-hook nil
+  ""
+  :type '(repeat function)
+  :group 'whereis-symbol)
+
+(defun ws-call-goto-frontends (command &rest arg)
+  "Iterate all the `ws-backends' and pass `command' by order."
+  (apply ws-goto-frontend command arg))
+
+(defun ws-goto-normal-process (backend)
+  (let ((symb (ws-call-backend backend :symbol)))
     (cond
      ;; Return `:stop' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
      ((eq symb :stop)
-      (setq sos-backend backend))
+      (setq ws-backend backend))
 
      ;; Return nil ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
      ((null symb))
 
      ;; Something ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
      (t
-      (setq sos-backend backend)
-      (let ((candidates (sos-call-backend sos-backend :candidates symb)))
-        (and candidates
-             (cond
-              ((listp candidates)
-               (sos-call-goto-def-frontends :show candidates))
-              ;; Load `deferred' module at runtime.
-              ((and (require 'deferred) (deferred-p candidates))
-               (deferred:nextc
-                 candidates
-                 (lambda (real-candidates)
-                   (sos-call-goto-def-frontends :show real-candidates)))))))))))
+      (setq ws-backend backend)
+      (let ((candidates (ws-call-backend ws-backend :candidates symb)))
+        (when candidates
+          (run-hooks ws-before-goto-hook)
+          (cond
+           ((listp candidates)
+            (ws-call-goto-frontends :show candidates))
+           ;; Load `deferred' module at runtime.
+           ((and (require 'deferred) (deferred-p candidates))
+            (deferred:nextc
+              candidates
+              (lambda (real-candidates)
+                (ws-call-goto-frontends :show real-candidates)))))
+          (run-hooks ws-after-goto-hook)))))))
 
-(defun sos-goto-def-1st-process ()
-  (dolist (backend sos-backends)
-    (sos-goto-def-normal-process backend)
-    (if sos-backend
+(defun ws-goto-1st-process ()
+  (dolist (backend ws-backends)
+    (ws-goto-normal-process backend)
+    (if ws-backend
         (return t))))
 
 ;;;###autoload
-(defun sos-goto-definition ()
+(defun ws-goto-definition ()
   (interactive)
-  (and (sos-is-idle-begin)
-       (if (null sos-backend)
-           (sos-goto-def-1st-process)
-         (sos-goto-def-normal-process sos-backend))))
+  (and (ws-is-idle-begin)
+       (condition-case err
+           (if (null ws-backend)
+               (ws-goto-1st-process)
+             (ws-goto-normal-process ws-backend))
+         (error (message "ws-goto-definition error: %s" err)))))
 
 ;;;###autoload
-(defun sos-goto-local-symbol ()
+(defun ws-goto-local-symbol ()
   (interactive)
   ;; TODO:
   )
 
 ;;;###autoload
-(defun sos-goto-global-symbol ()
+(defun ws-goto-global-symbol ()
   (interactive)
   ;; TODO:
   )
 
-(provide 'sos)
+(provide 'whereis-symbol)

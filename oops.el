@@ -356,25 +356,23 @@ or go back to just one window (by deleting all but the selected window)."
   ;; Update `load-path' refer to `package-load-list'.
   (package-initialize))
 
+;; Packages.
+(oops-init-packages)
 (and load-file-name
      (let ((dir (file-name-directory load-file-name)))
        (add-to-list 'load-path (concat dir "/hl-anything"))
        (add-to-list 'load-path (concat dir "/history"))
        (add-to-list 'load-path (concat dir "/prj"))
-       (add-to-list 'load-path (concat dir "/sos"))
-       (add-to-list 'load-path (concat dir "/lang")) ;; TODO: deprecated!
-       ))
-
+       (add-to-list 'load-path (concat dir "/whereis-symbol"))
+       ;; TODO: deprecated!
+       (add-to-list 'load-path (concat dir "/lang"))))
 ;; TODO: Deprecated after packaging following modules.
 (require 'hl-anything)
 (require 'history)
 (require 'prj)
-(require 'sos)
+(require 'whereis-symbol)
 ;; TODO: deprecated
 (require 'oops-lisp-lib)
-
-;; Packages.
-(oops-init-packages)
 ;; Hooks.
 (oops-init-mode-hooks)
 ;; Emacs instance started from the GUI inherits a default set of environment
@@ -400,6 +398,6 @@ or go back to just one window (by deleting all but the selected window)."
 (when (require 'prj)
   (unless (prj-load-recent-project)
     (prj-load-project))
-  (sos-definition-window-mode 1))
+  (whereis-symbol-mode 1))
 
 (provide 'oops)
