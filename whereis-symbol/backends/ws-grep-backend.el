@@ -36,10 +36,10 @@
 (defun ws-grep-backend (command &rest args)
   (case command
     (:symbol
-     (when (eq major-mode (or (and (featurep 'prj-grep-mode)
-                                   'prj-grep-mode)
-                              (and (featurep 'compile)
-                                   'compilation-mode)))
+     (when (memq major-mode `(,(and (featurep 'prj-grep-mode)
+                                    'prj-grep-mode)
+                              ,(and (featurep 'compile)
+                                    'compilation-mode)))
        (unless mark-active
          (save-excursion
            (beginning-of-line)
