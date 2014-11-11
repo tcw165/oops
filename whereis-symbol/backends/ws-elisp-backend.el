@@ -108,7 +108,7 @@ LIBRARY should be a string (the name of the library)."
                                     (or find-function-source-path load-path)
                                     load-file-rep-suffixes)))
              (doc&linum (ws-elisp-get-doc&linum file thing
-                                                 ws-elisp-find-feature-regexp))
+                                                ws-elisp-find-feature-regexp))
              (linum (nth 1 doc&linum))
              (keywords (nth 2 doc&linum)))
         (and (= linum 0) (error "linum should be a positive integer!"))
@@ -147,7 +147,7 @@ refer to `find-function-noselect', `find-function-search-for-symbol' and
           ;; Normal Function ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           (let* ((file (ws-elisp-normalize-path (symbol-file real-symb 'defun)))
                  (doc&linum (ws-elisp-get-doc&linum file thing
-                                                     ws-elisp-find-function-regexp))
+                                                    ws-elisp-find-function-regexp))
                  (linum (nth 1 doc&linum))
                  (keywords (nth 2 doc&linum)))
             (list :symbol thing
@@ -167,7 +167,7 @@ refer to `find-variable-noselect', `find-function-search-for-symbol' and
             ;; Normal Variable ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
             (let* ((file (ws-elisp-normalize-path file))
                    (doc&linum (ws-elisp-get-doc&linum file thing
-                                                       ws-elisp-find-variable-regexp))
+                                                      ws-elisp-find-variable-regexp))
                    (linum (nth 1 doc&linum))
                    (keywords (nth 2 doc&linum)))
               (list :symbol thing
@@ -385,7 +385,7 @@ file-local variable.\n")
     (when symb
       (let* ((file (ws-elisp-normalize-path (symbol-file symb 'defface)))
              (doc&linum (ws-elisp-get-doc&linum file thing
-                                                 ws-elisp-find-face-regexp))
+                                                ws-elisp-find-face-regexp))
              (linum (nth 1 doc&linum))
              (keywords (nth 2 doc&linum)))
         (list :symbol thing
@@ -402,23 +402,26 @@ file-local variable.\n")
   (case command
     (:symbol
      (when (memq major-mode '(emacs-lisp-mode
-                                lisp-interaction-mode))
+                              lisp-interaction-mode))
        (let ((symb (ws-elisp-thingatpt)))
          ;; Return the thing in string or `:stop'.
          (or symb :stop))))
     (:candidates
-     (let* ((thing (car args))
-            (symb (intern-soft thing))
+     (let* ((thing (nth 0 args))
+            (is-prefix (nth 1 args))
+            (symbol (intern-soft thing))
             candidates)
        ;; TODO: use tag system.
-       ;; The last one gets the top priority.
-       (dolist (cand (list (ws-elisp-find-feature thing symb)
-                           (ws-elisp-find-face thing symb)
-                           (ws-elisp-find-variable thing symb)
-                           (ws-elisp-find-function thing symb)
-                           (ws-elisp-find-function-parameter thing)
-                           (ws-elisp-find-let-variable thing)))
-         (and cand (push cand candidates)))
+       (if is-prefix
+           (setq candidates '(1 2 3))
+         ;; The last one gets the top priority.
+         (dolist (cand (list (ws-elisp-find-feature thing symbol)
+                             (ws-elisp-find-face thing symbol)
+                             (ws-elisp-find-variable thing symbol)
+                             (ws-elisp-find-function thing symbol)
+                             (ws-elisp-find-function-parameter thing)
+                             (ws-elisp-find-let-variable thing)))
+           (and cand (push cand candidates))))
        candidates))))
 
 (provide 'ws-elisp-backend)

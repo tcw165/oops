@@ -148,13 +148,19 @@ and files and load any required libraries.
   "Cache backend which is specifically for the current buffer.")
 (make-variable-buffer-local 'ws-backend)
 
-(defun ws-call-backend (backend command &rest args)
-  "Call BACKEND."
-  (apply backend command args))
+(defun ws-call-backend (command &rest args)
+  "Find workable BACKEND and call it."
+  (if ws-backend
+      (apply ws-backend command args)
+    (dolist (backend ws-backends)
+      (when (setq ws-symbol (funcall backend :symbol))
+        (return (apply (setq ws-backend backend)
+                       command
+                       args))))))
 
 (defun ws-init-backend (backend)
   "Ask BACKEND to initialize itself."
-  (ws-call-backend backend :init))
+  (funcall backend :init))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Where Is Symbol Mode ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -202,46 +208,6 @@ Example:
   (dolist (frontend ws-frontends)
     (apply frontend command args)))
 
-(defun ws-normal-process (backend)
-  (let ((symb (ws-call-backend backend :symbol)))
-    (cond
-     ;; Return `:stop' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-     ((eq symb :stop)
-      (setq ws-backend backend
-            ws-symbol nil)
-      (ws-call-frontends :hide))
-
-     ;; Return nil ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-     ((null symb)
-      (setq ws-symbol nil)
-      (ws-call-frontends :hide))
-
-     ;; Something ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-     (t
-      (if (equal symb ws-symbol)
-          (ws-call-frontends :update)
-        (setq ws-backend backend
-              ws-symbol symb)
-        (let ((candidates (ws-call-backend ws-backend :candidates symb)))
-          (if candidates
-              (cond
-               ((listp candidates)
-                (ws-call-frontends :show candidates))
-               ;; Load `deferred' module at runtime.
-               ((and (require 'deferred) (deferred-p candidates))
-                (deferred:nextc
-                  candidates
-                  (lambda (real-candidates)
-                    (ws-call-frontends :show real-candidates)))))
-            (ws-call-frontends :hide))))))))
-
-(defun ws-1st-process ()
-  (dolist (backend ws-backends)
-    (ws-normal-process backend)
-    (if ws-backend
-        (return t)
-      (ws-call-frontends :hide))))
-
 (defun ws-is-skip-command (&rest commands)
   "Return t if `this-command' should be skipped.
 If you want to skip additional commands, try example:
@@ -263,10 +229,27 @@ If you want to skip additional commands, try example:
     (setq ws-source-buffer (current-buffer)
           ws-source-window (selected-window))
     (condition-case err
-        (if (null ws-backend)
-            (ws-1st-process)
-          (ws-normal-process ws-backend))
-      (error (message "whereis-symbol-mode error: %s" err)))))
+        (let ((old-symbol ws-symbol))
+          (setq ws-symbol (ws-call-backend :symbol))
+          (if (memq ws-symbol '(nil :stop))
+              ;; Return nil or `:stop' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+              (ws-call-frontends :hide)
+            ;; non-nil ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+            (if (equal ws-symbol old-symbol)
+                (ws-call-frontends :update)
+              (let ((candidates (ws-call-backend :candidates ws-symbol)))
+                (if candidates
+                    (cond
+                     ((listp candidates)
+                      (ws-call-frontends :show candidates))
+                     ;; Load `deferred' module at runtime.
+                     ((and (require 'deferred) (deferred-p candidates))
+                      (deferred:nextc
+                        candidates
+                        (lambda (real-candidates)
+                          (ws-call-frontends :show real-candidates)))))
+                  (ws-call-frontends :hide))))))
+      (error (error "whereis-symbol-mode error: %s" err)))))
 
 ;;;###autoload
 (define-minor-mode whereis-symbol-mode
@@ -316,48 +299,34 @@ Commands:
   "Call goto-frontends."
   (apply ws-goto-frontend command arg))
 
-(defun ws-goto-normal-process (backend)
-  (let ((symb (ws-call-backend backend :symbol)))
-    (cond
-     ;; Return `:stop' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-     ((eq symb :stop)
-      (setq ws-backend backend))
-
-     ;; Return nil ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-     ((null symb))
-
-     ;; Something ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-     (t
-      (setq ws-backend backend)
-      (let ((candidates (ws-call-backend ws-backend :candidates symb)))
-        (when candidates
-          (run-hooks ws-before-goto-hook)
-          (cond
-           ((listp candidates)
-            (ws-call-goto-frontends :show candidates))
-           ;; Load `deferred' module at runtime.
-           ((and (require 'deferred) (deferred-p candidates))
-            (deferred:nextc
-              candidates
-              (lambda (real-candidates)
-                (ws-call-goto-frontends :show real-candidates)))))
-          (run-hooks ws-after-goto-hook)))))))
-
-(defun ws-goto-1st-process ()
-  (dolist (backend ws-backends)
-    (ws-goto-normal-process backend)
-    (if ws-backend
-        (return t))))
-
 ;;;###autoload
 (defun ws-goto-definition ()
   (interactive)
   (and (ws-is-idle-begin)
        (condition-case err
-           (if (null ws-backend)
-               (ws-goto-1st-process)
-             (ws-goto-normal-process ws-backend))
-         (error (message "ws-goto-definition error: %s" err)))))
+           (let ((symbol (ws-call-backend :symbol)))
+             ;; not nil or `:stop'.
+             (unless (memq symbol '(nil :stop))
+               (let ((candidates (ws-call-backend :candidates symbol)))
+                 (when candidates
+                   (run-hooks ws-before-goto-hook)
+                   (cond
+                    ((listp candidates)
+                     (ws-call-goto-frontends :show candidates))
+                    ;; Load `deferred' module at runtime.
+                    ((and (require 'deferred) (deferred-p candidates))
+                     (deferred:nextc
+                       candidates
+                       (lambda (real-candidates)
+                         (ws-call-goto-frontends :show real-candidates)))))
+                   (run-hooks ws-after-goto-hook)))))
+         (error (error "ws-goto-definition error: %s" err)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun ws-display-goto-result ()
+  (let ((candidates (ws-call-backend :candidates "" t)))
+    ))
 
 ;;;###autoload
 (defun ws-goto-local-symbol ()
@@ -365,26 +334,28 @@ Commands:
   ;; TODO:
   (minibuffer-with-setup-hook
       (lambda ()
-        ;; (setq *grizzl-current-result* nil)
-        ;; (setq *grizzl-current-selection* 0)
-        ;; (grizzl-mode 1)
-        ;; (lexical-let*
-        ;;     ((hookfun (lambda ()
-        ;;                 (setq *grizzl-current-result*
-        ;;                       (grizzl-search (minibuffer-contents)
-        ;;                                      index
-        ;;                                      *grizzl-current-result*))
-        ;;                 (grizzl-display-result index prompt)))
-        ;;      (exitfun (lambda ()
-        ;;                 (grizzl-mode -1)
-        ;;                 (remove-hook 'post-command-hook    hookfun t))))
-        ;;   (add-hook 'minibuffer-exit-hook exitfun nil t)
-        ;;   (add-hook 'post-command-hook    hookfun nil t))
+        (setq *grizzl-current-result* nil)
+        (setq *grizzl-current-selection* 0)
+        (grizzl-mode 1)
+        (lexical-let*
+            ((hookfun (lambda ()
+                        (setq *grizzl-current-result*
+                              (grizzl-search (minibuffer-contents)
+                                             index
+                                             *grizzl-current-result*))
+                        (grizzl-display-result index prompt)))
+             (exitfun (lambda ()
+                        (grizzl-mode -1)
+                        (remove-hook 'post-command-hook    hookfun t))))
+          (add-hook 'minibuffer-exit-hook exitfun nil t)
+          (add-hook 'post-command-hook    hookfun nil t))
         )
     (read-from-minibuffer ">>> ")
-    ;; (grizzl-selected-result index)
+    (grizzl-selected-result index)
     )
   )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
 (defun ws-goto-global-symbol ()
