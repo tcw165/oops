@@ -125,58 +125,6 @@
   (and (eobp) (forward-line -1)))
 
 ;;;###autoload
-(defun oops--move-lines (step)
-  "Move the current line or the lines covered by region upward or downward without modifying `kill-ring'."
-  ;; There're two situation:
-  ;; (point) ---------------
-  ;; -----------------(mark)
-  ;; or
-  ;; (mark)-----------------
-  ;; ----------------(point)
-  (let* ((beg (line-beginning-position 1))
-         (end (line-beginning-position 2))
-         (line-num 1)
-         (point-excursion (- (point) end))
-         (mark-excursion 0)
-         text)
-    (when mark-active
-      (setq beg (save-excursion
-                  (goto-char (region-beginning))
-                  (beginning-of-line 1)
-                  (point))
-            end (save-excursion
-                  (goto-char (region-end))
-                  (beginning-of-line 2)
-                  (point))
-            line-num (count-lines (region-beginning) (region-end))
-            point-excursion (- (point) end)
-            mark-excursion (- (mark) (point))))
-    ;; Extract region.
-    (setq text (delete-and-extract-region beg end))
-    ;; Move upward/downward and insert the cut region.
-    (forward-line step)
-    (insert text)
-    ;; Set new point.
-    (goto-char (+ (point) point-excursion))
-    ;; Set new mark.
-    (when mark-active
-      (deactivate-mark)
-      (set-mark (+ (point) mark-excursion))
-      (setq deactivate-mark nil))))
-
-;;;###autoload
-(defun oops-move-lines-up ()
-  "Move the current line or the lines covered by region upward without modifying `kill-ring'."
-  (interactive)
-  (oops--move-lines -1))
-
-;;;###autoload
-(defun oops-move-lines-down ()
-  "Move the current line or the lines covered by region downward without modifying `kill-ring'."
-  (interactive)
-  (oops--move-lines 1))
-
-;;;###autoload
 (defun oops-indent-or-company ()
   (interactive)
   (if (or mark-active
@@ -394,6 +342,9 @@ or go back to just one window (by deleting all but the selected window)."
                            ,(and (require 'company-jedi)
                                  '(company-jedi company-files))
                            (company-cmake company-files))))
+;; smart-shift extension.
+(when (require 'smart-shift)
+  (global-smart-shift-mode 1))
 ;; Project management.
 (when (require 'prj)
   (unless (prj-load-recent-project)
