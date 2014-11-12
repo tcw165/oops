@@ -95,9 +95,11 @@ and files and load any required libraries.
   * Return nil tells engine to skip the backend and continue the iteration.
 
 `:candidates': The backend should return a CANDIDATE list or nil.
-  The 2nd argument is the symbol (stored in `ws-symbol');
-  The 3rd argument is a boolean indicating whether the symbol is just a prefix or 
-  not;
+  The 2nd argument, SYMBOL, is the symbol (stored in `ws-symbol');
+  The 3rd argument, IS-PREFIX, is a boolean indicating whether the symbol is just a 
+  prefix or not;
+  The 4th argument, SEARCH-GLOBAL, is a boolean indicating whether to search 
+  globally or just locally in the current file.
 
   Backend could use the symbol and remaining argument to find candidates.
   * Return a CANDIDATE list tells engine where the definition are at. The CANDIDATE 
@@ -112,6 +114,9 @@ and files and load any required libraries.
   Note: `:doc' and `:file' are exclusive.
 
   `:linum': The line number (integer).
+  or
+  `:offset': The offset in the file (integer).
+  Note: `:linum' and `:offset' are exclusive.
 
   CANDIDATE's Optional Keys:
   --------------------------
@@ -240,9 +245,10 @@ If you want to skip additional commands, try example:
               (let ((candidates (ws-call-backend :candidates ws-symbol)))
                 (if candidates
                     (cond
+                     ;; Normal candidates ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                      ((listp candidates)
                       (ws-call-frontends :show candidates))
-                     ;; Load `deferred' module at runtime.
+                     ;; `deferred' candidate ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                      ((and (require 'deferred) (deferred-p candidates))
                       (deferred:nextc
                         candidates
@@ -302,25 +308,26 @@ Commands:
 ;;;###autoload
 (defun ws-goto-definition ()
   (interactive)
-  (and (ws-is-idle-begin)
-       (condition-case err
-           (let ((symbol (ws-call-backend :symbol)))
-             ;; not nil or `:stop'.
-             (unless (memq symbol '(nil :stop))
-               (let ((candidates (ws-call-backend :candidates symbol)))
-                 (when candidates
-                   (run-hooks ws-before-goto-hook)
-                   (cond
-                    ((listp candidates)
-                     (ws-call-goto-frontends :show candidates))
-                    ;; Load `deferred' module at runtime.
-                    ((and (require 'deferred) (deferred-p candidates))
-                     (deferred:nextc
-                       candidates
-                       (lambda (real-candidates)
-                         (ws-call-goto-frontends :show real-candidates)))))
-                   (run-hooks ws-after-goto-hook)))))
-         (error (error "ws-goto-definition error: %s" err)))))
+  (when (ws-is-idle-begin)
+    (condition-case err
+        (let ((symbol (ws-call-backend :symbol)))
+          ;; not nil or `:stop'.
+          (unless (memq symbol '(nil :stop))
+            (let ((candidates (ws-call-backend :candidates symbol)))
+              (when candidates
+                (run-hooks ws-before-goto-hook)
+                (cond
+                 ;; Normal candidates ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                 ((listp candidates)
+                  (ws-call-goto-frontends :show candidates))
+                 ;; `deferred' candidate ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                 ((and (require 'deferred) (deferred-p candidates))
+                  (deferred:nextc
+                    candidates
+                    (lambda (real-candidates)
+                      (ws-call-goto-frontends :show real-candidates)))))
+                (run-hooks ws-after-goto-hook)))))
+      (error (error "ws-goto-definition error: %s" err)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

@@ -395,6 +395,49 @@ file-local variable.\n")
               :keywords keywords)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Find Completion ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun ws-elisp-imenu-to-alists (imenu-index)
+  (let (alists)
+    (dolist (index imenu-index)
+      (setq alists
+            (append alists
+                    (if (imenu--subalist-p index)
+                        (ws-elisp-imenu-to-alists (cdr index))
+                      (list index)))))
+    alists))
+
+(defun ws-elisp-alist-to-candidate (alist)
+  (list :symbol (car alist)
+        :file buffer-file-name
+        :offset (marker-position (cdr alist))))
+
+(defun ws-elisp-alists-to-candidates (alists)
+  (let (candidates)
+    (dolist (alist alists)
+      (push (ws-elisp-alist-to-candidate alist) candidates))
+    candidates))
+
+(defun ws-elisp-complete-local (&optional prefix)
+  (let* ((alist (ws-elisp-imenu-to-alists
+                 (save-excursion
+                   (funcall imenu-create-index-function))))
+         (tail alist)
+         candidates)
+    (if (member prefix '(nil ""))
+        (setq candidates (ws-elisp-alists-to-candidates alist))
+      (while tail
+        (when (string-match prefix (caar tail))
+          (push (ws-elisp-alist-to-candidate (car tail)) candidates))
+        (setq tail (cdr tail))))
+    (reverse candidates)))
+;; (ws-elisp-complete-local)
+;; (ws-elisp-complete-local "find.*\\(fu\\)")
+
+(defun ws-elisp-complete-global (prefix)
+  )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Back-ends ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
@@ -409,11 +452,14 @@ file-local variable.\n")
     (:candidates
      (let* ((thing (nth 0 args))
             (is-prefix (nth 1 args))
+            (search-globally (nth 2 args))
             (symbol (intern-soft thing))
             candidates)
        ;; TODO: use tag system.
        (if is-prefix
-           (setq candidates '(1 2 3))
+           (if search-globally
+               (setq candidates (ws-elisp-complete-global thing))
+             (setq candidates (ws-elisp-complete-local thing)))
          ;; The last one gets the top priority.
          (dolist (cand (list (ws-elisp-find-feature thing symbol)
                              (ws-elisp-find-face thing symbol)
