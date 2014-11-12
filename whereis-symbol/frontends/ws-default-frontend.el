@@ -35,6 +35,7 @@
 (require 'hl-line)
 (require 'linum)
 (require 'tabulated-list)
+(eval-when-compile (require 'cl))
 
 ;; 3rd Party Library.
 (require 'history)
@@ -43,13 +44,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Common ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defvar ws-def-buf nil
+(defvar ws-symbol-preview-buffer nil
   "Definition buffer.")
 
-(defvar ws-def-win nil
+(defvar ws-symbol-preview-window nil
   "Definition window.")
 
-(defvar ws-def-win-height 0
+(defvar ws-symbol-preview-window-height 0
   "The height of definition window.")
 
 (defvar ws-candidates nil
@@ -59,49 +60,49 @@
   "A list containing `ws-candidates'. Engine will push the current candidates 
 into the stack when user navigate to deeper definition in the definition window.")
 
-(defmacro ws-with-definition-buffer (&rest body)
+(defmacro ws-with-symbol-preview-window (&rest body)
   "Get definition buffer and window ready then interpret the `body'."
   (declare (indent 0) (debug t))
   `(progn
-     (unless ws-def-buf
-       (setq ws-def-buf (get-buffer-create "*Definition*")))
-     (unless (window-live-p ws-def-win)
+     (unless ws-symbol-preview-buffer
+       (setq ws-symbol-preview-buffer (get-buffer-create "*Definition*")))
+     (unless (window-live-p ws-symbol-preview-window)
        (let* ((win (cond
                     ;; Outline window is present ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                     ;; TODO:
                     ;; Default ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                     (t (frame-root-window))))
-              (height (or (and (> ws-def-win-height 0)
-                               (- 0 ws-def-win-height))
+              (height (or (and (> ws-symbol-preview-window-height 0)
+                               (- 0 ws-symbol-preview-window-height))
                           (and win
                                (/ (window-height win) -3)))))
          (and win height
-              (setq ws-def-win (split-window win height 'below)))))
+              (setq ws-symbol-preview-window (split-window win height 'below)))))
      ;; Bind definition buffer to definition window.
-     (set-window-buffer ws-def-win ws-def-buf t)
-     (with-selected-window ws-def-win
-       (with-current-buffer ws-def-buf
+     (set-window-buffer ws-symbol-preview-window ws-symbol-preview-buffer t)
+     (with-selected-window ws-symbol-preview-window
+       (with-current-buffer ws-symbol-preview-buffer
          (setq buffer-read-only nil)
          ,@body
          ;; Avoid the engine to scan this buffer.
          (setq ws-is-skip t
                buffer-read-only t)))))
 
-(defun ws-toggle-definition-buffer&window (toggle)
-  "Display or hide the `ws-def-buf' and `ws-def-win'."
+(defun ws-toggle-symbol-preview-window (toggle)
+  "Display or hide the `ws-symbol-preview-buffer' and `ws-symbol-preview-window'."
   (let ((enabled (or (and (booleanp toggle) toggle)
                      (and (numberp toggle)
                           (> toggle 0)))))
     (if enabled
-        (ws-with-definition-buffer
+        (ws-with-symbol-preview-window
           (setq header-line-format nil
                 mode-line-format (ws-candidate-mode-line)))
-      (when (windowp ws-def-win)
-        (delete-window ws-def-win))
-      (when (bufferp ws-def-buf)
-        (kill-buffer ws-def-buf))
-      (setq ws-def-buf nil
-            ws-def-win nil))))
+      (when (windowp ws-symbol-preview-window)
+        (delete-window ws-symbol-preview-window))
+      (when (bufferp ws-symbol-preview-buffer)
+        (kill-buffer ws-symbol-preview-buffer))
+      (setq ws-symbol-preview-buffer nil
+            ws-symbol-preview-window nil))))
 
 (defun ws-is-multiple-candidates ()
   (> (length ws-candidates) 1))
@@ -114,7 +115,7 @@ into the stack when user navigate to deeper definition in the definition window.
          (linum (or (plist-get candidate :linum) 1))
          (keywords (plist-get candidate :keywords)))
     (and candidate
-         (ws-with-definition-buffer
+         (ws-with-symbol-preview-window
            (kill-all-local-variables)
            (remove-overlays)
            ;; Insert content and set major mode.
@@ -143,7 +144,7 @@ into the stack when user navigate to deeper definition in the definition window.
 (defun ws-show-candidates (&optional select-index)
   "Show multiple candidates prompt."
   ;; TODO: Check if there're candidates need to be showed immediately.
-  (ws-with-definition-buffer
+  (ws-with-symbol-preview-window
     ;; Insert condidates.
     (ws-show-candidates-common)
     ;; Major mode.
@@ -188,7 +189,7 @@ into the stack when user navigate to deeper definition in the definition window.
           (incf id))))
     (setq tabulated-list-entries (nreverse tabulated-list-entries))))
 
-(defun ws-goto-definition-from-candidates-common ()
+(defun ws-goto-symbol-from-candidates-common ()
   (let* ((candidate (nth 0 ws-candidates))
          (file (plist-get candidate :file))
          (linum (plist-get candidate :linum))
@@ -248,13 +249,13 @@ into the stack when user navigate to deeper definition in the definition window.
     map))
 
 (defvar ws-candidate-mode-hook '((lambda ()
-                                    (linum-mode 1)
-                                    (setq-local hl-line-sticky-flag t)
-                                    (hl-line-mode 1))
-                                  (lambda ()
-                                    ;; Use `hl-highlight-mode' to prevent highlights to being blocked.
-                                    (setq hl-is-highlight-special-faces t)
-                                    (hl-highlight-mode 1))))
+                                   (linum-mode 1)
+                                   (setq-local hl-line-sticky-flag t)
+                                   (hl-line-mode 1))
+                                 (lambda ()
+                                   ;; Use `hl-highlight-mode' to prevent highlights to being blocked.
+                                   (setq hl-is-highlight-special-faces t)
+                                   (hl-highlight-mode 1))))
 
 (defvar ws-linum-map
   (let ((map (make-sparse-keymap)))
@@ -332,7 +333,7 @@ into the stack when user navigate to deeper definition in the definition window.
     (let* ((candidate (nth 0 ws-candidates))
            (linum (plist-get candidate :linum)))
       (when (and linum (integerp linum))
-        (ws-with-definition-buffer
+        (ws-with-symbol-preview-window
           (goto-char 1)
           (forward-line (1- linum))
           (end-of-line)
@@ -341,8 +342,8 @@ into the stack when user navigate to deeper definition in the definition window.
 ;;;###autoload
 (define-minor-mode ws-candidate-mode
   "Minor mode for *Definition* buffers."
-  :lighter " sos:candidate"
-  :group 'ws-group
+  :lighter " ws:candidate"
+  :group 'whereis-symbol
   (if ws-candidate-mode
       (let* ((candidate (nth 0 ws-candidates))
              (file (plist-get candidate :file))
@@ -369,7 +370,7 @@ into the stack when user navigate to deeper definition in the definition window.
     map))
 
 (defvar ws-candidates-mode-hook `(linum-mode
-                                   hl-line-mode))
+                                  hl-line-mode))
 
 (defvar ws-jump-in-button-map
   (let ((map (make-sparse-keymap)))
@@ -395,20 +396,20 @@ into the stack when user navigate to deeper definition in the definition window.
 (defun ws-next-candidate ()
   (interactive)
   (when (ws-is-multiple-candidates)
-    (ws-with-definition-buffer
+    (ws-with-symbol-preview-window
       (ws-next-line))))
 
 ;;;###autoload
 (defun ws-prev-candidate ()
   (interactive)
   (when (ws-is-multiple-candidates)
-    (ws-with-definition-buffer
+    (ws-with-symbol-preview-window
       (ws-previous-line))))
 
 ;;;###autoload
 (defun ws-jump-in-candidate ()
   (interactive)
-  (ws-with-definition-buffer
+  (ws-with-symbol-preview-window
     (let ((select-index (tabulated-list-get-id)))
       (if select-index
           (progn
@@ -433,7 +434,7 @@ into the stack when user navigate to deeper definition in the definition window.
 (define-derived-mode ws-candidates-mode tabulated-list-mode
   "sos:candidates"
   "doc"
-  :group 'ws-group
+  :group 'whereis-symbol
   (setq mode-line-format (ws-candidates-mode-line)
         buffer-read-only t)
   ;; Make highlight line sticky only for current buffer.
@@ -447,27 +448,35 @@ into the stack when user navigate to deeper definition in the definition window.
 (defvar ws-goto-candidates-mode-map
   (let ((map (make-sparse-keymap)))
     (suppress-keymap map t)
-    (define-key map [?e] '(lambda () (interactive) (ws-goto-definition-from-candidates)))
-    (define-key map [?q] '(lambda () (interactive) (kill-buffer (current-buffer))))
-    (define-key map [escape] '(lambda () (interactive) (kill-buffer (current-buffer))))
+    (define-key map [?e] '(lambda ()
+                            (interactive)
+                            (ws-goto-symbol-from-candidates)))
+    (define-key map [?q] '(lambda ()
+                            (interactive)
+                            (kill-buffer (current-buffer))))
+    (define-key map [escape] '(lambda ()
+                                (interactive)
+                                (kill-buffer (current-buffer))))
     (define-key map [left] '(lambda () (interactive) (ws-left-char)))
     (define-key map [right] '(lambda () (interactive) (ws-right-char)))
     (define-key map [up] '(lambda () (interactive) (ws-previous-line)))
     (define-key map [down] '(lambda () (interactive) (ws-next-line)))
-    (define-key map [return] '(lambda () (interactive) (ws-goto-definition-from-candidates)))
+    (define-key map [return] '(lambda ()
+                                (interactive)
+                                (ws-goto-symbol-from-candidates)))
     map))
 
 (defvar ws-goto-candidates-mode-hook `(linum-mode
-                                        hl-line-mode))
+                                       hl-line-mode))
 
-(defun ws-goto-definition-from-candidates ()
+(defun ws-goto-symbol-from-candidates ()
   (let ((entry (tabulated-list-get-entry)))
     (if entry
         ;; Open definition if there is a file.
         (if (file-exists-p (aref entry 3))
             (progn
               (kill-buffer)
-              (ws-goto-definition-from-candidates-common))
+              (ws-goto-symbol-from-candidates-common))
           (message "It is only a doucmentation, so cannot open this type of definition."))
       (message "Invalid choice!"))))
 
@@ -475,7 +484,7 @@ into the stack when user navigate to deeper definition in the definition window.
 (define-derived-mode ws-goto-candidates-mode tabulated-list-mode
   "sos:goto-definitions"
   "doc"
-  :group 'ws-group
+  :group 'whereis-symbol
   ;; Make highlight line sticky only for current buffer.
   (setq-local hl-line-sticky-flag t)
   ;; Mode line.
@@ -486,13 +495,102 @@ into the stack when user navigate to deeper definition in the definition window.
   (tabulated-list-print))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Search Symbol ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defcustom ws-search-symbol-display-lines 10
+  "Maximum lines of symbols to be showed when searching local or global symbol."
+  :type 'integer
+  :group 'whereis-symbol)
+
+(defvar ws-search-symbol-timer nil)
+
+(defvar ws-search-symbol-index 0)
+
+(defvar ws-symbol-searcher nil
+  "A function provided by engine. The frontend can call this function to get 
+CANDIDATES list.")
+
+(defvar ws-minibuffer-search-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [up] 'ws-selection-1)
+    (define-key map [down] 'ws-selection+1)
+    (define-key map [prior] 'ws-selection-page)
+    (define-key map [next] 'ws-selection+page)
+    map))
+
+(defun ws-candidates-to-string (candidates)
+  (let* ((candidate (nthcdr ws-search-symbol-index candidates))
+         (total (min ws-search-symbol-display-lines
+                     (length candidates)))
+         (lines total)
+         string)
+    (while (> lines 0)
+      (setq string (concat string
+                           "  " (plist-get (car candidate) :symbol)
+                           (and (> lines 1) "\n"))
+            candidate (cdr candidate))
+      (decf lines))
+    (cons total string)))
+
+(defun ws-search-symbol-mode-line ()
+  "-----")
+
+(defun ws-display-search-result ()
+  (delete-all-overlays)
+  (let* ((data (ws-candidates-to-string (funcall ws-symbol-searcher
+                                                 (minibuffer-contents))))
+         (lines (car data))
+         (matches (cdr data))
+         (mode-line (ws-search-symbol-mode-line)))
+    (overlay-put (make-overlay (point-min) (point-min))
+                 'before-string
+                 (format "%s\n%s\n" matches mode-line))
+    (set-window-text-height nil (max 3 (+ lines 2)))))
+
+(defun ws-exit-minibuffer-hook ()
+  (ws-minibuffer-search-mode -1))
+
+;;;###autoload
+(defun ws-selection+1 ()
+  (interactive))
+
+;;;###autoload
+(defun ws-selection-1 ()
+  (interactive))
+
+;;;###autoload
+(defun ws-selection+page ()
+  (interactive))
+
+;;;###autoload
+(defun ws-selection-page ()
+  (interactive))
+
+;;;###autoload
+(define-minor-mode ws-minibuffer-search-mode
+  ""
+  :group 'whereis-symbol
+  (unless (minibufferp)
+    (error "The minor-mode is only for minibuffer!"))
+  (if ws-minibuffer-search-mode
+      (progn
+        (setq ws-search-symbol-timer (run-with-idle-timer 0.3 t
+                                                          'ws-display-search-result)
+              ws-search-symbol-index 0)
+        (add-hook 'minibuffer-exit-hook 'ws-exit-minibuffer-hook nil t))
+    (when (timerp ws-search-symbol-timer)
+      (cancel-timer ws-search-symbol-timer)
+      (setq ws-search-symbol-timer nil))
+    (remove-hook 'minibuffer-exit-hook 'ws-exit-minibuffer-hook t)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Front-ends ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
-(defun ws-definition-window-frontend (command &rest args)
+(defun ws-symbol-preview-frontend (command &rest args)
   (case command
-    (:init (ws-toggle-definition-buffer&window 1))
-    (:destroy (ws-toggle-definition-buffer&window -1))
+    (:init (ws-toggle-symbol-preview-window 1))
+    (:destroy (ws-toggle-symbol-preview-window -1))
     (:show
      ;; TODO: remember user choice at last session in the project.
      (setq ws-candidates (car args)
@@ -500,16 +598,17 @@ into the stack when user navigate to deeper definition in the definition window.
            ;; Clean the stack.
            ws-candidates-stack nil)
      (and ws-candidates
-          (ws-toggle-definition-buffer&window 1)
+          (ws-toggle-symbol-preview-window 1)
           (if (ws-is-multiple-candidates)
               (ws-show-candidates)
             (ws-show-candidate)))))
   ;; Save the height of definition window.
-  (and (window-live-p ws-def-win)
-       (setq ws-def-win-height (window-height ws-def-win))))
+  (and (window-live-p ws-symbol-preview-window)
+       (setq ws-symbol-preview-window-height (window-height
+                                              ws-symbol-preview-window))))
 
 ;;;###autoload
-(defun ws-goto-definitions-frontend (command &rest args)
+(defun ws-goto-symbol-frontend (command &rest args)
   (case command
     (:show
      (setq ws-candidates (car args))
@@ -527,6 +626,18 @@ into the stack when user navigate to deeper definition in the definition window.
          ;; Single Candidate ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
          (ignore-errors
            (kill-buffer buf-name))
-         (ws-goto-definition-from-candidates-common))))))
+         (ws-goto-symbol-from-candidates-common))))))
+
+;;;###autoload
+(defun ws-fuzzy-search-symbol-frontend (command &rest args)
+  (case command
+    (:show
+     (setq ws-symbol-searcher (nth 0 args))
+     (minibuffer-with-setup-hook
+         (lambda ()
+           (ws-minibuffer-search-mode 1)
+           (ws-display-search-result))
+       (read-from-minibuffer ">>> ")))))
 
 (provide 'ws-default-frontend)
+;;; ws-default-frontend.el ends here

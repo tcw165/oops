@@ -96,8 +96,8 @@ and files and load any required libraries.
 
 `:candidates': The backend should return a CANDIDATE list or nil.
   The 2nd argument, SYMBOL, is the symbol (stored in `ws-symbol');
-  The 3rd argument, IS-PREFIX, is a boolean indicating whether the symbol is just a 
-  prefix or not;
+  The 3rd argument, IS-SEARCH, is a boolean indicating whether the symbol is just 
+  a prefix or not;
   The 4th argument, SEARCH-GLOBAL, is a boolean indicating whether to search 
   globally or just locally in the current file.
 
@@ -142,7 +142,7 @@ and files and load any required libraries.
     :doc    \"This is a documentary of the built-in ...\"
     :type   \"built-in\"
     :linum  1) ...)"
-  :type '(repeat (symbol :tag "Back-end"))
+  :type '(repeat (function :tag "Back-end"))
   :group 'whereis-symbol)
 
 (defvar ws-symbol nil
@@ -170,8 +170,8 @@ and files and load any required libraries.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Where Is Symbol Mode ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defcustom ws-frontends '(ws-definition-window-frontend)
-  "The list of frontends for the purpose of visualization.
+(defcustom ws-frontend 'ws-symbol-preview-frontend
+  "Function to show visualization of candidate(s) made by `whereis-symbol-mode'.
 
 Commands:
 ---------
@@ -189,11 +189,11 @@ Example:
       (:show (message PROMPTY)))
       (:hide ...)
       (:destroy ...))"
-  :type '(repeat (symbol :tag "Front-end"))
+  :type '(function :tag "Front-end")
   :group 'whereis-symbol)
 
 (defcustom ws-idle-delay 0.3
-  "The idle delay in seconds before the engine starts."
+  "The idle delay in seconds before the `whereis-symbol-mode' engine starts."
   :type '(number :tag "Seconds"))
 
 (defvar ws-timer nil
@@ -209,9 +209,8 @@ Example:
   "t to skip `ws-idle-begin'.")
 (make-variable-buffer-local 'ws-is-skip)
 
-(defun ws-call-frontends (command &rest args)
-  (dolist (frontend ws-frontends)
-    (apply frontend command args)))
+(defun ws-call-frontend (command &rest args)
+  (apply ws-frontend command args))
 
 (defun ws-is-skip-command (&rest commands)
   "Return t if `this-command' should be skipped.
@@ -238,40 +237,41 @@ If you want to skip additional commands, try example:
           (setq ws-symbol (ws-call-backend :symbol))
           (if (memq ws-symbol '(nil :stop))
               ;; Return nil or `:stop' ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-              (ws-call-frontends :hide)
+              (ws-call-frontend :hide)
             ;; non-nil ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
             (if (equal ws-symbol old-symbol)
-                (ws-call-frontends :update)
+                (ws-call-frontend :update)
               (let ((candidates (ws-call-backend :candidates ws-symbol)))
                 (if candidates
                     (cond
                      ;; Normal candidates ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                      ((listp candidates)
-                      (ws-call-frontends :show candidates))
+                      (ws-call-frontend :show candidates))
                      ;; `deferred' candidate ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                      ((and (require 'deferred) (deferred-p candidates))
                       (deferred:nextc
                         candidates
                         (lambda (real-candidates)
-                          (ws-call-frontends :show real-candidates)))))
-                  (ws-call-frontends :hide))))))
+                          (ws-call-frontend :show real-candidates)))))
+                  (ws-call-frontend :hide))))))
       (error (error "whereis-symbol-mode error: %s" err)))))
 
 ;;;###autoload
 (define-minor-mode whereis-symbol-mode
   "This local minor mode gethers symbol returned from backends around the point 
-and show the reference visually through frontends. Usually frontends output the 
-result to the `ws-def-buf' displayed in the `ws-def-win'."
+and show the reference visually through frontends. Default frontend is 
+`ws-symbol-bottom-window-frontend' which output the result to the 
+`ws-symbol-preview-buffer' displayed in the `ws-symbol-preview-window'."
   :global t
   :group 'whereis-symbol
   (if whereis-symbol-mode
       (progn
         ;; Initialize front-ends & back-ends.
-        (ws-call-frontends :init)
+        (ws-call-frontend :init)
         (mapc 'ws-init-backend ws-backends)
         (setq ws-timer (run-with-idle-timer ws-idle-delay t 'ws-idle-begin)))
     ;; Destroy front-ends & back-ends.
-    (ws-call-frontends :destroy)
+    (ws-call-frontend :destroy)
     (when ws-timer
       (cancel-timer ws-timer)
       (setq ws-timer nil))))
@@ -279,16 +279,17 @@ result to the `ws-def-buf' displayed in the `ws-def-win'."
 ;; TODO: menu-bar and tool-bar keymap.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Go to Definition ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Goto Symbol ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defcustom ws-goto-frontend 'ws-goto-definitions-frontend
-  "A frontend controls the way to goto definition both for single candidate and 
-multiple candidates. Default is `ws-goto-definitions-frontend'.
+(defcustom ws-goto-symbol-frontend 'ws-goto-symbol-frontend
+  "A frontend controls the way to goto symbol's definition both for single 
+candidate and multiple candidates. Developers can customize GUI for theyselves. 
+Default is `ws-goto-symbol-frontend'.
 
 Commands:
 ---------
-`:show': Show the result. The 1st argument is the candidates."
-  :type '(symbol :tag "Front-end")
+`:show': Show the result. The 2nd argument is a CANDIDATE list made by backends."
+  :type '(function :tag "Front-end")
   :group 'whereis-symbol)
 
 (defcustom ws-before-goto-hook nil
@@ -301,12 +302,8 @@ Commands:
   :type '(repeat function)
   :group 'whereis-symbol)
 
-(defun ws-call-goto-frontends (command &rest arg)
-  "Call goto-frontends."
-  (apply ws-goto-frontend command arg))
-
 ;;;###autoload
-(defun ws-goto-definition ()
+(defun ws-goto-symbol ()
   (interactive)
   (when (ws-is-idle-begin)
     (condition-case err
@@ -319,55 +316,53 @@ Commands:
                 (cond
                  ;; Normal candidates ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                  ((listp candidates)
-                  (ws-call-goto-frontends :show candidates))
+                  (funcall ws-goto-symbol-frontend :show candidates))
                  ;; `deferred' candidate ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                  ((and (require 'deferred) (deferred-p candidates))
                   (deferred:nextc
                     candidates
                     (lambda (real-candidates)
-                      (ws-call-goto-frontends :show real-candidates)))))
+                      (funcall ws-goto-symbol-frontend
+                               :show real-candidates)))))
                 (run-hooks ws-after-goto-hook)))))
-      (error (error "ws-goto-definition error: %s" err)))))
+      (error (error "ws-goto-symbol error: %s" err)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Search Local/Global Symbol ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun ws-display-goto-result ()
-  (let ((candidates (ws-call-backend :candidates "" t)))
-    ))
+(defcustom ws-search-symbol-frontend 'ws-fuzzy-search-symbol-frontend
+  "A frontend controls the way to goto definition both for single candidate and 
+multiple candidates. Developers can customize GUI for theyselves. Default is 
+`ws-fuzzy-search-symbol-frontend'.
 
-;;;###autoload
-(defun ws-goto-local-symbol ()
-  (interactive)
-  ;; TODO:
-  (minibuffer-with-setup-hook
-      (lambda ()
-        (setq *grizzl-current-result* nil)
-        (setq *grizzl-current-selection* 0)
-        (grizzl-mode 1)
-        (lexical-let*
-            ((hookfun (lambda ()
-                        (setq *grizzl-current-result*
-                              (grizzl-search (minibuffer-contents)
-                                             index
-                                             *grizzl-current-result*))
-                        (grizzl-display-result index prompt)))
-             (exitfun (lambda ()
-                        (grizzl-mode -1)
-                        (remove-hook 'post-command-hook    hookfun t))))
-          (add-hook 'minibuffer-exit-hook exitfun nil t)
-          (add-hook 'post-command-hook    hookfun nil t))
-        )
-    (read-from-minibuffer ">>> ")
-    (grizzl-selected-result index)
-    )
-  )
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Commands:
+---------
+`:show': Show the result.
+The 2nd argument is a FUNCTION which lets the frontend get information from the 
+backend. The FUNCTION takes one argument, which is a string to be searched;
+"
+  :type '(function :tag "Front-end")
+  :group 'whereis-symbol)
 
 ;;;###autoload
-(defun ws-goto-global-symbol ()
+(defun ws-search-local-symbol ()
   (interactive)
-  ;; TODO:
-  )
+  (funcall ws-search-symbol-frontend :show
+           (lambda (&optional match)
+             (with-current-buffer ws-source-buffer
+               (ws-call-backend :candidates
+                                (or match "")
+                                t)))))
+
+;;;###autoload
+(defun ws-search-global-symbol ()
+  (interactive)
+  (funcall ws-search-symbol-frontend :show
+           (lambda (&optional match)
+             (with-current-buffer ws-source-buffer
+               (ws-call-backend :candidates
+                                (or match "")
+                                t t)))))
 
 (provide 'whereis-symbol)
+;;; whereis-symbol.el ends here

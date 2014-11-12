@@ -61,9 +61,9 @@
 (global-set-key (kbd "M-/") 'oops-toggle-comment)
 
 ;; Ctrl + up
-(global-set-key (kbd "C-<up>") 'oops-move-lines-up)
+(global-set-key (kbd "C-<up>") 'smart-shift-up)
 ;; Ctrl + down
-(global-set-key (kbd "C-<down>") 'oops-move-lines-down)
+(global-set-key (kbd "C-<down>") 'smart-shift-down)
 ;; Alt + [
 (global-set-key (kbd "M-[") 'his-prev-history)
 ;; Alt + ]
@@ -96,7 +96,7 @@
 ;; F3
 (global-set-key (kbd "<f3>") 'hl-find-thing-forwardly)
 ;; F4
-(global-set-key (kbd "<f4>") 'ws-goto-definition)
+(global-set-key (kbd "<f4>") 'ws-goto-symbol)
 
 ;; Shift + F1
 ;; Shift + F2

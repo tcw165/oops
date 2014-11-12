@@ -28,7 +28,9 @@
 ;; 2014-10-01 (0.0.1)
 ;;    Initial release.
 
+;; GNU library.
 (require 'thingatpt)
+(require 'imenu)
 
 (defconst ws-elisp-find-function-regexp "^\\s-*(\\(?:def\\(ine-skeleton\\|ine-generic-mode\\|ine-derived-mode\\|ine\\(?:-global\\)?-minor-mode\\|ine-compilation-mode\\|un-cvs-mode\\|foo\\|[^icfgv]\\(\\w\\|\\s_\\)+\\*?\\)\\|easy-mmode-define-[a-z-]+\\|easy-menu-define\\|menu-bar-make-toggle\\)\\(?:\\s-\\|\\|;.*\n\\)+\\(?:'\\|(quote \\)?\\\\?\\(?1:%s\\)\\(?:\\s-\\|$\\|(\\|)\\)"
   "Refer to `find-function-regexp'.")
@@ -395,7 +397,7 @@ file-local variable.\n")
               :keywords keywords)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Find Completion ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Search Symbol ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun ws-elisp-imenu-to-alists (imenu-index)
   (let (alists)
@@ -418,23 +420,23 @@ file-local variable.\n")
       (push (ws-elisp-alist-to-candidate alist) candidates))
     candidates))
 
-(defun ws-elisp-complete-local (&optional prefix)
+(defun ws-elisp-complete-local (&optional match)
   (let* ((alist (ws-elisp-imenu-to-alists
                  (save-excursion
                    (funcall imenu-create-index-function))))
          (tail alist)
          candidates)
-    (if (member prefix '(nil ""))
+    (if (member match '(nil ""))
         (setq candidates (ws-elisp-alists-to-candidates alist))
       (while tail
-        (when (string-match prefix (caar tail))
+        (when (string-match (regexp-quote match) (caar tail))
           (push (ws-elisp-alist-to-candidate (car tail)) candidates))
         (setq tail (cdr tail))))
     (reverse candidates)))
 ;; (ws-elisp-complete-local)
 ;; (ws-elisp-complete-local "find.*\\(fu\\)")
 
-(defun ws-elisp-complete-global (prefix)
+(defun ws-elisp-complete-global (match)
   )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -451,12 +453,12 @@ file-local variable.\n")
          (or symb :stop))))
     (:candidates
      (let* ((thing (nth 0 args))
-            (is-prefix (nth 1 args))
+            (is-search (nth 1 args))
             (search-globally (nth 2 args))
             (symbol (intern-soft thing))
             candidates)
        ;; TODO: use tag system.
-       (if is-prefix
+       (if is-search
            (if search-globally
                (setq candidates (ws-elisp-complete-global thing))
              (setq candidates (ws-elisp-complete-local thing)))
@@ -471,3 +473,4 @@ file-local variable.\n")
        candidates))))
 
 (provide 'ws-elisp-backend)
+;;; ws-elisp-backend.el ends here
