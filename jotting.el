@@ -10,6 +10,7 @@
 
 ;; "highlight-things-in-a-highlighted-thing-0123456789"
 ;; (indent-rigidly 672 881 2)
+;; `message'
 
 (deferred:$
   (deferred:next
