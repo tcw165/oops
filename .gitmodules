@@ -1,3 +1,6 @@
 [submodule "hl-anything"]
 	path = hl-anything
 	url = https://github.com/boyw165/hl-anything.git
+[submodule "whereis-symbol"]
+	path = whereis-symbol
+	url = https://github.com/boyw165/whereis-symbol.git
