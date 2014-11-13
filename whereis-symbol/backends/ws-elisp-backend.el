@@ -423,6 +423,7 @@ file-local variable.\n")
 (defun ws-elisp-complete-local (&optional match)
   (let* ((alist (ws-elisp-imenu-to-alists
                  (save-excursion
+                   (imenu--cleanup)
                    (funcall imenu-create-index-function))))
          (tail alist)
          candidates)

@@ -166,26 +166,6 @@
     (let ((process-connection-type nil))
       (start-process "" nil "xdg-open" ".")))))
 
-;; TODO: deprecated
-;;;###autoload
-(defun oops-goto-global-symbol ()
-  ""
-  (interactive)
-  (cond
-   ;; lisp
-   ((memq major-mode (list 'emacs-lisp-mode
-                           'lisp-interaction-mode)))))
-
-;; TODO: deprecated
-;;;###autoload
-(defun oops-goto-local-symbol ()
-  (interactive)
-  (cond
-   ;; lisp
-   ((memq major-mode (list 'emacs-lisp-mode
-                           'lisp-interaction-mode))
-    (oops-lisp-goto-lsymb))))
-
 ;;;###autoload
 (defun oops-common-escape ()
   "Exit the current \"mode\" (in a generalized sense of the word).
@@ -311,16 +291,12 @@ or go back to just one window (by deleting all but the selected window)."
        (add-to-list 'load-path (concat dir "/hl-anything"))
        (add-to-list 'load-path (concat dir "/history"))
        (add-to-list 'load-path (concat dir "/prj"))
-       (add-to-list 'load-path (concat dir "/whereis-symbol"))
-       ;; TODO: deprecated!
-       (add-to-list 'load-path (concat dir "/lang"))))
+       (add-to-list 'load-path (concat dir "/whereis-symbol"))))
 ;; TODO: Deprecated after packaging following modules.
 (require 'hl-anything)
 (require 'history)
 (require 'prj)
 (require 'whereis-symbol)
-;; TODO: deprecated
-(require 'oops-lisp-lib)
 ;; Hooks.
 (oops-init-mode-hooks)
 ;; Emacs instance started from the GUI inherits a default set of environment

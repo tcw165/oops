@@ -70,7 +70,7 @@
 (global-set-key (kbd "M-]") 'his-next-history)
 
 ;; Ctrl + o
-(global-set-key (kbd "C-o") 'oops-goto-local-symbol)
+(global-set-key (kbd "C-o") 'ws-search-local-symbol)
 ;; Ctrl + r
 (global-set-key (kbd "C-r") 'prj-find-file)
 ;; Ctrl + Shift + o

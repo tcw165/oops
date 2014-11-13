@@ -348,7 +348,7 @@ remove one.\n"
     (:find-files
      (let ((file (and (require 'grizzl)
                       (grizzl-completing-read
-                       (format "[%s] Find file: " (prj-project-name))
+                       (format " [%s] find file" (prj-project-name))
                        files))))
        (when file
          (funcall 'prj-find-file-impl file))))))

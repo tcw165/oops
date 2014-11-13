@@ -1,9 +1,9 @@
-;;; whereis-symbol.el --- Smartly detect symbol at point and show symbol's whence in an isolated window.
+;;; whereis-symbol.el --- Smartly detect symbol at point and show its definition in another window.
 ;;
 ;; Copyright (C) 2014
 ;;
 ;; Author: boyw165
-;; Version: 0.0.1
+;; Version: 20141113.1608
 ;; Compatibility: GNU Emacs 24.3+
 ;;
 ;; This file is NOT part of GNU Emacs.
@@ -23,16 +23,51 @@
 ;;
 ;;; Commentary:
 ;;
-;; This is a framework that refers to the point and show useful information.
+;; This is a FRAMEWORK which helps you to easily find symbol's definition:
+;; * `whereis-symbol-mode':
+;;   Detect symbol at point in a very short idle delay and show its definition
+;;   in another window. All you need to do is to move your point and enjoy the
+;;   convenience. (inspired by a commercial software, Source Insight)
+;; * `ws-goto-symbol':
+;;   Go to the definition of the symbol if any.
+;; * `ws-search-local-symbol':
+;;   Prompt user to search local symbols (symbols defined in current file).
+;; * `ws-search-global-symbol':
+;;   Prompt user to search symbols globally (symbols from multiple files or in 
+;;   a project, ...etc).
+;;
+;; Support Lanuages:
+;; ----------------
+;; * Emacs Lisp
+;; * Python
+;; * C++
+;;
+;; TODO:
+;; -----
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;;; Change Log:
 ;;
-;; 2014-10-31 (0.0.x)
+;; 2014-11-13
+;; * Initialize `ws-search-symbol-frontend' (minibuffer version).
+;;
+;; 2014-10-31
 ;; * Support asynchronous backends which use `deferred' library.
 ;;
-;; 2014-08-01 (0.0.1)
+;; 2014-10-23
+;; * Support preview of local variable like "let" for ELISP.
+;;
+;; 2014-10-15
+;; * Initialize `ws-goto-symbol-frontend'.
+;; * Support cases both of single or multiple candidates.
+;;
+;; 2014-09-30
+;; * Initialize `ws-symbol-preview-frontend' (bottom window version).
+;; * Initialize `ws-elisp-backend'.
+;; * Support cases both of single or multiple candidates.
+;;
+;; 2014-08-01
 ;; * Initial release which was inspired by `company-mode'.
 ;;   https://github.com/company-mode/company-mode
 ;;
@@ -41,7 +76,7 @@
 ;; GNU library.
 (eval-when-compile (require 'cl))
 
-;; whereis-symbol's library.
+;; Package's library.
 (and load-file-name
      (let ((dir (file-name-directory load-file-name)))
        (add-to-list 'load-path (concat dir "/frontends"))
