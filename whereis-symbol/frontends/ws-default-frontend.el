@@ -621,8 +621,11 @@ CANDIDATES list.")
                  (format "%s\n%s\n" (or matches "-- No Match --") mode-line))
     (set-window-text-height nil (max 3 (+ lines 2)))))
 
+(defun ws-is-idle-search-begin ()
+  (not (equal ws-search-symbol-match (minibuffer-contents))))
+
 (defun ws-idle-search-begin ()
-  (unless (equal ws-search-symbol-match (minibuffer-contents))
+  (when (ws-is-idle-search-begin)
     (setq ws-search-symbol-match (minibuffer-contents)
           ws-search-symbol-candidates (funcall ws-symbol-searcher
                                                ws-search-symbol-match)
@@ -689,6 +692,7 @@ CANDIDATES list.")
   (if ws-minibuffer-search-mode
       (progn
         (setq truncate-lines t
+              ws-search-symbol-match nil
               ws-search-symbol-timer (run-with-idle-timer 0.3 t
                                                           'ws-idle-search-begin))
         (add-hook 'post-command-hook 'ws-display-search-result nil t)
