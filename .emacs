@@ -10,7 +10,6 @@
  '(enable-local-eval nil)
  '(enable-local-variables nil)
  '(hl-line-sticky-flag nil)
- '(ido-mode (quote both) nil (ido))
  '(imenu-sort-function (quote imenu--sort-by-name))
  '(indent-tabs-mode nil)
  '(inhibit-default-init t)
@@ -40,6 +39,9 @@
 ;; Ctrl + ESC
 (global-set-key (kbd "C-x <escape>") 'delete-other-windows)
 
+;; Ctrl + x Ctrl + f
+(global-set-key (kbd "C-x C-f") 'helm-find-files)
+
 ;; Ctrl + w, command + w
 (global-set-key (kbd "C-w") 'oops-kill-buffer-or-window-or-frame)
 (global-set-key (kbd "s-w") 'oops-kill-buffer-or-window-or-frame)
@@ -49,12 +51,17 @@
 (global-set-key (kbd "C-S-d") 'oops-kill-lines)
 ;; Ctrl + z
 (global-set-key (kbd "C-z") 'oops-undo)
-
+;; Ctrl + f
+(global-set-key (kbd "C-f") 'helm-occur)
+;; Ctrl + c f
+(global-set-key (kbd "C-c f") 'helm-google-suggest)
 ;; Ctrl + l
 (global-set-key (kbd "C-l") 'goto-line)
-;; Ctrl + Alt + l
-(global-set-key (kbd "C-M-l") 'prj-list-files)
+;; Ctrl + b
+(global-set-key (kbd "C-b") 'helm-buffers-list)
 
+;; Alt + x
+(global-set-key (kbd "M-x") 'helm-M-x)
 ;; Ctrl + /
 (global-set-key (kbd "C-/") 'oops-toggle-comment)
 ;; Alt + /
@@ -70,14 +77,10 @@
 (global-set-key (kbd "M-]") 'his-next-history)
 
 ;; Ctrl + o
-(global-set-key (kbd "C-o") 'ws-search-local-symbol)
+(global-set-key (kbd "C-o") 'helm-imenu)
+(global-set-key (kbd "C-S-o") 'ws-search-symbol)
 ;; Ctrl + r
 (global-set-key (kbd "C-r") 'prj-find-file)
-;; Ctrl + Shift + o
-(global-set-key (kbd "C-S-o") 'oops-goto-global-symbol)
-
-;; Ctrl + x, Ctrl + b
-(global-set-key (kbd "C-x C-b") 'ido-switch-buffer)
 
 ;; Alt + left/right/up/down
 (global-set-key (kbd "M-<left>") 'oops-windmove-left)

@@ -18,6 +18,9 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+;; 3rd party library.
+(require 'grizzl)
+
 (defface prj-button-face
   '((t (:background "lightgrey" :foreground "black" :weight bold)))
   "Face for button."
@@ -346,10 +349,9 @@ remove one.\n"
     (:init)
     (:destroy)
     (:find-files
-     (let ((file (and (require 'grizzl)
-                      (grizzl-completing-read
-                       (format " [%s] find file" (prj-project-name))
-                       files))))
+     (let ((file (grizzl-completing-read-database
+                  (format "[%s] find file" (prj-project-name))
+                  files)))
        (when file
          (funcall 'prj-find-file-impl file))))))
 

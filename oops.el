@@ -267,9 +267,7 @@ or go back to just one window (by deleting all but the selected window)."
     (add-hook hook func t)))
 
 (defun oops-init-mode-hooks ()
-  (oops-add-hooks 'emacs-lisp-mode-hook `(hl-paren-mode
-                                          ,(and (require 'imenu)
-                                                'imenu-add-menubar-index)))
+  (oops-add-hooks 'emacs-lisp-mode-hook `(hl-paren-mode))
   (oops-add-hooks 'python-mode-hook)
   (oops-add-hooks 'c-mode-hook)
   (oops-add-hooks 'c++-mode-hook))
@@ -297,6 +295,11 @@ or go back to just one window (by deleting all but the selected window)."
 (require 'history)
 (require 'prj)
 (require 'whereis-symbol)
+(require 'grizzl-imenu)
+(require 'helm-imenu)
+(require 'helm-files)
+(require 'helm-net)
+(require 'helm-command)
 ;; Hooks.
 (oops-init-mode-hooks)
 ;; Emacs instance started from the GUI inherits a default set of environment
@@ -306,7 +309,10 @@ or go back to just one window (by deleting all but the selected window)."
   (exec-path-from-shell-initialize))
 ;; Mode line.
 (setq-default mode-line-format oops-default-mode-line)
-;; Company extension.
+;; helm
+(when (featurep 'helm)
+  (setq-default helm-buffers-fuzzy-matching t))
+;; company extension.
 (when (require 'company)
   (setq company-idle-delay 0)
   (setq company-minimum-prefix-length 1)

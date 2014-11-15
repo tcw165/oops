@@ -28,6 +28,9 @@
 ;; 2014-08-01 (0.0.1)
 ;;    Initial release.
 
+;; 3rd party library.
+(require 'grizzl)
+
 (defvar prj-total-files-cache nil)
 
 (defvar prj-process-grep nil)
@@ -186,18 +189,15 @@ Example:
            (prj-process-cat db-doctype db-all)))
        ;; Create fuzzy search table in the memory.
        (message "[%s] Initializing fuzzy search for files..." (prj-project-name))
-       (if (require 'grizzl)
-           (with-temp-buffer
-             (insert-file-contents-literally db-all)
-             (prj-export-data
-              (prj-total-files-cache-path)
-              (setq prj-total-files-cache
-                    (grizzl-make-index (split-string (buffer-string) "\n" t)))))
-         (message "[%s] Initialize fuzzy search for files... failed"
-                  (prj-project-name)))))))
+       (with-temp-buffer
+         (insert-file-contents-literally db-all)
+         (prj-export-data
+          (prj-total-files-cache-path)
+          (setq prj-total-files-cache (grizzl-make-database
+                                       (split-string (buffer-string) "\n" t)))))))))
 
 ;;;###autoload
-(defun prj-find-files-backend (command &optional doctypes filepaths other-format)
+(defun prj-find-files-backend (command &optional doctypes filepaths is-list)
   (case command
     (:init)
     (:destroy)
@@ -208,10 +208,10 @@ Example:
        (error "The parameter, filepaths, must be a list!"))
      (cond
       ;; Return "all" file ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-      ((and (null doctypes) (null filepaths) (null other-format))
+      ((and (null doctypes) (null filepaths) (null is-list))
        (prj-filedb-path "all"))
       ;; Return list of all files ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-      ((and (null doctypes) (null filepaths) other-format)
+      ((and (null doctypes) (null filepaths) is-list)
        prj-total-files-cache)
       ;; Others ... ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
       (t
@@ -232,10 +232,10 @@ Example:
              (dolist (filepath filepaths)
                (prj-process-sync-grep (expand-file-name filepath) temp1 temp2))
            (setq temp2 temp1))
-         (if other-format
+         (if is-list
              (with-temp-buffer
                (insert-file-contents-literally temp2)
-               (split-string (buffer-string) "\n" t))
+               (grizzl-make-database (split-string (buffer-string) "\n" t)))
            temp2)))))))
 
 ;;;###autoload

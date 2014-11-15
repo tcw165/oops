@@ -1,16 +1,9 @@
-;; (require 'grizzl)
-;; (grizzl-completing-read "> " (grizzl-make-index '("/Users/Boy/loopy/lib/python2.7/site-packages/atom/enum.py"
-;;                                                   "/Users/Boy/loopy/lib/python2.7/site-packages/atom/intenum.py"
-;;                                                   "/Users/Boy/Documents/_CPP/ycmd/cpp/ycm/Utils.cpp"
-;;                                                   "/Users/Boy/Documents/_CPP/ycmd/ycmd/completers/general/tests/testdata/filename_completer/test.cpp")))
+(require 'complete)
+(completing-read "prompt: " '("111" "222" "333" "444" "555" "666"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (require 'deferred)
-
-;; "highlight-things-in-a-highlighted-thing-0123456789"
-;; (indent-rigidly 672 881 2)
-;; `message'
 
 (deferred:$
   (deferred:next
