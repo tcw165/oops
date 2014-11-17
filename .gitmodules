@@ -4,6 +4,3 @@
 [submodule "whereis-symbol"]
 	path = whereis-symbol
 	url = https://github.com/boyw165/whereis-symbol.git
-[submodule "grizzl"]
-	path = grizzl
-	url = https://github.com/boyw165/grizzl.git
