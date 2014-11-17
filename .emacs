@@ -61,7 +61,7 @@
 (global-set-key (kbd "C-b") 'helm-buffers-list)
 
 ;; Alt + x
-(global-set-key (kbd "M-x") 'helm-M-x)
+;; (global-set-key (kbd "M-x") 'helm-M-x)
 ;; Ctrl + /
 (global-set-key (kbd "C-/") 'oops-toggle-comment)
 ;; Alt + /

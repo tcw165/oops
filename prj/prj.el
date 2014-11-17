@@ -327,6 +327,8 @@ user loads a project or unload a project."
 ;;;###autoload
 (defun prj-workspace-projects ()
   "Return a list containing projects' name in current workspace."
+  (unless (file-exists-p prj-workspace-path)
+    (make-directory prj-workspace-path t))
   (let (projects)
     (dolist (name (directory-files prj-workspace-path))
       (unless (member name '("." ".."))
@@ -503,8 +505,9 @@ user loads a project or unload a project."
 (defun prj-edit-project ()
   "Show configuration for editing project's setting."
   (interactive)
-  (and (prj-project-p)
-       (prj-show-frontends :edit-project)))
+  (if (prj-project-p)
+      (prj-show-frontends :edit-project)
+    (message "No project was loaded!")))
 
 ;;;###autoload
 (defun prj-load-project (&optional name)

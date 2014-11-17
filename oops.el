@@ -290,16 +290,16 @@ or go back to just one window (by deleting all but the selected window)."
        (add-to-list 'load-path (concat dir "/history"))
        (add-to-list 'load-path (concat dir "/prj"))
        (add-to-list 'load-path (concat dir "/whereis-symbol"))))
+(require 'exec-path-from-shell)
+(require 'helm-imenu)
+(require 'helm-files)
+(require 'helm-net)
+(require 'helm-command)
 ;; TODO: Deprecated after packaging following modules.
 (require 'hl-anything)
 (require 'history)
 (require 'prj)
 (require 'whereis-symbol)
-(require 'grizzl-imenu)
-(require 'helm-imenu)
-(require 'helm-files)
-(require 'helm-net)
-(require 'helm-command)
 ;; Hooks.
 (oops-init-mode-hooks)
 ;; Emacs instance started from the GUI inherits a default set of environment
@@ -320,9 +320,6 @@ or go back to just one window (by deleting all but the selected window)."
                             company-preview-frontend
                             company-echo-metadata-frontend))
   (setq company-backends `((company-elisp company-files)
-                           ;; (company-clang company-files)
-                           ,(and (require 'company-jedi)
-                                 '(company-jedi company-files))
                            (company-cmake company-files))))
 ;; smart-shift extension.
 (when (require 'smart-shift)
