@@ -57,7 +57,7 @@
 (global-set-key (kbd "C-z") 'oops-undo)
 ;; Ctrl + f
 (global-set-key (kbd "C-f") 'helm-occur)
-;; Ctrl + c f
+;; Ctrl + c, f
 (global-set-key (kbd "C-c f") 'helm-google-suggest)
 ;; Ctrl + l
 (global-set-key (kbd "C-l") 'goto-line)
