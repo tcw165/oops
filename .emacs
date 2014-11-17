@@ -47,8 +47,12 @@
 (global-set-key (kbd "s-w") 'oops-kill-buffer-or-window-or-frame)
 ;; Ctrl + d
 (global-set-key (kbd "C-d") 'oops-duplicate-lines)
-;; Ctrl + shift + d
+;; Ctrl + Shift + d
 (global-set-key (kbd "C-S-d") 'oops-kill-lines)
+;; Ctrl + Alt + Left
+(global-set-key (kbd "C-M-<left>") 'backward-sexp)
+;; Ctrl + Alt + Right
+(global-set-key (kbd "C-M-<right>") 'forward-sexp)
 ;; Ctrl + z
 (global-set-key (kbd "C-z") 'oops-undo)
 ;; Ctrl + f
