@@ -61,8 +61,8 @@
 (global-set-key (kbd "C-c f") 'helm-google-suggest)
 ;; Ctrl + l
 (global-set-key (kbd "C-l") 'goto-line)
-;; Ctrl + b
-(global-set-key (kbd "C-b") 'helm-buffers-list)
+;; Ctrl + tab
+(global-set-key (kbd "C-<tab>") 'helm-buffers-list)
 
 ;; Alt + x
 ;; (global-set-key (kbd "M-x") 'helm-M-x)
