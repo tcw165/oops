@@ -31,6 +31,8 @@
 (dolist (arch '(("elpa" . "http://melpa.milkbox.net/packages/")
                 ("marmalade" . "http://marmalade-repo.org/packages/")))
   (add-to-list 'package-archives arch t))
+;; activate all the packages (in particular autoloads)
+(package-initialize)
 ;; fetch the list of packages available 
 (package-refresh-contents)
 ;; install the missing packages
@@ -43,8 +45,6 @@
                    exec-path-from-shell))
   (unless (package-installed-p package)
     (package-install package)))
-;; activate all the packages (in particular autoloads)
-(package-initialize)
 
 (provide 'oops-install)
 ;;; oops-install.el ends here
