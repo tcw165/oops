@@ -94,7 +94,7 @@ project; Powerful selective grep string or regular expression in a project, etc.
   :group 'prj-group)
 
 (defcustom prj-document-types '(("Text" . "*.txt;*.md")
-                                ("Emacs Lisp" . ".emacs;*.el")
+                                ("Emacs Lisp" . ".emacs;*.el;*.el.gz")
                                 ("Shell" . ".bashrc;.bash_profile;.zshrc;*.sh")
                                 ("Python" . "*.py")
                                 ("Octave" . "*.m")
