@@ -268,6 +268,7 @@ or go back to just one window (by deleting all but the selected window)."
 
 (defun oops-init-mode-hooks ()
   (oops-add-hooks 'emacs-lisp-mode-hook `(hl-paren-mode))
+  (oops-add-hooks 'sh-mode)
   (oops-add-hooks 'python-mode-hook)
   (oops-add-hooks 'c-mode-hook)
   (oops-add-hooks 'c++-mode-hook))
