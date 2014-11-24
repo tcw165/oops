@@ -278,8 +278,6 @@ or go back to just one window (by deleting all but the selected window)."
   (dolist (arch '(("elpa" . "http://melpa.milkbox.net/packages/")
                   ("marmalade" . "http://marmalade-repo.org/packages/")))
     (add-to-list 'package-archives arch t))
-  ;; Install required packages.
-  ;; (package-install 'jedi)
   ;; Update `load-path' refer to `package-load-list'.
   (package-initialize))
 
@@ -297,11 +295,6 @@ or go back to just one window (by deleting all but the selected window)."
 (require 'helm-files)
 (require 'helm-net)
 (require 'helm-command)
-;; TODO: Deprecated after packaging following modules.
-(require 'hl-anything)
-(require 'history)
-(require 'prj)
-(require 'whereis-symbol)
 ;; Hooks.
 (oops-init-mode-hooks)
 ;; Emacs instance started from the GUI inherits a default set of environment
@@ -327,10 +320,13 @@ or go back to just one window (by deleting all but the selected window)."
 (when (require 'smart-shift)
   (global-smart-shift-mode 1))
 ;; Project management.
+(when (require 'history))
 (when (require 'prj)
   (unless (prj-load-recent-project)
     (prj-load-project)))
 (when (require 'whereis-symbol)
   (whereis-symbol-mode 1))
+(when (require 'hl-anything)
+  (hl-highlight-mode 1))
 
 (provide 'oops)
