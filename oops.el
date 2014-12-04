@@ -307,7 +307,9 @@ or go back to just one window (by deleting all but the selected window)."
   (setq-default helm-buffers-fuzzy-matching t))
 ;; ycmd
 (when (require 'ycmd)
-  (ycmd-setup))
+  (ycmd-setup)
+  (setq ycmd-server-command `("python"
+                              ,(expand-file-name "~/_CODE/ycmd/ycmd"))))
 ;; company extension.
 (when (and (require 'company)
            (require 'company-ycmd))
