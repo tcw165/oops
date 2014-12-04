@@ -94,10 +94,11 @@ project; Powerful selective grep string or regular expression in a project, etc.
   :group 'prj-group)
 
 (defcustom prj-document-types '(("Text" . "*.txt;*.md")
+                                ("Json" . "*.json")
+                                ("XML" . "*.xml")
                                 ("Emacs Lisp" . ".emacs;*.el;*.el.gz")
                                 ("Shell" . ".bashrc;.bash_profile;.zshrc;*.sh")
                                 ("Python" . "*.py")
-                                ("Octave" . "*.m")
                                 ("C/C++ Header" . "*.h;*.hxx;*.hpp")
                                 ("C/C++ Source" . "*.c;*.cxx;*.cpp"))
   "Categorize file names refer to specific matches and give them type names. 

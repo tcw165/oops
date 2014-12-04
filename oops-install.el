@@ -41,6 +41,8 @@
                    deferred
                    grizzl
                    company
+                   company-ycmd
+                   ycmd
                    helm
                    exec-path-from-shell))
   (unless (package-installed-p package)

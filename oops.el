@@ -291,10 +291,7 @@ or go back to just one window (by deleting all but the selected window)."
        (add-to-list 'load-path (concat dir "/whereis-symbol"))
        (add-to-list 'load-path (concat dir "/grizzl"))))
 (require 'exec-path-from-shell)
-(require 'helm-imenu)
-(require 'helm-files)
-(require 'helm-net)
-(require 'helm-command)
+
 ;; Hooks.
 (oops-init-mode-hooks)
 ;; Emacs instance started from the GUI inherits a default set of environment
@@ -305,17 +302,23 @@ or go back to just one window (by deleting all but the selected window)."
 ;; Mode line.
 (setq-default mode-line-format oops-default-mode-line)
 ;; helm
-(when (featurep 'helm)
+(when (and (require 'helm-imenu)
+           (require 'helm-files))
   (setq-default helm-buffers-fuzzy-matching t))
+;; ycmd
+(when (require 'ycmd)
+  (ycmd-setup))
 ;; company extension.
-(when (require 'company)
+(when (and (require 'company)
+           (require 'company-ycmd))
   (setq company-idle-delay 0)
   (setq company-minimum-prefix-length 1)
   (setq company-frontends `(company-pseudo-tooltip-unless-just-one-frontend
                             company-preview-frontend
                             company-echo-metadata-frontend))
   (setq company-backends `((company-elisp company-files)
-                           (company-cmake company-files))))
+                           (company-cmake company-files)
+                           (company-ycmd company-files))))
 ;; smart-shift extension.
 (when (require 'smart-shift)
   (global-smart-shift-mode 1))
