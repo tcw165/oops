@@ -329,8 +329,11 @@ or go back to just one window (by deleting all but the selected window)."
 (when (require 'prj)
   (unless (prj-load-recent-project)
     (prj-load-project)))
-(when (require 'whereis-symbol)
+(when (and (require 'whereis-symbol)
+           (prj-project-p))
   (whereis-symbol-mode 1))
+(when (require 'ws-ycmd-backend)
+  (add-to-list 'ws-backends 'ws-ycmd-backend t))
 (when (require 'hl-anything)
   (hl-highlight-mode 1))
 
