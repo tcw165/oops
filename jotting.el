@@ -114,3 +114,6 @@
 (font-lock-fontify-region (point-min) (point-max) t)
 ;; (font-lock-fontify-buffer)
 ;; `font-lock-keywords'
+
+(dolist (abc '(1 2 3 4 5))
+  )
