@@ -53,6 +53,9 @@
   (deferred:nextc it
     (lambda (x) (insert x))))
 
+(let* ())
+(let ())
+(lexical-let* ())
 (lexical-let ((count 0)
               (anm "-/|\\-")
               (end 60)
@@ -86,32 +89,28 @@
 ;; 111
 ;;   111
 ;;     111
-;;      111
+;;      111 111
 ;;         111
 ;;           111
 
 (font-lock-add-keywords nil
                         `(((lambda (limit)
-                             (message "linum = %s, col = %s, limit = %s, match-data = %s"
+                             (message "linum = %s, col = %s, point = %s, limit = %s"
                                       (line-number-at-pos)
                                       (current-column)
-                                      limit
-                                      (match-data))
-                             ;; (catch 'break
-                             ;;   (save-excursion
-                             ;;     (beginning-of-buffer)
-                             ;;     (while (re-search-forward "111" (min (point-at-eol) limit) t)
-                             ;;       (when (= (line-number-at-pos) 89)
-                             ;;         (throw 'break (match-data))))
-                             ;;     (end-of-buffer)))
-                             (when (= (line-number-at-pos) 89)
-                               ;; (beginning-of-line)
-                               (re-search-forward "111" limit t)
-                               (when (/= (line-number-at-pos) 89)
-                                 (set-match-data nil t))
-                               (match-data))
+                                      (point)
+                                      limit)
+
+                             (when (bobp)
+                               (message "-- beginning of buffer!"))
+                             (catch 'break
+                               (while (re-search-forward "111" limit t)
+                                 (when (= (line-number-at-pos) 89)
+                                   (throw 'break t))
+                                 nil))
                              )
                            0 'hl-symbol-face prepend))
                         'append)
-(font-lock-fontify-buffer)
+(font-lock-fontify-region (point-min) (point-max) t)
+;; (font-lock-fontify-buffer)
 ;; `font-lock-keywords'
