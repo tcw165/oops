@@ -53,9 +53,8 @@
   (deferred:nextc it
     (lambda (x) (insert x))))
 
-(let* ())
-(let ())
-(lexical-let* ())
+(let ((highlight 'highlight))
+  (message "%s" highlight))
 (lexical-let ((count 0)
               (anm "-/|\\-")
               (end 60)
@@ -89,31 +88,45 @@
 ;; 111
 ;;   111
 ;;     111
-;;      111 111
+;;      111 1111
 ;;         111
 ;;           111
 
 (font-lock-add-keywords nil
                         `(((lambda (limit)
-                             (message "linum = %s, col = %s, point = %s, limit = %s"
-                                      (line-number-at-pos)
-                                      (current-column)
-                                      (point)
-                                      limit)
-
-                             (when (bobp)
-                               (message "-- beginning of buffer!"))
                              (catch 'break
                                (while (re-search-forward "111" limit t)
                                  (when (= (line-number-at-pos) 89)
                                    (throw 'break t))
-                                 nil))
-                             )
+                                 nil)))
                            0 'hl-symbol-face prepend))
                         'append)
 (font-lock-fontify-region (point-min) (point-max) t)
 ;; (font-lock-fontify-buffer)
 ;; `font-lock-keywords'
 
-(dolist (abc '(1 2 3 4 5))
-  )
+/home/boyw165/.emacs.d/oops/whereis-symbol/frontends/ws-default-frontend.el
+~/123123???? \/12323.el
+c:\home\boyw165\.emacs.d\oops\whereis-symbol\frontends\ws-default-frontend.el
+~\font.xxcc
+d:\adsfadsfadsf\adsfadsfads\adsfadsfds
+~/.emacs.d/oops
+;; `ws-candidate-mode'
+;; Make number highlighted.
+(font-lock-add-keywords nil
+                        `(("\\<[0-9]+\\>"
+                           0 font-lock-keyword-face append))
+                        'append)
+;; Unix-liked path.
+(font-lock-add-keywords nil
+                        `(("~?\\(\/[-a-zA-Z0-9_.\\ *#$%@?|]*\\)+"
+                           0 font-lock-keyword-face append))
+                        'append)
+;; Windows path.
+(font-lock-add-keywords nil
+                        `(("\\(~\\|[a-zA-Z]:\\)\\(\\\\[-a-zA-Z0-9_. @]*\\)+"
+                           0 font-lock-keyword-face append))
+                        'append)
+(save-excursion
+  (font-lock-fontify-region (point-min) (point-max)))
+
