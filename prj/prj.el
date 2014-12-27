@@ -450,9 +450,9 @@ user loads a project or unload a project."
 ;;;###autoload
 (defun prj-find-file-impl (file)
   (when (file-exists-p file)
-    (his-add-position-type-history)
+    (his-add-history)
     (find-file file)
-    (his-add-position-type-history)))
+    (his-add-history)))
 
 ;;;###autoload
 (defun prj-search-project-impl (match &optional doctypes filepaths case-sensitive word-only)
@@ -577,9 +577,9 @@ project to be loaded."
           (kill-buffer)
         (and buffer (kill-buffer buffer))
         ;; Go to search buffer.
-        (his-add-position-type-history)
+        (his-add-history)
         (switch-to-buffer (prj-searchdb-buffer t) t t)
-        (his-add-position-type-history)))))
+        (his-add-history)))))
 
 ;;;###autoload
 (defun prj-list-files ()
