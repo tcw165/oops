@@ -49,7 +49,25 @@
 (defgroup history nil
   "A lightweight history utility.")
 
-(defcustom his-history-max 16
+(defgroup history-face nil
+  "Face of history.")
+
+(defface his-prompt
+  '((t (:inherit 'minibuffer-prompt)))
+  "Face of prompt when calling `his-goto-history'."
+  :group 'history-face)
+
+(defface his-current-history
+  '((t (:foreground "black" :background "gold1" :widget 'bold)))
+  "Face of symbol for current history when calling `his-goto-history'."
+  :group 'history-face)
+
+(defface his-other-history
+  '((t (:foreground "dim gray" :background "#d1f5ea")))
+  "Face of symbol for other history when calling `his-goto-history'."
+  :group 'history-face)
+
+(defcustom his-history-max 64
   "The maximum lenght of history."
   :type 'integer
   :group 'history)
@@ -67,7 +85,12 @@
 (defvar his-histories nil
   "The history database. see `his-add-history' for details.")
 
-(defvar his-index 0)
+(defvar his-index 0
+  "The index of current history in the database.")
+
+(defvar history-mode-map
+  (let ((map (make-sparse-keymap)))
+    map))
 
 (defun his-same-line? (pos1 pos2)
   (let ((line-pos1 (save-excursion
@@ -111,7 +134,8 @@
         ;; Remove it if its buffer was killed.
         (setq his-histories (delq history his-histories)))))
   ;; Update index if necessary.
-  (when (> his-index (length his-histories))
+  (when (and his-histories
+             (>= his-index (length his-histories)))
     (setq his-index (1- (length his-histories)))))
 
 (defun his-move-history (step)
@@ -123,8 +147,7 @@
     (setq his-index 0))))
 
 (defun his-use-current-history ()
-  (if (= (length his-histories) 0)
-      (message "[History] no history!")
+  (when (> (length his-histories) 0)
     (let* ((history (nth his-index his-histories))
            (marker (plist-get history :marker))
            (buffer (marker-buffer marker))
@@ -132,11 +155,59 @@
       ;; Switch to buffer.
       (switch-to-buffer buffer)
       ;; Update point.
-      (goto-char pos))
-    (message "[History] navigate to %s/%s."
-             (if (> (length his-histories) 0)
-                 (- (length his-histories) his-index) 0)
-             (length his-histories))))
+      (goto-char pos))))
+
+(defun his-undefined ()
+  "Empty command for keymap binding."
+  (interactive))
+
+(defun his-preview-prev-history ()
+  (interactive)
+  (when (minibufferp)
+    (delete-minibuffer-contents)
+    (setq his-index (1+ his-index))
+    (and (>= his-index (length his-histories))
+         (setq his-index (1- (length his-histories))))
+    (insert (his-histories-string))
+    (re-search-backward "\*")
+    ;; Use history and re-select minibuffer.
+    (his-use-current-history)
+    (select-window (active-minibuffer-window))))
+
+(defun his-preview-next-history ()
+  (interactive)
+  (when (minibufferp)
+    (delete-minibuffer-contents)
+    (setq his-index (1- his-index))
+    (and (< his-index 0)
+         (setq his-index 0))
+    (insert (his-histories-string))
+    (re-search-backward "\*")
+    ;; Use history and re-select minibuffer.
+    (his-use-current-history)
+    (select-window (active-minibuffer-window))))
+
+(defun his-preview-goto-history ()
+  (interactive)
+  (when (minibufferp)
+    (setq-default his-index his-index)
+    (throw 'exit t)))
+
+(defun his-histories-string ()
+  "Histories list string."
+  (let* ((total (length his-histories))
+         (prompt (propertize (format "History %d/%d: "
+                                     (- total his-index) total)
+                             'face 'his-prompt))
+         value)
+    (loop for i from 0 below total do
+          (setq value (concat value
+                              (if (= i (- total 1 his-index))
+                                  (propertize "*"
+                                              'face 'his-current-history)
+                                (propertize "."
+                                            ' face 'his-other-history)))))
+    (concat prompt value)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Public Functions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -167,19 +238,42 @@ the history will be deleted immediately."
   "Show histories in a pretty way."
   (interactive)
   (his-remove-invalid-history)
-  (message "[History] index/total = %s/%s\n[History] history = %s"
-           (if (> (length his-histories) 0)
-               (1+ his-index) 0)
-           (length his-histories)
-           his-histories))
+  (message (his-histories-string)))
 
 ;;;###autoload
 (defun his-goto-history ()
   (interactive)
-  )
+  (when (> (length his-histories) 0)
+    (minibuffer-with-setup-hook
+      (lambda ()
+        ;; Make index a buffer local variable so that user can return to
+        ;; original status.
+        (setq-local his-index his-index)
+        ;; Change minibuffer's local map.
+        (use-local-map (let ((map (make-sparse-keymap)))
+                         (define-key map [remap self-insert-command] 'his-undefined)
+                         (define-key map (kbd "<up>") 'his-undefined)
+                         (define-key map (kbd "<down>") 'his-undefined)
+                         (define-key map (kbd "<left>") 'his-preview-prev-history)
+                         (define-key map (kbd "<right>") 'his-preview-next-history)
+                         (define-key map (kbd "<escape>") 'exit-minibuffer)
+                         (define-key map (kbd "<return>") 'his-preview-goto-history)
+                         map)))
+      (let* ((str (his-histories-string))
+             (index (1+ (string-match "\*" str)))
+             (buffer (current-buffer))
+             (pos (point)))
+        (if (catch 'exit
+              (read-from-minibuffer "" (cons str index))
+              nil)
+            ;; Use history.
+            (his-use-current-history)
+          ;; Not to use history.
+          (switch-to-buffer buffer)
+          (goto-char pos))))))
 
 ;;;###autoload
-(defun his-discard-histories ()
+(defun his-kill-histories ()
   "Discard all the histories."
   (interactive)
   (setq his-index 0
@@ -199,8 +293,10 @@ the history will be deleted immediately."
       ;; If point is close from current history, use next/previous history.
       (when (and (eq buffer (current-buffer))
                  (his-same-line? (point) pos))
-        (his-move-history 1))))
-  (his-use-current-history))
+        (his-move-history 1)))
+    ;; Use history.
+    (his-use-current-history))
+  (his-show-history))
 
 ;;;###autoload
 (defun his-next-history ()
@@ -216,8 +312,10 @@ the history will be deleted immediately."
       ;; If point is close from current history, use next/previous history.
       (when (and (eq buffer (current-buffer))
                  (his-same-line? (point) pos))
-        (his-move-history -1))))
-  (his-use-current-history))
+        (his-move-history -1)))
+    ;; Use history.
+    (his-use-current-history))
+  (his-show-history))
 
 ;;;###autoload
 (define-minor-mode history-mode
@@ -246,7 +344,7 @@ the history will be deleted immediately."
   (define-key (default-value 'global-map) [menu-bar edit history-more]
     (cons "History..." (make-sparse-keymap "History Miscellaneous Function...")))
   (define-key (default-value 'global-map) [menu-bar edit history-more discard-history]
-    '(menu-item "Discard History" his-discard-histories
+    '(menu-item "Discard History" his-kill-histories
 		:enable (> (length his-histories) 0)
 		:help "Discard all the history"))
   (define-key (default-value 'global-map) [menu-bar edit history-more show-history]
