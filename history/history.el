@@ -1,9 +1,9 @@
-;;; history.el --- Smart navigation history engine.
+;;; history.el --- History utility for source code navigation.
 ;;
 ;; Copyright (C) 2014
 ;;
 ;; Author: boyw165
-;; Version: 20141204.1100
+;; Version: 20150103.1300
 ;; Package-Requires: ((emacs "24.3"))
 ;; Compatibility: GNU Emacs 24.3+
 ;;
@@ -209,43 +209,51 @@
                                             ' face 'his-other-history)))))
     (concat prompt value)))
 
-;; `tool-bar-map'
+(defun his-menu-enable? ()
+  (> (length his-histories) 0))
+
 (defun his-add-menu-items ()
-  ;; menu bar
-  (define-key (default-value 'global-map) [menu-bar edit separator-history]
-    '(menu-item "--"))
-  (define-key global-map [menu-bar edit history-group]
-    (cons "History" (make-sparse-keymap)))
-  (define-key global-map [menu-bar edit history-group discard-history]
-    '(menu-item "Kill All History" his-kill-histories
-		:enable (> (length his-histories) 0)))
-  (define-key global-map [menu-bar edit history-group show-history]
+  "Add menu and tool-bar buttons."
+  ;; Add menu bar.
+  (define-key-after global-map [menu-bar edit history-group]
+    (cons "History" (make-sparse-keymap))
+    'separator-search)
+  (define-key-after global-map [menu-bar edit history-group set-history]
+    '(menu-item "Add History" his-add-history))
+  (define-key-after (default-value 'global-map) [menu-bar edit history-group previous-history]
+    '(menu-item "Previous History" his-prev-history
+		:enable (his-menu-enable?)))
+  (define-key-after (default-value 'global-map) [menu-bar edit history-group next-history]
+    '(menu-item "Next History" his-next-history
+		:enable (his-menu-enable?)))
+  (define-key-after global-map [menu-bar edit history-group show-history]
     '(menu-item "List History" his-show-history
 		:help "List history in a buffer"))
-  (define-key (default-value 'global-map) [menu-bar edit history-group next-history]
-    '(menu-item "Next History" his-next-history
-		:enable (> (length his-histories) 0)))
-  (define-key (default-value 'global-map) [menu-bar edit history-group previous-history]
-    '(menu-item "Previous History" his-prev-history
-		:enable (> (length his-histories) 0)))
-  (define-key global-map [menu-bar edit history-group set-history]
-    '(menu-item "Add History" his-add-history))
-
-  ;; tool bar
+  (define-key-after global-map [menu-bar edit history-group discard-history]
+    '(menu-item "Kill All History" his-kill-histories
+		:enable (his-menu-enable?)))
+  ;; Add tool bar.
   (when tool-bar-mode
-    (define-key tool-bar-map [separator-history]
-      '("--"))
-    (define-key tool-bar-map [set-history]
-      '(menu-item "Set History" his-add-history
-                  :image (find-image '((:type xpm :file "images/add-history.xpm")))))
-    (define-key tool-bar-map [next-history]
-      '(menu-item "Next History" his-next-history
-                  :image (find-image '((:type xpm :file "images/next-history.xpm")))
-                  :enable (> (length his-histories) 0)))
-    (define-key tool-bar-map [previous-history]
+    (define-key-after tool-bar-map [separator-history]
+      '("--")
+      'paste)
+    (define-key-after tool-bar-map [add-history]
+      '(menu-item "Add History" his-add-history
+                  :image (find-image '((:type xpm :file "images/add-history.xpm"))))
+      'separator-history)
+    (define-key-after tool-bar-map [previous-history]
       '(menu-item "Previous History" his-prev-history
                   :image (find-image '((:type xpm :file "images/prev-history.xpm")))
-                  :enable (> (length his-histories) 0)))))
+                  :enable (his-menu-enable?))
+      'add-history)
+    (define-key-after tool-bar-map [next-history]
+      '(menu-item "Next History" his-next-history
+                  :image (find-image '((:type xpm :file "images/next-history.xpm")))
+                  :enable (his-menu-enable?))
+      'previous-history)))
+
+(defun remove-menu-items ()
+  )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Public Functions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -361,9 +369,8 @@ the history will be deleted immediately."
   :lighter " history"
   :global t
   (if history-mode
-      (progn
-        (his-add-menu-items))
-    ))
+      (his-add-menu-items)
+    (remove-menu-items)))
 
 (provide 'history)
 ;;; history.el ends here
