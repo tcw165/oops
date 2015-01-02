@@ -209,6 +209,44 @@
                                             ' face 'his-other-history)))))
     (concat prompt value)))
 
+;; `tool-bar-map'
+(defun his-add-menu-items ()
+  ;; menu bar
+  (define-key (default-value 'global-map) [menu-bar edit separator-history]
+    '(menu-item "--"))
+  (define-key global-map [menu-bar edit history-group]
+    (cons "History" (make-sparse-keymap)))
+  (define-key global-map [menu-bar edit history-group discard-history]
+    '(menu-item "Kill All History" his-kill-histories
+		:enable (> (length his-histories) 0)))
+  (define-key global-map [menu-bar edit history-group show-history]
+    '(menu-item "List History" his-show-history
+		:help "List history in a buffer"))
+  (define-key (default-value 'global-map) [menu-bar edit history-group next-history]
+    '(menu-item "Next History" his-next-history
+		:enable (> (length his-histories) 0)))
+  (define-key (default-value 'global-map) [menu-bar edit history-group previous-history]
+    '(menu-item "Previous History" his-prev-history
+		:enable (> (length his-histories) 0)))
+  (define-key global-map [menu-bar edit history-group set-history]
+    '(menu-item "Add History" his-add-history))
+
+  ;; tool bar
+  (when tool-bar-mode
+    (define-key tool-bar-map [separator-history]
+      '("--"))
+    (define-key tool-bar-map [set-history]
+      '(menu-item "Set History" his-add-history
+                  :image (find-image '((:type xpm :file "images/add-history.xpm")))))
+    (define-key tool-bar-map [next-history]
+      '(menu-item "Next History" his-next-history
+                  :image (find-image '((:type xpm :file "images/next-history.xpm")))
+                  :enable (> (length his-histories) 0)))
+    (define-key tool-bar-map [previous-history]
+      '(menu-item "Previous History" his-prev-history
+                  :image (find-image '((:type xpm :file "images/prev-history.xpm")))
+                  :enable (> (length his-histories) 0)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Public Functions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -324,74 +362,8 @@ the history will be deleted immediately."
   :global t
   (if history-mode
       (progn
-        )
+        (his-add-menu-items))
     ))
-
-;;;###autoload
-(defun his-add-menu-and-toolbar-item ()
-  ;; menu bar
-  (define-key (default-value 'global-map) [menu-bar edit separator-history]
-    '(menu-item "--"))
-
-  ;; .------------------.
-  ;; | Next History     |
-  ;; | Previous History |
-  ;; | History....-----------------.
-  ;; |           | Set History     |
-  ;; ~ ~ ~ ~ ~ ~ | Show History    |
-  ;;             | Discard History |
-  ;;             '-----------------'
-  (define-key (default-value 'global-map) [menu-bar edit history-more]
-    (cons "History..." (make-sparse-keymap "History Miscellaneous Function...")))
-  (define-key (default-value 'global-map) [menu-bar edit history-more discard-history]
-    '(menu-item "Discard History" his-kill-histories
-		:enable (> (length his-histories) 0)
-		:help "Discard all the history"))
-  (define-key (default-value 'global-map) [menu-bar edit history-more show-history]
-    '(menu-item "List History" his-show-history
-		:help "List history in a buffer"))
-  (define-key (default-value 'global-map) [menu-bar edit history-more set-history]
-    '(menu-item "Set History" his-add-history
-		:help "Add a history refer to current buffer and point"))
-
-  ;; .------------------.
-  ;; | Next History     |
-  ;; | Previous History |
-  ;; | History...       |
-  ;; |                  |
-  ;; ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
-  ;; (define-key global-map [menu-bar edit next-history]
-  ;;   '("Next History" . his-next-history))
-  (define-key (default-value 'global-map) [menu-bar edit next-history]
-    '(menu-item "Next History" his-next-history
-		:enable (> (length his-histories) 0)
-		:help "Go to next history"))
-  (define-key (default-value 'global-map) [menu-bar edit previous-history]
-    '(menu-item "Previous History" his-prev-history
-		:enable (> (length his-histories) 0)
-		:help "Go to previous history"))
-
-  ;; tool bar
-  (when tool-bar-mode
-    (define-key (default-value 'tool-bar-map) [separator-history]
-      '("--"))
-    (define-key (default-value 'tool-bar-map) [set-history]
-      '(menu-item "Set History" his-add-history
-                  :image (find-image '((:type xpm :file "set-history.xpm")))
-                  :help "Add a history refer to current buffer and point"))
-    (define-key (default-value 'tool-bar-map) [next-history]
-      '(menu-item "Next History" his-next-history
-                  :image (find-image '((:type xpm :file "next-history.xpm")))
-                  :enable (> (length his-histories) 0)
-                  :help "Go to next history"))
-    (define-key (default-value 'tool-bar-map) [previous-history]
-      '(menu-item "Previous History" his-prev-history
-                  :image (find-image '((:type xpm :file "prev-history.xpm")))
-                  :enable (> (length his-histories) 0)
-                  :help "Go to previous history"))))
-
-;; Automatically add menu items of this feature.
-(his-add-menu-and-toolbar-item)
 
 (provide 'history)
 ;;; history.el ends here
