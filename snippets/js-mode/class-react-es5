@@ -1,0 +1,17 @@
+# -*- mode: snippet -*-
+#name : ReactClass ES5
+# --
+var ${1:SomeClass} = React.createClass({
+
+  getInitialState: function() {
+    return {};
+  },
+
+  render: function() {
+    return (
+      $0
+    );
+  }
+});
+
+module.exports = $1;

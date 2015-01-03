@@ -1,0 +1,4 @@
+# -*- mode: snippet -*-
+#name : Flux dispatcher
+# --
+var Dispatcher = require('flux').Dispatcher;$0

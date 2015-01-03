@@ -1,0 +1,9 @@
+# -*- mode: snippet -*-
+#name : ES6 class
+# --
+/**
+ * Description ...
+ */
+class ${1:SomeClass} {
+  constructor() {$0}
+};

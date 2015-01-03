@@ -1,0 +1,11 @@
+# -*- mode: snippet -*-
+#name : doctype
+# --
+doctype ${1:$$(yas-choose-value '("html" "xml" "transitional" "strict" "frameset" "1.1" "basic" "mobile"))}
+$1
+  head
+    block head
+      $2
+  body
+    block content
+      $3

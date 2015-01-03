@@ -1,0 +1,4 @@
+# -*- mode: snippet -*-
+#name : ES5 require
+# --
+var ${1:module} = require('$0$1');

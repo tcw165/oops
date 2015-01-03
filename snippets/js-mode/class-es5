@@ -1,0 +1,16 @@
+# -*- mode: snippet -*-
+#name : ES5 class
+# --
+/**
+ * Description ...
+ */
+function ${1:name} ($2) {
+  if (!(this instanceof $1)) {
+    return new $1($2);
+  }
+  // super();
+  $0
+}
+
+// Don't use $1.prototype = { ... }, which will kill its original constructor.
+// $1.prototype.$3 = function() {};

@@ -1,0 +1,29 @@
+# -*- mode: snippet -*-
+#name : singleton sample
+# --
+/**
+ * Some Singleton
+ */
+var $1 = (function() {
+  // Instance stores a reference to the Singleton.
+  var instance;
+
+  function init() {
+    // Singleton ///////////////////////////////////////////////////////////////
+    // Private /////////////////////////////////////////////////////////////////
+    $0
+
+    // Public //////////////////////////////////////////////////////////////////
+    return {};
+  }
+
+  return {
+    getInstance: function() {
+      if (!instance) {
+        instance = init();
+      }
+
+      return instance;
+    }
+  };
+})();

@@ -1,6 +1,6 @@
 ;;; oops-install.el --- Install oops and its prerequisities.
 ;;
-;; Copyright (C) 2014
+;; Copyright (C) 2014, 2015
 ;;
 ;; Author: boyw165
 ;; Package-Requires: ((emacs "24.3"))
@@ -28,23 +28,45 @@
 ;;; Code:
 
 (require 'package)
-(dolist (arch '(("elpa" . "http://melpa.milkbox.net/packages/")
-                ("marmalade" . "http://marmalade-repo.org/packages/")))
+(dolist (arch '(("melpa-stable" . "https://stable.melpa.org/packages/")
+                ("melpa" . "http://melpa.milkbox.net/packages/")))
   (add-to-list 'package-archives arch t))
-;; activate all the packages (in particular autoloads)
+;; Activate all the packages (in particular autoloads).
 (package-initialize)
-;; fetch the list of packages available 
+;; Fetch the list of packages available.
 (package-refresh-contents)
-;; install the missing packages
-(dolist (package '(hl-anything
-                   smart-shift
+;; Install the missing packages.
+(dolist (package '(;; Packages Owned by Myself
+                   history
+                   hl-anything
+                   searchq
+                   ;; Async
                    deferred
-                   grizzl
+                   exec-path-from-shell
+                   ;; Key
+                   guide-key
+                   ;; Edit.
+                   smart-shift
+                   ;; Version Control.
+                   diff-hl
+                   ;; Completion Framework.
                    company
-                   company-ycmd
-                   ycmd
                    helm
-                   exec-path-from-shell))
+                   ;; Yasnippet
+                   yasnippet
+                   ;; Project Management.
+                   projectile
+                   ;; YCMD
+                   ycmd
+                   company-ycmd
+                   ;; Json
+                   json-mode
+                   ;; JavaScript
+                   tern
+                   company-tern
+                   ;; Jade/Styl
+                   jade-mode
+                   stylus-mode))
   (unless (package-installed-p package)
     (package-install package)))
 

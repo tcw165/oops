@@ -1,9 +1,15 @@
 [submodule "hl-anything"]
 	path = hl-anything
 	url = https://github.com/boyw165/hl-anything.git
-[submodule "whereis-symbol"]
-	path = whereis-symbol
-	url = https://github.com/boyw165/whereis-symbol.git
-[submodule "grizzl"]
-	path = grizzl
-	url = https://github.com/boyw165/grizzl.git
+	branch = master
+[submodule "history"]
+	path = history
+	url = https://github.com/boyw165/history.git
+	branch = master
+[submodule "whereis"]
+	path = whereis
+	url = https://github.com/boyw165/whereis.git
+	branch = master
+[submodule "searchq"]
+	path = searchq
+	url = https://github.com/boyw165/searchq.git

@@ -1,0 +1,4 @@
+# -*- mode: snippet -*-
+#name : bind(this)
+# --
+bind(${1:this})$0

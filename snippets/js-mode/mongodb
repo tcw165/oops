@@ -1,0 +1,4 @@
+# -*- mode: snippet -*-
+#name : import/require MongoClient
+# --
+var MongoClient = require('mongodb').MongoClient;

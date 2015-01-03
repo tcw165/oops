@@ -1,0 +1,7 @@
+# -*- mode: snippet -*-
+#name : /** ... */ style comment
+# --
+/**
+ * Description$0
+ *
+ */
