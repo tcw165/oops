@@ -88,12 +88,15 @@
 
 ;; GNU Library.
 (require 'thingatpt)
+(require 'tool-bar)
+(eval-when-compile (require 'cl))
 
 (defgroup history nil
   "A lightweight history utility.")
 
 (defgroup history-face nil
-  "Face of history.")
+  "Face of history."
+  :group 'history)
 
 (defface his-prompt
   '((t (:inherit 'minibuffer-prompt)))
@@ -113,11 +116,6 @@
 (defcustom his-history-max 64
   "The maximum lenght of history."
   :type 'integer
-  :group 'history)
-
-(defcustom his-history-savepath "~/.emacs.d/.history"
-  "Path of cached history."
-  :type 'string
   :group 'history)
 
 (defcustom his-ignore-buffer-names '("\*.*\*")
@@ -249,7 +247,11 @@
     (concat prompt value)))
 
 (defun his-menu-enable? ()
-  (> (length his-histories) 0))
+  (catch 'ignore
+    (dolist (ignore his-ignore-buffer-names)
+      (when (string-match ignore (buffer-name))
+        (throw 'ignore nil)))
+    (> (length his-histories) 0)))
 
 (defun his-add-menu-items ()
   "Add menu and tool-bar buttons."
@@ -312,18 +314,18 @@ IS-THING? is t, it will cache the symbol string at point (if any) and use it as
 a comparison in checking algorithm when navigating to it. If they are not matched, 
 the history will be deleted immediately."
   (interactive)
-  (let (history
-        (thing (thing-at-point 'symbol t)))
-    ;; Create history.
-    (setq history (plist-put history :marker (copy-marker (point) t)))
-    ;; Cache the symbol string if necessary.q
-    (and is-thing? thing
-         (setq history (plist-put history :symbol thing)))
-    ;; Add to databse.
-    (catch 'ignore
-      (dolist (ignore his-ignore-buffer-names)
-        (when (string-match ignore (buffer-name))
-          (throw 'ignore (message "ignore"))))
+  (catch 'ignore
+    (dolist (ignore his-ignore-buffer-names)
+      (when (string-match ignore (buffer-name))
+        (throw 'ignore nil)))
+    (let (history
+          (thing (thing-at-point 'symbol t)))
+      ;; Create history.
+      (setq history (plist-put history :marker (copy-marker (point) t)))
+      ;; Cache the symbol string if necessary.q
+      (and is-thing? thing
+           (setq history (plist-put history :symbol thing)))
+      ;; Add to databse.
       (his-add-history-internal history))))
 
 ;;;###autoload
