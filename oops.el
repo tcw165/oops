@@ -635,6 +635,11 @@ STEP means move backwardly. Notice: It won't modify `kill-ring'."
 ;;   (setq ycmd-server-command `("python"
 ;;                               ,(expand-file-name "~/_CODE/ycmd/ycmd"))))
 
+(when (ignore-errors
+        (require 'neotree))
+  (custom-set-variables
+   '(neo-window-width 40)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Necessary Minor Modes ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -700,7 +705,7 @@ STEP means move backwardly. Notice: It won't modify `kill-ring'."
 (global-set-key (kbd "C-o") 'helm-imenu)
 (global-set-key (kbd "C-r") 'oops-project-prefix-map)
 (global-set-key (kbd "C-r b") 'projectile-find-file)
-(global-set-key (kbd "C-r f") 'speedbar)
+(global-set-key (kbd "C-r f") 'neotree-toggle)
 ;; (global-set-key (kbd "C-r d") 'prj-delete-project)
 ;; (global-set-key (kbd "C-r f") 'prj-search-project)
 ;; (global-set-key (kbd "C-r l") 'prj-load-project)

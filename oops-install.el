@@ -43,6 +43,8 @@
                    ;; Async
                    deferred
                    exec-path-from-shell
+                   ;; File Browser.
+                   neotree
                    ;; Key
                    guide-key
                    ;; Edit.
